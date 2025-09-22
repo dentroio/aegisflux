@@ -72,3 +72,6 @@ go run cmd/sender/main.go ../../../data/samples/events_multiple.json
 
 
 
+
+
+

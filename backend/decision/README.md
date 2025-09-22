@@ -25,7 +25,7 @@ The Decision Service is responsible for creating and managing agentic decision p
 
 Environment variables:
 
-- `DECISION_HTTP_ADDR` - HTTP server address (default: `:8083`)
+- `DECISION_HTTP_ADDR` - HTTP server address (default: `:8087`)
 - `DECISION_NATS_URL` - NATS server URL (default: `nats://localhost:4222`)
 - `DECISION_MAX_PLANS` - Maximum number of plans to store (default: `1000`)
 - `DECISION_LOG_LEVEL` - Log level (default: `INFO`)
@@ -58,7 +58,7 @@ go build -o decision ./cmd/decision
 docker build -t aegisflux/decision:latest .
 
 # Run the container
-docker run -p 8083:8083 \
+docker run -p 8087:8087 \
   -e DECISION_NATS_URL=nats://nats:4222 \
   aegisflux/decision:latest
 ```
@@ -68,7 +68,7 @@ docker run -p 8083:8083 \
 ### Using Finding ID
 
 ```bash
-curl -X POST http://localhost:8083/plans \
+curl -X POST http://localhost:8087/plans \
   -H "Content-Type: application/json" \
   -d '{
     "finding_id": "finding-123",
@@ -79,7 +79,7 @@ curl -X POST http://localhost:8083/plans \
 ### Using Inline Finding
 
 ```bash
-curl -X POST http://localhost:8083/plans \
+curl -X POST http://localhost:8087/plans \
   -H "Content-Type: application/json" \
   -d '{
     "finding": {
@@ -152,14 +152,14 @@ This is a scaffold implementation. The following components will be implemented 
 
 ```bash
 # Test health endpoint
-curl http://localhost:8083/healthz
+curl http://localhost:8087/healthz
 
 # Test readiness endpoint
-curl http://localhost:8083/readyz
+curl http://localhost:8087/readyz
 
 # List all plans
-curl http://localhost:8083/plans
+curl http://localhost:8087/plans
 
 # Get specific plan
-curl http://localhost:8083/plans/plan-123
+curl http://localhost:8087/plans/plan-123
 ```

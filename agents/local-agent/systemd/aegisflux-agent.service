@@ -44,7 +44,7 @@ CPUQuota=50%
 Environment=AGENT_HOST_ID=%i
 Environment=AGENT_LOG_LEVEL=info
 Environment=AGENT_CACHE_DIR=/tmp/aegisflux-agent
-Environment=AGENT_REGISTRY_URL=http://bpf-registry:8084
+Environment=AGENT_REGISTRY_URL=http://bpf-registry:8090
 Environment=AGENT_NATS_URL=nats://nats:4222
 Environment=AGENT_VAULT_URL=http://vault:8200
 

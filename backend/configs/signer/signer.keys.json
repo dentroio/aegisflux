@@ -1,0 +1,21 @@
+{
+  "active": {
+    "kid": "default-key-1",
+    "public_key": "dummy-public-key-replace-with-actual-key",
+    "private_key": "dummy-private-key-replace-with-actual-key",
+    "algorithm": "Ed25519",
+    "created_at": "2025-09-19T13:00:00Z",
+    "expires_at": "2026-09-19T13:00:00Z"
+  },
+  "keys": [
+    {
+      "kid": "default-key-1",
+      "public_key": "dummy-public-key-replace-with-actual-key",
+      "private_key": "dummy-private-key-replace-with-actual-key",
+      "algorithm": "Ed25519",
+      "created_at": "2025-09-19T13:00:00Z",
+      "expires_at": "2026-09-19T13:00:00Z"
+    }
+  ]
+}
+

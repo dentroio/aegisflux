@@ -1,0 +1,10 @@
+{
+  "target_ip": "8.8.8.8",
+  "protocol": "icmp",
+  "direction": "egress",
+  "interface": "eth0",
+  "priority": 100,
+  "ttl": 3600,
+  "action": "drop",
+  "hook_type": "tc_egress"
+}

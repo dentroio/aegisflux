@@ -64,7 +64,7 @@ The service can be configured using environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BPF_REGISTRY_HTTP_ADDR` | `:8084` | HTTP server address |
+| `BPF_REGISTRY_HTTP_ADDR` | `:8090` | HTTP server address |
 | `BPF_REGISTRY_DATA_DIR` | `/data/artifacts` | Directory for storing artifacts |
 | `BPF_REGISTRY_LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARN, ERROR) |
 
@@ -79,7 +79,7 @@ docker build -t aegisflux-bpf-registry .
 # Run the container
 docker run -d \
   --name bpf-registry \
-  -p 8084:8084 \
+  -p 8090:8090 \
   -v /path/to/artifacts:/data/artifacts \
   -e BPF_REGISTRY_DATA_DIR=/data/artifacts \
   aegisflux-bpf-registry

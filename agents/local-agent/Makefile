@@ -82,7 +82,7 @@ run:
 run-dev:
 	@echo "Running agent in development mode..."
 	AGENT_HOST_ID=localhost \
-	AGENT_REGISTRY_URL=http://localhost:8084 \
+	AGENT_REGISTRY_URL=http://localhost:8090 \
 	AGENT_POLL_INTERVAL_SEC=10 \
 	AGENT_NATS_URL=nats://localhost:4222 \
 	AGENT_VAULT_URL=http://localhost:8200 \
@@ -103,7 +103,7 @@ docker-run:
 		--privileged \
 		-v /sys/fs/bpf:/sys/fs/bpf \
 		-e AGENT_HOST_ID=localhost \
-		-e AGENT_REGISTRY_URL=http://host.docker.internal:8084 \
+		-e AGENT_REGISTRY_URL=http://host.docker.internal:8090 \
 		-e AGENT_NATS_URL=nats://host.docker.internal:4222 \
 		-e AGENT_VAULT_URL=http://host.docker.internal:8200 \
 		aegisflux/local-agent:latest

@@ -18,7 +18,7 @@ func ExampleOrchestration() error {
 	// Configuration
 	templatesDir := "/path/to/bpf-templates"
 	outputDir := "/tmp/bpf-orchestrator"
-	registryURL := "http://localhost:8084"
+	registryURL := "http://localhost:8090"
 	authToken := "your-auth-token"
 
 	// Create orchestrator
@@ -92,7 +92,7 @@ func ExampleBatchOrchestration() error {
 	// Configuration
 	templatesDir := "/path/to/bpf-templates"
 	outputDir := "/tmp/bpf-orchestrator"
-	registryURL := "http://localhost:8084"
+	registryURL := "http://localhost:8090"
 	authToken := "your-auth-token"
 
 	orchestrator := NewOrchestrator(logger, templatesDir, outputDir, registryURL, authToken)
@@ -156,7 +156,7 @@ func ExampleTemplateValidation() error {
 
 	templatesDir := "/path/to/bpf-templates"
 	outputDir := "/tmp/bpf-orchestrator"
-	registryURL := "http://localhost:8084"
+	registryURL := "http://localhost:8090"
 	authToken := "your-auth-token"
 
 	orchestrator := NewOrchestrator(logger, templatesDir, outputDir, registryURL, authToken)
@@ -189,7 +189,7 @@ func ExampleErrorHandling() error {
 	// Configuration with invalid values to trigger errors
 	templatesDir := "/nonexistent/templates"
 	outputDir := "/tmp/bpf-orchestrator"
-	registryURL := "http://localhost:8084"
+	registryURL := "http://localhost:8090"
 	authToken := "invalid-token"
 
 	orchestrator := NewOrchestrator(logger, templatesDir, outputDir, registryURL, authToken)
@@ -239,7 +239,7 @@ func ExampleCleanup() error {
 
 	templatesDir := "/path/to/bpf-templates"
 	outputDir := "/tmp/bpf-orchestrator"
-	registryURL := "http://localhost:8084"
+	registryURL := "http://localhost:8090"
 	authToken := "your-auth-token"
 
 	orchestrator := NewOrchestrator(logger, templatesDir, outputDir, registryURL, authToken)

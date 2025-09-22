@@ -13,3 +13,4 @@ echo "[*] bundle security-monitor-v1 (headers):"
 curl -I ${REG}/bundles/security-monitor-v1
 
 
+

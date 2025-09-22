@@ -95,7 +95,7 @@ The agent is configured through environment variables:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AGENT_HOST_ID` | `localhost` | Unique identifier for this host |
-| `AGENT_REGISTRY_URL` | `http://localhost:8084` | BPF Registry API URL |
+| `AGENT_REGISTRY_URL` | `http://localhost:8090` | BPF Registry API URL |
 | `AGENT_POLL_INTERVAL_SEC` | `30` | Polling interval in seconds |
 | `AGENT_NATS_URL` | `nats://localhost:4222` | NATS connection URL |
 | `AGENT_VAULT_URL` | `http://localhost:8200` | Vault server URL |
@@ -164,7 +164,7 @@ go build -o local-agent .
 ```bash
 # Set environment variables
 export AGENT_HOST_ID="host-001"
-export AGENT_REGISTRY_URL="http://localhost:8084"
+export AGENT_REGISTRY_URL="http://localhost:8090"
 export AGENT_NATS_URL="nats://localhost:4222"
 
 # Run the agent
@@ -182,7 +182,7 @@ docker run --rm -it \
   --privileged \
   -v /sys/fs/bpf:/sys/fs/bpf \
   -e AGENT_HOST_ID=host-001 \
-  -e AGENT_REGISTRY_URL=http://registry:8084 \
+  -e AGENT_REGISTRY_URL=http://bpf-registry:8090 \
   -e AGENT_NATS_URL=nats://nats:4222 \
   aegisflux/local-agent:latest
 ```
@@ -214,7 +214,7 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         - name: AGENT_REGISTRY_URL
-          value: "http://bpf-registry:8084"
+          value: "http://bpf-registry:8090"
         - name: AGENT_NATS_URL
           value: "nats://nats:4222"
         volumeMounts:

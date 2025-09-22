@@ -8,8 +8,3 @@ services:
     image: nats:2.10
     command: [ "-js", "-m", "8222", "-DV" ]
     ports: [ "4222:4222", "8222:8222" ]
-
-  registry:
-    build: ./backend/registry
-    environment: [ "REGISTRY_ADDR=:8090" ]
-    ports: [ "8090:8090" ]

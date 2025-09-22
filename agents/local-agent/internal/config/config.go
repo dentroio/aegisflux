@@ -41,7 +41,7 @@ type Config struct {
 func Load() (*Config, error) {
 	cfg := &Config{
 		HostID:           getEnv("AGENT_HOST_ID", "localhost"),
-		RegistryURL:      getEnv("AGENT_REGISTRY_URL", "http://localhost:8084"),
+		RegistryURL:      getEnv("AGENT_REGISTRY_URL", "http://localhost:8090"),
 		PollInterval:     getDurationEnv("AGENT_POLL_INTERVAL_SEC", 30*time.Second),
 		NATSURL:          getEnv("AGENT_NATS_URL", "nats://localhost:4222"),
 		VaultURL:         getEnv("AGENT_VAULT_URL", "http://localhost:8200"),

@@ -31,7 +31,7 @@ type AppConfig struct {
 // loadConfig loads configuration from environment variables
 func loadConfig() *AppConfig {
 	appConfig := &AppConfig{
-		HTTPAddr:      getEnv("DECISION_HTTP_ADDR", ":8083"),
+		HTTPAddr:      getEnv("DECISION_HTTP_ADDR", ":8087"),
 		NATSURL:       getEnv("DECISION_NATS_URL", "nats://localhost:4222"),
 		ConfigAPIURL:  getEnv("CONFIG_API_URL", "http://localhost:8085"),
 		MaxPlans:      getEnvInt("DECISION_MAX_PLANS", 1000),

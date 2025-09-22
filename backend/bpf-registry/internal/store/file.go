@@ -296,3 +296,99 @@ func (s *FileStore) metadataToArtifact(id string, metadata map[string]interface{
 
 	return artifact, nil
 }
+
+// AssignArtifactToHost assigns an artifact to a specific host
+func (s *FileStore) AssignArtifactToHost(artifactID, hostID string) error {
+	s.logger.Info("Assigning artifact to host", "artifact_id", artifactID, "host_id", hostID)
+
+	// Get current artifact
+	artifact, err := s.GetArtifact(artifactID)
+	if err != nil {
+		return fmt.Errorf("failed to get artifact: %w", err)
+	}
+
+	// Check if host is already assigned
+	for _, existingHost := range artifact.Hosts {
+		if existingHost == hostID {
+			s.logger.Info("Host already assigned to artifact", "artifact_id", artifactID, "host_id", hostID)
+			return nil // Already assigned, no error
+		}
+	}
+
+	// Add host to the list
+	artifact.Hosts = append(artifact.Hosts, hostID)
+
+	// Save updated artifact metadata
+	metadata := s.artifactToMetadata(artifact)
+	err = s.fsStore.SaveArtifactMetadata(artifactID, metadata)
+	if err != nil {
+		return fmt.Errorf("failed to save artifact metadata: %w", err)
+	}
+
+	s.logger.Info("Successfully assigned artifact to host", "artifact_id", artifactID, "host_id", hostID)
+	return nil
+}
+
+// UnassignArtifactFromHost removes a host assignment from an artifact
+func (s *FileStore) UnassignArtifactFromHost(artifactID, hostID string) error {
+	s.logger.Info("Unassigning artifact from host", "artifact_id", artifactID, "host_id", hostID)
+
+	// Get current artifact
+	artifact, err := s.GetArtifact(artifactID)
+	if err != nil {
+		return fmt.Errorf("failed to get artifact: %w", err)
+	}
+
+	// Remove host from the list
+	newHosts := make([]string, 0, len(artifact.Hosts))
+	found := false
+	for _, existingHost := range artifact.Hosts {
+		if existingHost != hostID {
+			newHosts = append(newHosts, existingHost)
+		} else {
+			found = true
+		}
+	}
+
+	if !found {
+		s.logger.Info("Host was not assigned to artifact", "artifact_id", artifactID, "host_id", hostID)
+		return nil // Not assigned, no error
+	}
+
+	artifact.Hosts = newHosts
+
+	// Save updated artifact metadata
+	metadata := s.artifactToMetadata(artifact)
+	err = s.fsStore.SaveArtifactMetadata(artifactID, metadata)
+	if err != nil {
+		return fmt.Errorf("failed to save artifact metadata: %w", err)
+	}
+
+	s.logger.Info("Successfully unassigned artifact from host", "artifact_id", artifactID, "host_id", hostID)
+	return nil
+}
+
+// UpdateArtifactHosts updates the complete host list for an artifact
+func (s *FileStore) UpdateArtifactHosts(artifactID string, hosts []string) error {
+	s.logger.Info("Updating artifact hosts", "artifact_id", artifactID, "hosts", hosts)
+
+	// Get current artifact
+	artifact, err := s.GetArtifact(artifactID)
+	if err != nil {
+		return fmt.Errorf("failed to get artifact: %w", err)
+	}
+
+	// Update hosts list
+	artifact.Hosts = make([]string, len(hosts))
+	copy(artifact.Hosts, hosts)
+
+	// Save updated artifact metadata
+	metadata := s.artifactToMetadata(artifact)
+	err = s.fsStore.SaveArtifactMetadata(artifactID, metadata)
+	if err != nil {
+		return fmt.Errorf("failed to save artifact metadata: %w", err)
+	}
+
+	s.logger.Info("Successfully updated artifact hosts", "artifact_id", artifactID, "host_count", len(hosts))
+	return nil
+}

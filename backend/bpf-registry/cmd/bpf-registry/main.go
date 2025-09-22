@@ -23,7 +23,7 @@ type Config struct {
 // loadConfig loads configuration from environment variables
 func loadConfig() *Config {
 	config := &Config{
-		HTTPAddr:    getEnv("BPF_REGISTRY_HTTP_ADDR", ":8084"),
+		HTTPAddr:    getEnv("BPF_REGISTRY_HTTP_ADDR", ":8090"),
 		DataDir:     getEnv("BPF_REGISTRY_DATA_DIR", "/data/artifacts"),
 		LogLevel:    getEnv("BPF_REGISTRY_LOG_LEVEL", "INFO"),
 	}

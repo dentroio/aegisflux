@@ -290,7 +290,7 @@ Configure alerts based on:
 export AGENT_HOST_ID=host-001
 
 # Registry configuration
-export AGENT_REGISTRY_URL=http://bpf-registry:8084
+export AGENT_REGISTRY_URL=http://bpf-registry:8090
 
 # Polling configuration
 export AGENT_POLL_INTERVAL_SEC=30
@@ -339,7 +339,7 @@ docker run -d \
   --privileged \
   -p 8080:8080 \
   -e AGENT_HOST_ID=host-001 \
-  -e AGENT_REGISTRY_URL=http://bpf-registry:8084 \
+  -e AGENT_REGISTRY_URL=http://bpf-registry:8090 \
   -e AGENT_NATS_URL=nats://nats:4222 \
   aegisflux-agent
 ```
@@ -370,7 +370,7 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         - name: AGENT_REGISTRY_URL
-          value: "http://bpf-registry:8084"
+          value: "http://bpf-registry:8090"
         - name: AGENT_NATS_URL
           value: "nats://nats:4222"
         livenessProbe:

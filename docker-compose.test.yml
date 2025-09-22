@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # Test Database
+  postgres-test:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: aegisflux_test
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d aegisflux_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test NATS Server
+  nats-test:
+    image: nats:2.10
+    command: ["-js", "-m", "8222", "-DV"]
+    ports:
+      - "4223:4222"
+      - "8223:8222"
+    healthcheck:
+      test: ["CMD", "nats", "server", "check", "jetstream"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test Registry Service
+  registry-test:
+    build: 
+      context: ./backend/services/registry
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgres://testuser:testpass@postgres-test:5432/aegisflux_test?sslmode=disable
+      - NATS_URL=nats://nats-test:4222
+      - REGISTRY_ADDR=:8090
+      - KEYS_PATH=/config/signer.keys.json
+      - TLS_CERT_PATH=/certs/server.crt
+      - TLS_KEY_PATH=/certs/server.key
+      - TLS_CA_PATH=/certs/ca.crt
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./backend/configs/signer:/config
+      - ./test-certs:/certs
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      nats-test:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test Actions API Service
+  actions-api-test:
+    build:
+      context: ./backend/actions-api
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgres://testuser:testpass@postgres-test:5432/aegisflux_test?sslmode=disable
+      - ACTIONS_ADDR=:8083
+      - TLS_CERT_PATH=/certs/server.crt
+      - TLS_KEY_PATH=/certs/server.key
+      - TLS_CA_PATH=/certs/ca.crt
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./test-certs:/certs
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test Database Migration Service
+  migrate-test:
+    image: postgres:15
+    environment:
+      - PGHOST=postgres-test
+      - PGUSER=testuser
+      - PGPASSWORD=testpass
+      - PGDATABASE=aegisflux_test
+    volumes:
+      - ./backend/internal/db/migrate:/migrations
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    command: >
+      sh -c "
+        until pg_isready -h postgres-test -U testuser; do
+          echo 'Waiting for postgres...'
+          sleep 2
+        done
+        echo 'Running migrations...'
+        psql -f /migrations/001_init.sql
+        echo 'Migrations completed'
+      "
+
+volumes:
+  postgres_test_data:
+

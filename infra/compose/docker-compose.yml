@@ -2,8 +2,9 @@ services:
   nats:
     image: nats:2.10-alpine
     ports:
-      - "4222:4222"
-    command: ["--jetstream"]
+      - "4222:4222"   # client port
+      - "8222:8222"   # monitoring port
+    command: ["--jetstream", "-m", "8222", "-DV"]
 
   timescale:
     image: timescale/timescaledb:latest-pg15
@@ -75,10 +76,10 @@ services:
     env_file: ["../../.env"]
     depends_on: [nats, neo4j, config-api]
     ports:
-      - "8083:8083"
+      - "8087:8087"
     environment:
       - DECISION_NATS_URL=nats://nats:4222
-      - DECISION_HTTP_ADDR=:8083
+      - DECISION_HTTP_ADDR=:8087
       - CONFIG_API_URL=http://config-api:8085
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=neo4j
@@ -142,9 +143,9 @@ services:
       - ../../bpf-templates:/app/bpf-templates:ro
     environment:
       - ORCHESTRATOR_NATS_URL=nats://nats:4222
-      - ORCHESTRATOR_HTTP_ADDR=:8084
+      - ORCH_HTTP_ADDR=:8084
       - BPF_REGISTRY_URL=http://bpf-registry:8090
-      - DECISION_API_URL=http://decision:8083
+      - DECISION_API_URL=http://decision:8087
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
       - ORCHESTRATOR_LOG_LEVEL=INFO
@@ -178,6 +179,7 @@ services:
       - AGENT_VAULT_TOKEN=root
       - AGENT_HTTP_PORT=7070
       - AGENT_LOG_LEVEL=info
+
 
 volumes:
   timescale_data:

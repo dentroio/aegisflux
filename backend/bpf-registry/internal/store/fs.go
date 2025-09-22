@@ -236,3 +236,23 @@ func (fs *FSStore) writeMetadata(path string, metadata map[string]interface{}) e
 
 	return fs.writeFile(path, data)
 }
+
+// SaveArtifactMetadata saves updated metadata for an existing artifact
+func (fs *FSStore) SaveArtifactMetadata(id string, metadata map[string]interface{}) error {
+	fs.logger.Info("Saving artifact metadata", "id", id)
+
+	// Check if artifact exists
+	artifactDir := filepath.Join(fs.dataDir, id)
+	if _, err := os.Stat(artifactDir); os.IsNotExist(err) {
+		return fmt.Errorf("artifact not found: %s", id)
+	}
+
+	// Save metadata
+	metadataPath := filepath.Join(artifactDir, "metadata.json")
+	if err := fs.writeMetadata(metadataPath, metadata); err != nil {
+		return fmt.Errorf("failed to write metadata: %w", err)
+	}
+
+	fs.logger.Info("Artifact metadata saved successfully", "id", id)
+	return nil
+}

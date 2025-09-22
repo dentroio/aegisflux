@@ -29,7 +29,7 @@ func ExampleDecisionIntegration() error {
 	// Create eBPF orchestrator
 	templatesDir := "/path/to/bpf-templates"
 	outputDir := "/tmp/bpf-orchestrator"
-	registryURL := "http://localhost:8084"
+	registryURL := "http://localhost:8090"
 	authToken := "your-auth-token"
 	orchestrator := ebpf.NewOrchestrator(logger, templatesDir, outputDir, registryURL, authToken)
 
@@ -78,7 +78,7 @@ func ExamplePlanProcessing() error {
 	defer nc.Close()
 
 	// Create components
-	registryURL := "http://localhost:8084"
+	registryURL := "http://localhost:8090"
 	orchestrator := ebpf.NewOrchestrator(logger, "/path/to/templates", "/tmp/output", registryURL, "token")
 	rolloutMgr := rollout.NewBPFRolloutManager(logger, nc, registryURL)
 	processor := NewDecisionProcessor(logger, nc, orchestrator, rolloutMgr, "http://localhost:8080")
@@ -198,7 +198,7 @@ func ExampleRollbackWorkflow() error {
 	defer nc.Close()
 
 	// Create components
-	registryURL := "http://localhost:8084"
+	registryURL := "http://localhost:8090"
 	rolloutMgr := rollout.NewBPFRolloutManager(logger, nc, registryURL)
 	rollbackHandler := NewRollbackHandler(logger, rolloutMgr)
 
@@ -280,7 +280,7 @@ func ExampleAPIIntegration() error {
 	}
 	defer nc.Close()
 
-	registryURL := "http://localhost:8084"
+	registryURL := "http://localhost:8090"
 	orchestrator := ebpf.NewOrchestrator(logger, "/path/to/templates", "/tmp/output", registryURL, "token")
 	rolloutMgr := rollout.NewBPFRolloutManager(logger, nc, registryURL)
 	processor := NewDecisionProcessor(logger, nc, orchestrator, rolloutMgr, "http://localhost:8080")

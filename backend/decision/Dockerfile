@@ -41,7 +41,7 @@ COPY --from=builder /app/llm/models.yaml /llm/models.yaml
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 
 # Expose port
-EXPOSE 8083
+EXPOSE 8087
 
 # Set the binary as the entrypoint
 ENTRYPOINT ["/decision"]

@@ -13,9 +13,10 @@ RUN go mod download
 # Copy source code
 COPY backend/common/ ../common/
 COPY backend/orchestrator/ .
+COPY schemas/ ../schemas/
 
 # Build the application
-RUN CGO_ENABLED=0 go build -o /out/orchestrator ./cmd/orchestrator/main_simple.go
+RUN CGO_ENABLED=0 go build -o /out/orchestrator ./cmd/orchestrator/main.go
 
 # eBPF build stage
 FROM alpine:3.20 AS ebpf-build
@@ -30,6 +31,7 @@ RUN make -C /app/bpf-templates/drop_egress_by_cgroup
 # Final stage
 FROM gcr.io/distroless/base-debian12
 COPY --from=go-build /out/orchestrator /orchestrator
+COPY --from=go-build /src/../schemas /schemas
 # Templates come via bind mount at runtime
 EXPOSE 8084
 ENTRYPOINT ["/orchestrator"]

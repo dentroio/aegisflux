@@ -8,13 +8,13 @@ RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /app
 
 # Copy go mod files
-COPY go.mod go.sum ./
+COPY agents/local-agent/go.mod agents/local-agent/go.sum ./
 
 # Download dependencies
 RUN go mod download
 
 # Copy source code
-COPY . .
+COPY agents/local-agent/ .
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o local-agent .
@@ -54,7 +54,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Default environment variables
 ENV AGENT_HOST_ID=localhost
-ENV AGENT_REGISTRY_URL=http://localhost:8084
+ENV AGENT_REGISTRY_URL=http://localhost:8090
 ENV AGENT_POLL_INTERVAL_SEC=30
 ENV AGENT_NATS_URL=nats://localhost:4222
 ENV AGENT_VAULT_URL=http://localhost:8200

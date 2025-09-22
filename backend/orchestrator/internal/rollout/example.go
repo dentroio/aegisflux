@@ -25,7 +25,7 @@ func ExampleRollout() error {
 	defer nc.Close()
 
 	// Create rollout manager
-	registryURL := "http://localhost:8084"
+	registryURL := "http://localhost:8090"
 	rolloutMgr := NewBPFRolloutManager(logger, nc, registryURL)
 
 	// Create telemetry monitor
@@ -254,7 +254,7 @@ func ExampleAPIUsage() error {
 	defer nc.Close()
 
 	// Create managers
-	registryURL := "http://localhost:8084"
+	registryURL := "http://localhost:8090"
 	rolloutMgr := NewBPFRolloutManager(logger, nc, registryURL)
 	telemetryMon := NewTelemetryMonitor(logger, nc)
 	apiServer := NewAPIServer(logger, rolloutMgr, telemetryMon)
@@ -292,7 +292,7 @@ func ExampleIntegration() error {
 	defer nc.Close()
 
 	// Create all managers
-	registryURL := "http://localhost:8084"
+	registryURL := "http://localhost:8090"
 	rolloutMgr := NewBPFRolloutManager(logger, nc, registryURL)
 	telemetryMon := NewTelemetryMonitor(logger, nc)
 	rollbackMgr := NewRollbackManager(logger, nc)
