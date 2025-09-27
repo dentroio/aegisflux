@@ -60,13 +60,16 @@ graph TB
 
 | Service | Purpose | Port | Status |
 |---------|---------|------|--------|
+| **Actions API** | Agent registration and management | 8083 | ✅ Implemented |
+| **WebSocket Gateway** | Real-time agent communication | 8080 | ✅ Implemented |
 | **Orchestrator** | REST API, MapSnapshot compilation | 8081 | ✅ Implemented |
 | **Segmenter** | Policy proposal and planning | 8086 | ✅ Implemented |
+| **BPF Registry** | eBPF artifact storage | 8084 | ✅ Implemented |
+| **Decision** | Policy compilation service | 8085 | ✅ Implemented |
 | **NATS** | Event bus and messaging | 4222 | ✅ Implemented |
 | **ETL-Enrich** | Event enrichment pipeline | 8082 | 🚧 In Progress |
-| **Correlator** | Rules engine and correlation | 8083 | 🚧 In Progress |
-| **Decision** | AI-powered decision making | 8084 | 🚧 In Progress |
-| **Ingest** | Agent telemetry ingestion | 8085 | 🚧 In Progress |
+| **Correlator** | Rules engine and correlation | 8087 | 🚧 In Progress |
+| **Ingest** | Agent telemetry ingestion | 8088 | 🚧 In Progress |
 
 ---
 
@@ -76,7 +79,7 @@ graph TB
 
 - Docker & Docker Compose
 - Go 1.21+ (for development)
-- NATS server (included in compose)
+- Node.js 18+ (for UI development)
 
 ### Development Setup
 
@@ -86,35 +89,60 @@ graph TB
    cd aegisflux
    ```
 
-2. **Start the core services**
+2. **Start the backend services**
    ```bash
    docker compose up -d
    ```
 
-3. **Verify services are running**
+3. **Start the UI (optional)**
    ```bash
+   cd ui/console
+   npm install
+   npm run dev
+   ```
+
+4. **Verify services are running**
+   ```bash
+   # Check backend health
+   curl -s localhost:8083/healthz    # Actions API
+   curl -s localhost:8080/health     # WebSocket Gateway
+   
    # Check orchestrator health
    curl -s localhost:8081/healthz
-   
-   # Check segmenter health  
-   curl -s localhost:8086/healthz
    
    # Monitor NATS messages
    nats sub "actions.seg.maps" -s nats://localhost:4222
    ```
 
-4. **Test the API**
-   ```bash
-   # Send a sample MapSnapshot
-   bash scripts/post_maps.sh
-   
-   # Or use the example script
-   ./backend/orchestrator/example_usage.sh
-   ```
+5. **Access the system**
+   - Web UI: http://localhost:3000
+   - API: http://localhost:8083
+   - WebSocket: ws://localhost:8080/ws/agent
 
 ---
 
 ## 📋 API Reference
+
+### Actions API
+
+**Base URL**: `http://localhost:8083`
+
+#### Agent Management
+- `POST /agents/register/init` - Initialize agent registration
+- `POST /agents/register/complete` - Complete agent registration  
+- `GET /agents` - List all agents
+- `GET /agents/{uid}/status` - Get agent status
+- `PUT /agents/{uid}/config` - Update agent configuration
+- `POST /agents/{uid}/send` - Send message to agent
+- `POST /agents/broadcast` - Broadcast to all agents
+
+### WebSocket Gateway
+
+**Base URL**: `ws://localhost:8080`
+
+#### Real-time Communication
+- `GET /ws/agent` - WebSocket endpoint for agents
+- `GET /health` - Gateway health check
 
 ### Orchestrator API
 
@@ -341,9 +369,15 @@ The dual license accommodates eBPF kernel license requirements while providing f
 
 ---
 
+## 📚 Documentation
+
+- **[User Guide](docs/USER_GUIDE.md)** - Getting started and basic usage
+- **[Engineer Guide](docs/ENGINEER_GUIDE.md)** - Architecture and development
+- **[API Reference](docs/API_REFERENCE.md)** - Complete API documentation
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+
 ## 📞 Support
 
-- **Documentation**: See `docs/` directory
 - **Issues**: [GitHub Issues](https://github.com/sgerhart/aegisflux/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/sgerhart/aegisflux/discussions)
 
