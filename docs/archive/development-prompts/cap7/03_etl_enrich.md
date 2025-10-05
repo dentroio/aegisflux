@@ -1,0 +1,2 @@
+- Join mapper outputs with CVE docs from `feeds.cve.updates` (cache in-memory or TSDB).
+- Produce `pkg_cve_enriched` records on `etl.enriched` with exploitability score scaffold.

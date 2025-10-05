@@ -464,4 +464,248 @@ Content-Type: application/json
 }
 ```
 
-For more information, see the [Engineer Guide](ENGINEER_GUIDE.md) and [Troubleshooting Guide](TROUBLESHOOTING.md).
+## Complete Service API Reference
+
+### Decision Service (Port 8087)
+
+**Base URL**: `http://localhost:8087`
+
+#### Generate Policy from Intent
+
+```http
+POST /plans/policy
+Content-Type: application/json
+
+{
+  "intent": "Block ICMP traffic to 8.8.8.8",
+  "target_hosts": ["192.168.1.100"],
+  "priority": "high"
+}
+```
+
+**Response**:
+```json
+{
+  "plan_id": "plan-12345",
+  "controls": [
+    {
+      "type": "nftables",
+      "rule": "drop icmp to 8.8.8.8"
+    }
+  ]
+}
+```
+
+### Orchestrator Service (Port 8081)
+
+**Base URL**: `http://localhost:8081`
+
+#### Process Segmentation Map
+
+```http
+POST /seg/maps
+Content-Type: application/json
+
+{
+  "map_snapshot": {
+    "allow_cidrs": ["192.168.1.0/24"],
+    "edges": [
+      {
+        "src": "192.168.1.10",
+        "dst": "192.168.1.20",
+        "port": 443,
+        "proto": "tcp"
+      }
+    ]
+  }
+}
+```
+
+### BPF Registry (Port 8090)
+
+**Base URL**: `http://localhost:8090`
+
+#### Create Artifact
+
+```http
+POST /artifacts
+Content-Type: application/json
+
+{
+  "name": "icmp-block-policy",
+  "version": "1.0.0",
+  "type": "ebpf",
+  "data": "base64-encoded-artifact-data"
+}
+```
+
+#### Assign Artifact to Host
+
+```http
+POST /assign/{artifact_id}/{host_id}
+Content-Type: application/json
+
+{
+  "assignment_id": "assign-12345",
+  "priority": 100
+}
+```
+
+### Ingest Service (Port 8086/8088)
+
+**gRPC Endpoint**: `localhost:8086`  
+**HTTP Endpoint**: `http://localhost:8088`
+
+#### Post Events (gRPC)
+
+```protobuf
+service Ingest {
+  rpc PostEvents(stream Event) returns (PostEventsResponse);
+}
+
+message Event {
+  string id = 1;
+  string type = 2;
+  string source = 3;
+  int64 timestamp = 4;
+  string env = 5;
+  string rdns = 6;
+  google.protobuf.Struct metadata = 7;
+  bytes payload = 8;
+}
+```
+
+#### Health Check (HTTP)
+
+```http
+GET /healthz
+```
+
+**Response**:
+```json
+{
+  "ok": true
+}
+```
+
+### Segmenter Service (Port 8089)
+
+**Base URL**: `http://localhost:8089`
+
+#### Generate Segmentation Proposal
+
+```http
+POST /segment/propose
+Content-Type: application/json
+
+{
+  "hosts": [
+    {
+      "id": "host-1",
+      "ip": "192.168.1.10",
+      "labels": ["role:web", "env:production"],
+      "services": ["http", "nginx"]
+    }
+  ],
+  "traffic_data": [
+    {
+      "source_host": "host-1",
+      "destination_host": "host-2",
+      "destination_port": 443,
+      "protocol": "tcp",
+      "bytes_transferred": 1024000,
+      "packet_count": 500,
+      "timestamp": "2025-09-28T17:30:00Z"
+    }
+  ],
+  "traffic_period": "1h",
+  "goals": ["reduce_lateral_movement", "security"]
+}
+```
+
+#### Create Segmentation Plan
+
+```http
+POST /segment/plan
+Content-Type: application/json
+
+{
+  "proposal_id": "proposal-12345",
+  "proposal": {
+    "id": "microseg-12345",
+    "name": "Microsegmentation Proposal",
+    "strategy": "microsegmentation",
+    "segments": [...]
+  },
+  "implementation_mode": "balanced"
+}
+```
+
+#### Get Segmentation Strategies
+
+```http
+GET /segment/strategies
+```
+
+**Response**:
+```json
+{
+  "strategies": [
+    {
+      "id": "microsegmentation",
+      "name": "Microsegmentation",
+      "description": "Fine-grained segmentation based on host characteristics",
+      "complexity": "high",
+      "security": "high"
+    }
+  ]
+}
+```
+
+#### Get Segmentation Goals
+
+```http
+GET /segment/goals
+```
+
+**Response**:
+```json
+{
+  "goals": [
+    {
+      "id": "reduce_lateral_movement",
+      "name": "Reduce Lateral Movement",
+      "description": "Prevent attackers from moving laterally across the network",
+      "priority": "high"
+    }
+  ]
+}
+```
+
+## Service Integration Matrix
+
+| Service | Protocol | Port | Primary Function |
+|---------|----------|------|------------------|
+| WebSocket Gateway | WebSocket | 8080 | Agent communication |
+| Actions API | HTTP | 8083 | Agent management |
+| Decision Service | HTTP | 8087 | Policy generation |
+| Orchestrator | HTTP | 8081 | eBPF compilation |
+| BPF Registry | HTTP | 8090 | Artifact storage |
+| Ingest Service | gRPC/HTTP | 8086/8088 | Event ingestion |
+| ETL-Enrich | Python | - | Data enrichment |
+| Segmenter | HTTP | 8089 | Network segmentation |
+
+## Complete Data Flow
+
+```
+Agent → WebSocket Gateway → Actions API
+  ↓
+Events → Ingest Service → ETL-Enrich → TimescaleDB/Neo4j
+  ↓
+Policy Intent → Decision Service → Orchestrator → BPF Registry
+  ↓
+Network Analysis → Segmenter → Policy Generation → Agent Deployment
+```
+
+For more information, see the [Engineer Guide](ENGINEER_GUIDE.md), [Agent Implementation Guide](AGENT_IMPLEMENTATION_GUIDE.md), and [Troubleshooting Guide](TROUBLESHOOTING.md).
+

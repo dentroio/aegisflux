@@ -7,10 +7,7 @@ import sys
 from typing import Optional
 
 from .config import config
-from .consumer import start_consumer, stop_consumer, setup_signal_handlers
-from .publish import close_publisher
-from .writers.timescale import close_writer as close_timescale_writer
-from .writers.neo4j import close_writer as close_neo4j_writer
+from .consumer import EventConsumer, setup_signal_handlers
 
 # Configure logging
 logging.basicConfig(
@@ -28,30 +25,31 @@ async def main():
     logger.info(f"TimescaleDB: {config.PG_HOST}:{config.PG_PORT}/{config.PG_DB}")
     logger.info(f"Neo4j: {config.NEO4J_URI}")
     
+    consumer = None
     try:
+        # Create consumer
+        consumer = EventConsumer(max_inflight=100)
+        
         # Setup signal handlers for graceful shutdown
-        setup_signal_handlers()
+        await setup_signal_handlers(consumer)
+        
+        # Connect to services
+        await consumer.connect()
         
         # Start the consumer
-        await start_consumer()
+        logger.info("Starting ETL consumer...")
+        await consumer.start()
         
-        # Keep the service running
-        logger.info("ETL enrichment service is running. Press Ctrl+C to stop.")
-        while True:
-            await asyncio.sleep(1)
-            
     except KeyboardInterrupt:
-        logger.info("Received interrupt signal")
+        logger.info("Received keyboard interrupt")
     except Exception as e:
         logger.error(f"Fatal error: {e}")
         sys.exit(1)
     finally:
         # Cleanup
         logger.info("Shutting down ETL enrichment service...")
-        await stop_consumer()
-        await close_publisher()
-        await close_timescale_writer()
-        await close_neo4j_writer()
+        if consumer:
+            await consumer.disconnect()
         logger.info("ETL enrichment service stopped")
 
 

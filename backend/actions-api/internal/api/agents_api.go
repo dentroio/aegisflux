@@ -1,7 +1,10 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -55,6 +58,62 @@ type LabelsUpdateRequest struct {
 // NoteUpdateRequest represents a request to update agent note
 type NoteUpdateRequest struct {
 	Note string `json:"note"`
+}
+
+// AgentConfigRequest represents a request to configure agent settings
+type AgentConfigRequest struct {
+	Channels    []string               `json:"channels,omitempty"`
+	Settings    map[string]interface{} `json:"settings,omitempty"`
+	Policies    []string               `json:"policies,omitempty"`
+	HeartbeatInterval int              `json:"heartbeat_interval,omitempty"`
+	ReconnectInterval int              `json:"reconnect_interval,omitempty"`
+	MessageQueueSize  int              `json:"message_queue_size,omitempty"`
+}
+
+// AgentStatusResponse represents agent connection status
+type AgentStatusResponse struct {
+	AgentID         string    `json:"agent_id"`
+	Connected       bool      `json:"connected"`
+	LastSeen        time.Time `json:"last_seen"`
+	Channels        []string  `json:"channels"`
+	SessionExpires  time.Time `json:"session_expires"`
+	WebSocketURL    string    `json:"websocket_url,omitempty"`
+	MessageCount    int       `json:"message_count,omitempty"`
+	Uptime          string    `json:"uptime,omitempty"`
+}
+
+// SendMessageRequest represents a request to send a message to an agent
+type SendMessageRequest struct {
+	Channel     string                 `json:"channel"`
+	Message     map[string]interface{} `json:"message"`
+	MessageType string                 `json:"message_type"` // request, response, event
+	Priority    int                    `json:"priority,omitempty"`
+	TTL         int                    `json:"ttl,omitempty"` // seconds
+}
+
+// SendMessageResponse represents the response for sending a message
+type SendMessageResponse struct {
+	MessageID string `json:"message_id"`
+	Status    string `json:"status"` // sent, queued, failed
+	Error     string `json:"error,omitempty"`
+}
+
+// BroadcastRequest represents a request to broadcast to all agents
+type BroadcastRequest struct {
+	Channel     string                 `json:"channel"`
+	Message     map[string]interface{} `json:"message"`
+	MessageType string                 `json:"message_type"` // request, response, event
+	AgentFilter []string               `json:"agent_filter,omitempty"` // specific agents only
+	Priority    int                    `json:"priority,omitempty"`
+	TTL         int                    `json:"ttl,omitempty"` // seconds
+}
+
+// BroadcastResponse represents the response for broadcasting
+type BroadcastResponse struct {
+	MessageID string   `json:"message_id"`
+	SentTo    []string `json:"sent_to"`
+	Failed    []string `json:"failed"`
+	TotalSent int      `json:"total_sent"`
 }
 
 // getAgents handles GET /agents with filtering support
@@ -154,6 +213,15 @@ func (s *Server) agentDispatch(w http.ResponseWriter, r *http.Request) {
 		case "note":
 			// /agents/{uid}/note
 			s.updateAgentNote(w, r, agentUID)
+		case "status":
+			// /agents/{uid}/status
+			s.getAgentStatus(w, r, agentUID)
+		case "config":
+			// /agents/{uid}/config
+			s.updateAgentConfig(w, r, agentUID)
+		case "send":
+			// /agents/{uid}/send
+			s.sendMessageToAgent(w, r, agentUID)
 		default:
 			http.Error(w, "Invalid endpoint", http.StatusNotFound)
 		}
@@ -319,5 +387,315 @@ func (s *Server) agentHasIP(agent *Agent, ip string) bool {
 
 	return false
 }
+
+// getAgentStatus handles GET /agents/{agent_uid}/status
+func (s *Server) getAgentStatus(w http.ResponseWriter, r *http.Request, agentUID string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	s.store.mu.Lock()
+	agent, exists := s.store.agents[agentUID]
+	s.store.mu.Unlock()
+
+	if !exists {
+		http.Error(w, "Agent not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if agent is connected via WebSocket (this would integrate with WebSocket gateway)
+	// For now, we'll simulate the status
+	connected := time.Since(agent.LastSeen) < 5*time.Minute // Consider connected if seen within 5 minutes
+	
+	response := AgentStatusResponse{
+		AgentID:        agentUID,
+		Connected:      connected,
+		LastSeen:       agent.LastSeen,
+		Channels:       []string{}, // Would be populated from WebSocket gateway
+		SessionExpires: agent.LastSeen.Add(24 * time.Hour), // 24 hour session
+		WebSocketURL:   "ws://localhost:8080/ws/agent",
+		MessageCount:   0, // Would be populated from WebSocket gateway
+		Uptime:         time.Since(agent.Created).String(),
+	}
+
+	w.Header().Set("content-type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// updateAgentConfig handles PUT /agents/{agent_uid}/config
+func (s *Server) updateAgentConfig(w http.ResponseWriter, r *http.Request, agentUID string) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req AgentConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	s.store.mu.Lock()
+	_, exists := s.store.agents[agentUID]
+	s.store.mu.Unlock()
+
+	if !exists {
+		http.Error(w, "Agent not found", http.StatusNotFound)
+		return
+	}
+
+	// Update agent configuration
+	// This would integrate with the WebSocket gateway to send configuration to the agent
+	response := map[string]interface{}{
+		"agent_uid": agentUID,
+		"config":    req,
+		"status":    "configuration_updated",
+		"message":   "Agent configuration updated successfully",
+	}
+
+	w.Header().Set("content-type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// sendMessageToAgent handles POST /agents/{agent_uid}/send
+func (s *Server) sendMessageToAgent(w http.ResponseWriter, r *http.Request, agentUID string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req SendMessageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	s.store.mu.Lock()
+	agent, exists := s.store.agents[agentUID]
+	s.store.mu.Unlock()
+
+	if !exists {
+		http.Error(w, "Agent not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if agent is connected
+	connected := time.Since(agent.LastSeen) < 5*time.Minute
+	
+	var response SendMessageResponse
+	messageID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+	
+	if connected {
+		// Send message to WebSocket Gateway
+		err := s.sendMessageToWebSocketGateway(agentUID, req.Channel, req.Message, req.MessageType)
+		if err != nil {
+			response = SendMessageResponse{
+				MessageID: messageID,
+				Status:    "failed",
+				Error:     fmt.Sprintf("Failed to send to WebSocket Gateway: %v", err),
+			}
+		} else {
+			response = SendMessageResponse{
+				MessageID: messageID,
+				Status:    "sent",
+			}
+		}
+	} else {
+		response = SendMessageResponse{
+			MessageID: messageID,
+			Status:    "queued",
+		}
+	}
+
+	w.Header().Set("content-type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// broadcastToAgents handles POST /agents/broadcast
+func (s *Server) broadcastToAgents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req BroadcastRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	s.store.mu.Lock()
+	defer s.store.mu.Unlock()
+
+	var sentTo []string
+	var failed []string
+
+	// Send to all agents or filtered agents
+	for agentUID, agent := range s.store.agents {
+		// Apply agent filter if specified
+		if len(req.AgentFilter) > 0 {
+			found := false
+			for _, filterAgent := range req.AgentFilter {
+				if agentUID == filterAgent {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+		}
+
+		// Check if agent is connected
+		connected := time.Since(agent.LastSeen) < 5*time.Minute
+		if !connected {
+			failed = append(failed, agentUID)
+			continue
+		}
+
+		// Actually send the message via NATS to WebSocket Gateway
+		err := s.sendMessageToWebSocketGateway(agentUID, req.Channel, req.Message, req.MessageType)
+		if err != nil {
+			log.Printf("Failed to send message to agent %s: %v", agentUID, err)
+			failed = append(failed, agentUID)
+		} else {
+			sentTo = append(sentTo, agentUID)
+		}
+	}
+
+	response := BroadcastResponse{
+		MessageID: fmt.Sprintf("broadcast_%d", time.Now().UnixNano()),
+		SentTo:    sentTo,
+		Failed:    failed,
+		TotalSent: len(sentTo),
+	}
+
+	w.Header().Set("content-type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// sendMessageToWebSocketGateway sends a message to the WebSocket Gateway via NATS
+func (s *Server) sendMessageToWebSocketGateway(agentUID, channel string, message map[string]interface{}, messageType string) error {
+	// Check if NATS is connected
+	if s.nc == nil {
+		return fmt.Errorf("NATS not connected")
+	}
+
+	// Convert message to JSON string for agent's SecureMessage structure
+	messageJSON, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message payload: %w", err)
+	}
+
+	// For now, send the JSON as base64-encoded string to match agent expectations
+	// TODO: Implement proper ChaCha20-Poly1305 encryption in production
+	payload := base64.StdEncoding.EncodeToString(messageJSON)
+
+	// Create the message payload
+	messageData := map[string]interface{}{
+		"id":        fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+		"type":      messageType,
+		"channel":   channel,
+		"payload":   payload, // Send as base64-encoded string to match SecureMessage format
+		"timestamp": time.Now().Unix(),
+		"headers":   make(map[string]string),
+		"target_agent": agentUID, // Add target agent for routing
+	}
+
+	// Convert to JSON
+	jsonData, err := json.Marshal(messageData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	// Publish to NATS subject for WebSocket Gateway
+	subject := "websocket.messages"
+	err = s.nc.Publish(subject, jsonData)
+	if err != nil {
+		return fmt.Errorf("failed to publish to NATS: %w", err)
+	}
+
+	log.Printf("Sent message to WebSocket Gateway via NATS for agent %s: %s", agentUID, string(jsonData))
+	return nil
+}
+
+// handleHeartbeat handles POST /agents/heartbeat - updates agent last seen timestamp
+func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var heartbeatData struct {
+		AgentUID string `json:"agent_uid"`
+		LastSeen string `json:"last_seen"`
+		Status   string `json:"status"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&heartbeatData); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if heartbeatData.AgentUID == "" {
+		http.Error(w, "Agent UID required", http.StatusBadRequest)
+		return
+	}
+
+	// Parse last seen time
+	lastSeen, err := time.Parse(time.RFC3339, heartbeatData.LastSeen)
+	if err != nil {
+		http.Error(w, "Invalid timestamp format", http.StatusBadRequest)
+		return
+	}
+
+	// Update agent in store
+	s.store.mu.Lock()
+	defer s.store.mu.Unlock()
+
+	// Try to find agent by UID first
+	if agent, exists := s.store.agents[heartbeatData.AgentUID]; exists {
+		agent.LastSeen = lastSeen
+		log.Printf("Updated heartbeat for agent %s: last_seen=%s", heartbeatData.AgentUID, heartbeatData.LastSeen)
+		
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "updated",
+			"agent_uid": heartbeatData.AgentUID,
+			"last_seen": heartbeatData.LastSeen,
+		})
+		return
+	}
+
+	// If not found by UID, try to find by hostname (for backward compatibility)
+	var foundAgent *Agent
+	var foundUID string
+	for uid, agent := range s.store.agents {
+		if agent.HostID == heartbeatData.AgentUID {
+			foundAgent = agent
+			foundUID = uid
+			break
+		}
+	}
+
+	if foundAgent != nil {
+		foundAgent.LastSeen = lastSeen
+		log.Printf("Updated heartbeat for agent %s (hostname %s): last_seen=%s", foundUID, heartbeatData.AgentUID, heartbeatData.LastSeen)
+		
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "updated",
+			"agent_uid": foundUID,
+			"hostname": heartbeatData.AgentUID,
+			"last_seen": heartbeatData.LastSeen,
+		})
+	} else {
+		http.Error(w, "Agent not found", http.StatusNotFound)
+	}
+}
+
+
+
 
 

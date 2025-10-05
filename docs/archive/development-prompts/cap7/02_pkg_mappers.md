@@ -1,0 +1,3 @@
+- Subscribe to `inventory.packages` (produce a sample from agents).
+- Implement real matching (name, epoch:version:release, distro, arch).
+- Emit ranked `candidates` with heuristics; publish on `feeds.pkg.cve`.

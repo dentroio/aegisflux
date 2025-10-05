@@ -97,25 +97,124 @@ type SecureMessage struct {
 
 ## Agent System
 
+The AegisFlux agent system consists of three main components working together to provide comprehensive endpoint monitoring and policy enforcement.
+
 ### Local Agent (`agents/local-agent/`)
 
-**Purpose**: Endpoint monitoring and policy enforcement
+**Purpose**: Main endpoint agent with comprehensive monitoring and policy enforcement capabilities
 
-**Key Components**:
-- WebSocket communication client
-- eBPF program loading and management
-- Policy enforcement engine
+**Key Features**:
+- **eBPF Program Management**: Loads, attaches, and manages BPF programs from the registry
+- **HTTP API**: RESTful API for monitoring and control (`/healthz`, `/status`, `/metrics`, `/programs`)
+- **Telemetry & Rollback**: Automatic monitoring with configurable thresholds and rollback
+- **Registry Integration**: Polls BPF Registry for new artifacts with signature verification
+- **TTL Management**: Automatic program unloading after TTL expires
+- **Systemd Integration**: Production-ready service with notifications and watchdog
+- **WebSocket Communication**: Real-time communication with backend services
+
+**Architecture**:
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   BPF Registry  │    │   NATS Cluster  │    │   Vault Server  │
+│                 │    │                 │    │                 │
+│ - Artifacts     │◄───┤ - Telemetry     │    │ - Signatures    │
+│ - Metadata      │    │ - Events        │    │ - Public Keys   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       ▲                       │
+         │                       │                       │
+         ▼                       │                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Local Agent                                  │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│  │   Registry  │  │    BPF      │  │ Telemetry   │            │
+│  │   Client    │  │   Loader    │  │   Sender    │            │
+│  │             │  │             │  │             │            │
+│  │ - Polling   │  │ - Loading   │  │ - Reporting │            │
+│  │ - Download  │  │ - Attaching │  │ - Events    │            │
+│  │ - Verify    │  │ - TTL Mgmt  │  │ - Heartbeat │            │
+│  └─────────────┘  └─────────────┘  └─────────────┘            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Configuration**:
+```bash
+# Key environment variables
+export AGENT_HOST_ID="host-001"
+export AGENT_REGISTRY_URL="http://localhost:8090"
+export AGENT_NATS_URL="nats://localhost:4222"
+export AGENT_VAULT_URL="http://localhost:8200"
+export AGENT_POLL_INTERVAL_SEC="30"
+export AGENT_MAX_PROGRAMS="10"
+export AGENT_DEFAULT_TTL_SEC="3600"
+```
 
 **Communication Protocol**:
 1. Connect to WebSocket Gateway
 2. Authenticate using Ed25519 keys
 3. Register with Actions API via WebSocket
-4. Receive and enforce policies
-5. Send heartbeat and status updates
+4. Poll registry for assigned artifacts
+5. Download, verify, and load eBPF programs
+6. Send telemetry and heartbeat updates
+7. Handle rollback signals and threshold violations
 
 ### eBPF Sensor (`agents/ebpf-sensor/`)
 
-**Purpose**: Kernel-level monitoring and data collection
+**Purpose**: Runtime signal collection and event monitoring using eBPF
+
+**Key Features**:
+- **Runtime Monitoring**: Collects exec/connect and other system events using eBPF
+- **Event Publishing**: Publishes JSON events to NATS `events.raw` subject
+- **High Performance**: Rust implementation using aya framework
+- **Schema Compliance**: Follows `schemas/Event.json` format
+- **Kernel-Level Data**: Captures events at kernel level for minimal overhead
+
+**Event Types**:
+- Process execution events
+- Network connection events
+- File system events
+- System call events
+
+**Implementation**:
+```rust
+// Example aya-based eBPF program
+use aya::{
+    programs::{KProbe, KProbeAttachType},
+    Bpf,
+};
+```
+
+### Policy Bundles (`agents/policy-bundles/`)
+
+**Purpose**: Signed mitigation and segmentation policy packs for distribution
+
+**Key Features**:
+- **Signed Policies**: Cryptographically signed policy definitions
+- **YAML Format**: Human-readable policy configuration
+- **Orchestrator Verification**: Verified by orchestrator before deployment
+- **Multiple Formats**: Supports nftables, Cilium, seccomp examples
+- **Policy Distribution**: Packaged for secure distribution to agents
+
+**Policy Types**:
+- Network segmentation policies
+- Process execution policies
+- System call restrictions (seccomp)
+- Container runtime policies (Cilium)
+
+**Example Policy Structure**:
+```yaml
+name: "block-icmp-to-dns"
+version: "1.0.0"
+type: "network_policy"
+rules:
+  - action: "block"
+    protocol: "icmp"
+    destination: "8.8.8.8"
+metadata:
+  description: "Block ICMP traffic to DNS servers"
+  severity: "medium"
+signature: "base64-encoded-signature"
+```
 
 ## Development Setup
 

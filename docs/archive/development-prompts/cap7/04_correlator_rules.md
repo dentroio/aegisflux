@@ -1,0 +1,3 @@
+- Add rules.d hot-reload; support temporal windows and host selectors.
+- On rule hit, emit `Finding` (schemas/finding.json) to `correlator.findings`.
+- Expose HTTP endpoints: list/add/enable/disable rules.

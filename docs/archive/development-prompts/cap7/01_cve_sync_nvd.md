@@ -1,0 +1,3 @@
+- Replace the one-shot NVD fetch with paginated, API key-based pulls.
+- Normalize CVSS (base, temporal), CWE, affected products, and references.
+- Publish compact docs on `feeds.cve.updates` with `cve_id` and versioned schema.

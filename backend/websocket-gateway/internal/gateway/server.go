@@ -4,16 +4,20 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/nats-io/nats.go"
+	"golang.org/x/crypto/chacha20poly1305"
 	"github.com/sgerhart/aegisflux/websocket-gateway/internal/auth"
 	"github.com/sgerhart/aegisflux/websocket-gateway/internal/types"
 )
@@ -29,6 +33,7 @@ type WebSocketGateway struct {
 	metrics           *types.ConnectionMetrics
 	httpServer        *http.Server
 	httpHandlers      *HTTPHandlers
+	nc                *nats.Conn // NATS connection for receiving messages from Actions API
 	mu                sync.RWMutex
 	ctx               context.Context
 	cancel            context.CancelFunc
@@ -72,6 +77,19 @@ func NewWebSocketGateway(config *types.Configuration) (*WebSocketGateway, error)
 		return nil, fmt.Errorf("failed to create message router: %w", err)
 	}
 
+	// Connect to NATS for receiving messages from Actions API
+	natsURL := os.Getenv("NATS_URL")
+	if natsURL == "" {
+		natsURL = "nats://localhost:4222"
+	}
+	
+	nc, err := nats.Connect(natsURL)
+	if err != nil {
+		log.Printf("Warning: Failed to connect to NATS: %v", err)
+	} else {
+		log.Printf("WebSocket Gateway connected to NATS at %s", natsURL)
+	}
+
 	gateway := &WebSocketGateway{
 		upgrader:          upgrader,
 		agentConnections:  make(map[string]*types.AgentConnection),
@@ -80,6 +98,7 @@ func NewWebSocketGateway(config *types.Configuration) (*WebSocketGateway, error)
 		messageRouter:     messageRouter,
 		config:            config,
 		metrics:           metrics,
+		nc:                nc, // NATS connection
 		ctx:               ctx,
 		cancel:            cancel,
 	}
@@ -96,11 +115,10 @@ func NewWebSocketGateway(config *types.Configuration) (*WebSocketGateway, error)
 
 // Start starts the WebSocket gateway server
 func (wsg *WebSocketGateway) Start() error {
-	// Start health monitoring
-	go wsg.startHealthMonitoring()
-
-	// Start message processing
-	go wsg.startMessageProcessing()
+	// Start NATS subscription for messages from Actions API
+	if wsg.nc != nil {
+		go wsg.startNATSSubscription()
+	}
 
 	// Create HTTP server
 	wsg.httpServer = &http.Server{
@@ -524,7 +542,42 @@ func (wsg *WebSocketGateway) handleAgentHeartbeat(agentID string, message types.
 	}
 	wsg.mu.Unlock()
 	
+	// Update Actions API with heartbeat (async)
+	go wsg.updateActionsAPIHeartbeat(agentID)
+	
 	return nil
+}
+
+// updateActionsAPIHeartbeat updates the Actions API with the agent's heartbeat
+func (wsg *WebSocketGateway) updateActionsAPIHeartbeat(agentID string) {
+	// Create heartbeat update request
+	heartbeatData := map[string]interface{}{
+		"agent_uid": agentID,
+		"last_seen": time.Now().Format(time.RFC3339),
+		"status":    "active",
+	}
+	
+	jsonData, err := json.Marshal(heartbeatData)
+	if err != nil {
+		log.Printf("Failed to marshal heartbeat data for agent %s: %v", agentID, err)
+		return
+	}
+	
+	// Send to Actions API
+	actionsAPIURL := "http://actions-api:8083/agents/heartbeat"
+	resp, err := http.Post(actionsAPIURL, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Failed to send heartbeat to Actions API for agent %s: %v", agentID, err)
+		return
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Actions API heartbeat update failed for agent %s: status %d", agentID, resp.StatusCode)
+		return
+	}
+	
+	log.Printf("Successfully updated Actions API heartbeat for agent %s", agentID)
 }
 
 func (wsg *WebSocketGateway) handleAgentPolicies(agentID string, message types.SecureMessage) error {
@@ -665,6 +718,26 @@ func (wsg *WebSocketGateway) handleAgentRegistration(agentID string, message typ
 	
 	log.Printf("Successfully registered agent %s with Actions API", agentID)
 	
+	// Extract agent_uid from the registration response
+	agentUID, _ := registrationResponse["agent_uid"].(string)
+	if agentUID != "" && agentUID != agentID {
+		// Update connection key from hostname to UID
+		log.Printf("Updating connection key from hostname %s to UID %s", agentID, agentUID)
+		wsg.mu.Lock()
+		if conn, exists := wsg.agentConnections[agentID]; exists {
+			// Remove old key (hostname)
+			delete(wsg.agentConnections, agentID)
+			// Update connection's AgentID to UID
+			conn.AgentID = agentUID
+			// Store with new key (UID)
+			wsg.agentConnections[agentUID] = conn
+			log.Printf("Successfully updated connection key from %s to %s", agentID, agentUID)
+		}
+		wsg.mu.Unlock()
+		// Update agentID for subsequent operations
+		agentID = agentUID
+	}
+	
 	// Send success response back to agent
 	response := types.SecureMessage{
 		ID:        fmt.Sprintf("reg_resp_%d", time.Now().UnixNano()),
@@ -777,6 +850,26 @@ func (wsg *WebSocketGateway) handleAgentRegistrationComplete(agentID string, mes
 	
 	log.Printf("Successfully completed agent registration for agent %s", agentID)
 	
+	// Extract agent_uid from the registration complete response
+	agentUID, _ := completionResponse["agent_uid"].(string)
+	if agentUID != "" && agentUID != agentID {
+		// Update connection key from hostname to UID
+		log.Printf("Updating connection key from hostname %s to UID %s", agentID, agentUID)
+		wsg.mu.Lock()
+		if conn, exists := wsg.agentConnections[agentID]; exists {
+			// Remove old key (hostname)
+			delete(wsg.agentConnections, agentID)
+			// Update connection's AgentID to UID
+			conn.AgentID = agentUID
+			// Store with new key (UID)
+			wsg.agentConnections[agentUID] = conn
+			log.Printf("Successfully updated connection key from %s to %s", agentID, agentUID)
+		}
+		wsg.mu.Unlock()
+		// Update agentID for subsequent operations
+		agentID = agentUID
+	}
+	
 	// Send success response back to agent
 	response := types.SecureMessage{
 		ID:        fmt.Sprintf("reg_complete_resp_%d", time.Now().UnixNano()),
@@ -802,5 +895,128 @@ func (wsg *WebSocketGateway) handleAgentRegistrationComplete(agentID string, mes
 		log.Printf("Sent registration complete response to agent %s", agentID)
 	}
 	
+	return nil
+}
+
+
+// startNATSSubscription starts listening for messages from Actions API via NATS
+func (wsg *WebSocketGateway) startNATSSubscription() {
+	if wsg.nc == nil {
+		log.Printf("NATS not connected, skipping subscription")
+		return
+	}
+
+	subject := "websocket.messages"
+	log.Printf("Subscribing to NATS subject: %s", subject)
+
+	_, err := wsg.nc.Subscribe(subject, func(m *nats.Msg) {
+		wsg.handleNATSMessage(m)
+	})
+
+	if err != nil {
+		log.Printf("Failed to subscribe to NATS subject %s: %v", subject, err)
+		return
+	}
+
+	log.Printf("Successfully subscribed to NATS subject: %s", subject)
+	
+	// Keep the subscription alive
+	select {
+	case <-wsg.ctx.Done():
+		log.Printf("NATS subscription stopped due to context cancellation")
+	}
+}
+
+// handleNATSMessage handles messages received from NATS (from Actions API)
+func (wsg *WebSocketGateway) handleNATSMessage(m *nats.Msg) {
+	log.Printf("Received message from NATS: %s", string(m.Data))
+
+	// Parse the message
+	var messageData map[string]interface{}
+	if err := json.Unmarshal(m.Data, &messageData); err != nil {
+		log.Printf("Failed to parse NATS message: %v", err)
+		return
+	}
+
+	// Extract target agent and channel
+	targetAgent, _ := messageData["target_agent"].(string)
+	channel, _ := messageData["channel"].(string)
+	messageType, _ := messageData["type"].(string)
+
+	if targetAgent == "" {
+		log.Printf("No target agent specified in NATS message")
+		return
+	}
+
+	log.Printf("Routing NATS message to agent %s on channel %s", targetAgent, channel)
+
+	// Send message to the target agent
+	if err := wsg.sendMessageToAgent(targetAgent, channel, messageData, messageType); err != nil {
+		log.Printf("Failed to send message to agent %s: %v", targetAgent, err)
+	}
+}
+
+// sendMessageToAgent sends a message to a specific agent via WebSocket
+func (wsg *WebSocketGateway) sendMessageToAgent(agentID, channel string, message map[string]interface{}, messageType string) error {
+	wsg.mu.Lock()
+	conn, exists := wsg.agentConnections[agentID]
+	wsg.mu.Unlock()
+
+	if !exists {
+		log.Printf("Agent %s not connected", agentID)
+		return fmt.Errorf("agent %s not connected", agentID)
+	}
+
+	// Generate nonce that matches agent expectations and ChaCha20-Poly1305 requirements
+	// Agent expects: base64.StdEncoding.EncodeToString([]byte("message_nonce"))
+	// But ChaCha20-Poly1305 requires exactly 12 bytes, so we'll use first 12 bytes of "message_nonce"
+	nonceBytes := []byte("message_nonc") // 12 bytes exactly
+	nonceStr := base64.StdEncoding.EncodeToString(nonceBytes)
+
+	// Derive shared key using both public keys (Option 3)
+	// Agent will use: SHA256(agent_public_key + backend_public_key)
+	// Backend uses: SHA256(agent_public_key + backend_public_key)
+	// Both sides derive the same shared secret using public keys only
+	backendPublicKey := wsg.authService.GetBackendPublicKey()
+	
+	// Use agent's public key first, then backend's public key (matches agent's order)
+	combined := append(conn.PublicKey, backendPublicKey...)
+	sharedKeyHash := sha256.Sum256(combined)
+	sharedKey := sharedKeyHash[:]
+
+	// Create ChaCha20-Poly1305 cipher
+	cipher, err := chacha20poly1305.New(sharedKey)
+	if err != nil {
+		return fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	// Encrypt the payload
+	payloadBytes := []byte(message["payload"].(string))
+	encryptedPayload := cipher.Seal(nil, nonceBytes, payloadBytes, nil)
+	encryptedPayloadStr := base64.StdEncoding.EncodeToString(encryptedPayload)
+
+	// Create the message to send with proper SecureMessage format
+	messageToSend := map[string]interface{}{
+		"id":        message["id"],
+		"type":      messageType,
+		"channel":   channel,
+		"payload":   encryptedPayloadStr, // Encrypted payload
+		"timestamp": message["timestamp"],
+		"nonce":     nonceStr, // Agent-expected nonce format
+		"signature": "",       // Empty signature for now - agent team needs to handle this
+		"headers":   message["headers"],
+	}
+
+	messageData, err := json.Marshal(messageToSend)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	// Send the message
+	if err := conn.Connection.WriteMessage(websocket.TextMessage, messageData); err != nil {
+		return fmt.Errorf("failed to send message: %w", err)
+	}
+
+	log.Printf("Successfully sent message to agent %s on channel %s", agentID, channel)
 	return nil
 }

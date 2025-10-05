@@ -1,0 +1,89 @@
+Objectives
+
+Backend-pushed policy actually enforces (no more simulation).
+
+Mode switch per assignment: observe (log only) vs block (drop).
+
+Complete host visibility from the agent: process tree, exec events, sockets, and network flows.
+
+B. Enforcement (Backend)
+
+Assignment payload
+
+{
+  "bundle_id": "net-guard-001",
+  "mode": "block",            // "block" | "observe"
+  "ttl_ts": "2025-10-01T00:00:00Z",
+  "selector": { "host_id": "h-123" },
+  "snapshot": {
+    "allow_cidr_v4": ["10.0.0.0/24"],
+    "deny_cidr_v4":  ["8.8.8.8/32", "1.1.1.1/32"],
+    "edges": [{"src":"svc:frontend","dst":"svc:auth"}]
+  }
+}
+
+
+Backend tasks
+
+Extend /assignments to accept mode.
+
+Sign the snapshot as part of the bundle (7.9 signer).
+
+On publish: write to DB, emit NATS aegis.assignments.created.
+
+C. Modes (observe vs block)
+
+Agent decision logic (in loader or helper)
+
+Read /sys/fs/bpf/aegis/mode:
+
+observe: programs still classify, but return ALLOW; emit enforce_decision(verdict="observe_drop") for any would-be drop
+
+block: return DROP where policy denies
+
+This lets you toggle safely from observe → block without changing policies.
+
+
+aegisflux-backend/
+  services/registry/handlers/
+    assignments.go     # add "mode" + signed snapshot
+    bundles.go
+  services/registry/publish/
+    nats.go            # assignment created → NATS
+  services/collector/
+    visibility_consumer.go # NATS → DB
+  internal/db/migrate/
+    002_visibility.sql  # tables for visibility frames + indexes
+  prompts/
+    backend_07_10_enforcement.md
+    backend_07_10_visibility.md
+
+
+CREATE TABLE visibility_frames(
+  id BIGSERIAL PRIMARY KEY,
+  agent_uid TEXT,
+  ts TIMESTAMPTZ,
+  procs JSONB,
+  flows JSONB
+);
+CREATE INDEX ON visibility_frames(agent_uid, ts DESC);
+
+prompts/backend_07_10_enforcement.md
+
+Extend POST /assignments → accept mode and snapshot.
+
+Validate snapshot schema; sign bundle (7.9 signer).
+
+Store assignment + emit aegis.assignments.created.
+
+Add GET /assignments/:id for inspection.
+
+Acceptance: posting assignment yields agent apply + telemetry.
+
+prompts/backend_07_10_visibility.md
+
+Add NATS consumer for aegis.visibility.host.*; persist JSON frames.
+
+GET /agents/:id/visibility/latest returns last frame.
+
+Acceptance: curl endpoint returns expected procs/flows content.

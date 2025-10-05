@@ -1,8 +1,14 @@
 module github.com/sgerhart/aegisflux/websocket-gateway
 
-go 1.21
+go 1.23.0
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/nats-io/nats.go v1.46.0 // indirect
+	github.com/nats-io/nkeys v0.4.11 // indirect
+	github.com/nats-io/nuid v1.0.1 // indirect
+	golang.org/x/crypto v0.37.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
 )

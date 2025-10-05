@@ -295,3 +295,7 @@ func (p *NATSPublisher) SubscribeWithQueue(subject, queue string, handler func(*
 	return p.conn.QueueSubscribe(subject, queue, handler)
 }
 
+
+
+
+

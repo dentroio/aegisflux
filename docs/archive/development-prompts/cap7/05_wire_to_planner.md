@@ -1,0 +1,2 @@
+- Forward high-severity Findings to the Decision Engine/Orchestrator as proposed **Adaptive Safeguards**.
+- For network risks, synthesize MapSnapshot drafts (service_id/edges/ttl).

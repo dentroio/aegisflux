@@ -1,0 +1,462 @@
+# AEGIS eBPF Agent - Backend Integration Guide
+
+## Overview
+
+This guide demonstrates how the backend communicates with the AEGIS eBPF agent to enforce network policies in real-time using kernel-space eBPF programs and BPF maps.
+
+## Architecture
+
+```
+Backend System → HTTP API → AEGIS Agent → eBPF Maps → Kernel Enforcement
+                    ↓
+                Telemetry ← Agent Stats ← eBPF Statistics
+```
+
+## 1. Backend to Agent Communication
+
+### Agent API Endpoints
+
+- **Policy Management**: `http://agent-host:7070/policies`
+- **Status Check**: `http://agent-host:7070/status`
+- **Statistics**: `http://agent-host:7070/stats`
+- **Health Check**: `http://agent-host:7070/health`
+
+### Authentication
+```http
+Content-Type: application/json
+Authorization: Bearer <token>  # If authentication enabled
+```
+
+## 2. Policy Enforcement Examples
+
+### Example 1: Block ICMP to 8.8.8.8
+
+#### Backend Request
+```http
+POST http://192.168.193.129:7070/policies
+Content-Type: application/json
+```
+
+#### Payload (Full Policy Format)
+```json
+{
+  "id": "security-block-dns-001",
+  "name": "Block Google DNS 8.8.8.8",
+  "description": "Security policy to block ICMP traffic to 8.8.8.8",
+  "type": "network",
+  "priority": 100,
+  "enabled": true,
+  "enforcement_type": "ebpf",
+  "rules": [
+    {
+      "id": "icmp-block-8888",
+      "action": "deny",
+      "priority": 1,
+      "conditions": [
+        {
+          "field": "dest_ip",
+          "operator": "eq",
+          "value": "8.8.8.8"
+        },
+        {
+          "field": "protocol",
+          "operator": "eq",
+          "value": "icmp"
+        }
+      ],
+      "metadata": {
+        "enforcement_method": "ebpf_map_update",
+        "map_name": "aegis_blocked_destinations",
+        "ttl_seconds": 3600,
+        "created_by": "security_team",
+        "reason": "block_suspicious_dns"
+      }
+    }
+  ],
+  "telemetry": {
+    "report_violations": true,
+    "report_interval_seconds": 60,
+    "include_packet_details": false
+  }
+}
+```
+
+#### Agent Response
+```json
+{
+  "id": "security-block-dns-001",
+  "status": "created",
+  "enforcement_active": true,
+  "map_updated": true,
+  "timestamp": "2025-09-20T02:15:30Z"
+}
+```
+
+### Example 2: Simplified Policy Formats
+
+#### Quick Block Format
+```json
+{
+  "action": "block",
+  "target": "8.8.8.8",
+  "protocol": "icmp",
+  "duration": 3600
+}
+```
+
+#### Advanced Multi-Rule Policy
+```json
+{
+  "id": "network-security-policy-001",
+  "rules": [
+    {
+      "dest_ip": "8.8.8.8",
+      "protocol": "icmp",
+      "action": "deny"
+    },
+    {
+      "dest_ip": "8.8.4.4",
+      "protocol": "icmp", 
+      "action": "deny"
+    },
+    {
+      "dest_port": 22,
+      "protocol": "tcp",
+      "action": "allow",
+      "conditions": ["src_ip_in_whitelist"]
+    }
+  ]
+}
+```
+
+#### Remove Policy
+```json
+{
+  "action": "unblock",
+  "target": "8.8.8.8",
+  "policy_id": "security-block-dns-001"
+}
+```
+
+## 3. Agent Processing Flow
+
+### Step 1: Policy Validation
+- JSON schema validation
+- Rule conflict detection
+- Priority ordering
+- Resource availability check
+
+### Step 2: eBPF Map Translation
+```bash
+# Agent converts policy to eBPF map operations
+# IP 8.8.8.8 = 0x08080808 in network byte order
+# Protocol ICMP = 1
+bpftool map update id 8 key hex 08080808 value hex 01
+```
+
+### Step 3: Kernel Enforcement
+- eBPF program reads from maps in real-time
+- Packet inspection at kernel level
+- Drop/allow decisions based on map data
+- Statistics collection
+
+## 4. eBPF Infrastructure
+
+### BPF Maps Used
+
+#### Policy Storage Map
+```c
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 4096);
+    __type(key, __u32);     // IP address (network byte order)
+    __type(value, __u8);    // Protocol (1=ICMP, 6=TCP, 17=UDP, 255=ALL)
+} aegis_blocked_destinations;
+```
+
+#### Statistics Map
+```c
+struct {
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+    __uint(max_entries, 20);
+    __type(key, __u32);     // Stat type
+    __type(value, __u64);   // Counter value
+} aegis_enforcement_stats;
+```
+
+### eBPF Program Logic
+```c
+SEC("classifier")
+int aegis_enforce(struct __sk_buff *skb)
+{
+    // Extract IP and protocol from packet
+    __u32 dest_ip = get_dest_ip(skb);
+    __u8 protocol = get_protocol(skb);
+    
+    // Check policy map
+    __u8 *blocked = bpf_map_lookup_elem(&aegis_blocked_destinations, &dest_ip);
+    if (blocked && (*blocked == protocol || *blocked == 255)) {
+        update_stats(STAT_PACKETS_BLOCKED);
+        return TC_ACT_SHOT;  // Drop packet
+    }
+    
+    return TC_ACT_OK;  // Allow packet
+}
+```
+
+## 5. Telemetry and Observability
+
+### Agent to Backend Telemetry
+
+#### Enforcement Events
+```json
+{
+  "id": "evt-20250920-001",
+  "type": "ebpf_enforcement",
+  "timestamp": "2025-09-20T02:15:30Z",
+  "host_id": "testhost-1b-arm64",
+  "agent_id": "aegis-testhost-1b-arm64",
+  "data": {
+    "policy_id": "security-block-dns-001",
+    "enforcement_action": "packet_dropped",
+    "dest_ip": "8.8.8.8",
+    "src_ip": "192.168.193.129",
+    "protocol": "icmp",
+    "packet_count": 5,
+    "enforcement_method": "ebpf_map",
+    "map_name": "aegis_blocked_destinations"
+  }
+}
+```
+
+#### Network Flow Statistics
+```json
+{
+  "id": "flow-stats-001",
+  "type": "network_flow",
+  "timestamp": "2025-09-20T02:15:30Z",
+  "data": {
+    "flows": [
+      {
+        "src_ip": "192.168.193.129",
+        "dest_ip": "8.8.8.8",
+        "protocol": "icmp",
+        "packets": 10,
+        "bytes": 840,
+        "duration_ms": 5000,
+        "blocked": true,
+        "policy_id": "security-block-dns-001"
+      }
+    ],
+    "top_talkers": [
+      {"ip": "8.8.8.8", "bytes": 1024},
+      {"ip": "1.1.1.1", "bytes": 512}
+    ]
+  }
+}
+```
+
+#### System Health
+```json
+{
+  "id": "health-001",
+  "type": "system_health",
+  "timestamp": "2025-09-20T02:15:30Z",
+  "data": {
+    "ebpf_programs_loaded": 2,
+    "active_policies": 1,
+    "packets_processed": 1250,
+    "packets_blocked": 15,
+    "memory_usage_mb": 45,
+    "cpu_usage_percent": 2.1,
+    "uptime_seconds": 86400
+  }
+}
+```
+
+## 6. Policy Management Operations
+
+### List Active Policies
+```http
+GET http://agent-host:7070/policies
+```
+
+Response:
+```json
+{
+  "policies": [
+    {
+      "id": "security-block-dns-001",
+      "name": "Block Google DNS 8.8.8.8",
+      "status": "active",
+      "created": "2025-09-20T02:15:30Z",
+      "rules_count": 1,
+      "violations_count": 15
+    }
+  ],
+  "total": 1,
+  "active": 1
+}
+```
+
+### Update Policy
+```http
+PUT http://agent-host:7070/policies/security-block-dns-001
+```
+
+### Delete Policy
+```http
+DELETE http://agent-host:7070/policies/security-block-dns-001
+```
+
+### Check Agent Status
+```http
+GET http://agent-host:7070/status
+```
+
+Response:
+```json
+{
+  "status": "healthy",
+  "version": "1.0.0",
+  "platform": "linux/arm64",
+  "ebpf_enabled": true,
+  "backend_connected": true,
+  "policies": {
+    "total": 1,
+    "active": 1,
+    "disabled": 0
+  },
+  "ebpf": {
+    "programs_loaded": 2,
+    "maps_active": 3,
+    "enforcement_active": true
+  },
+  "last_heartbeat": "2025-09-20T02:15:30Z"
+}
+```
+
+## 7. Error Handling
+
+### Policy Validation Errors
+```json
+{
+  "error": "validation_failed",
+  "message": "Invalid IP address format",
+  "details": {
+    "field": "rules[0].conditions[0].value",
+    "value": "invalid-ip",
+    "expected": "IPv4 address"
+  }
+}
+```
+
+### eBPF Operation Errors
+```json
+{
+  "error": "ebpf_map_update_failed",
+  "message": "Failed to update eBPF map",
+  "details": {
+    "map_name": "aegis_blocked_destinations",
+    "operation": "update",
+    "key": "08080808",
+    "errno": 22
+  }
+}
+```
+
+## 8. Advanced Features
+
+### Time-based Policies
+```json
+{
+  "id": "time-based-block",
+  "schedule": {
+    "start_time": "2025-09-20T09:00:00Z",
+    "end_time": "2025-09-20T17:00:00Z",
+    "days": ["monday", "tuesday", "wednesday", "thursday", "friday"]
+  },
+  "rules": [...]
+}
+```
+
+### Conditional Policies
+```json
+{
+  "id": "conditional-block",
+  "conditions": {
+    "cpu_usage_above": 80,
+    "memory_usage_above": 90,
+    "threat_level": "high"
+  },
+  "rules": [...]
+}
+```
+
+### Policy Templates
+```json
+{
+  "template": "block_ip_range",
+  "parameters": {
+    "ip_range": "8.8.8.0/24",
+    "protocols": ["icmp", "tcp"],
+    "duration": 3600
+  }
+}
+```
+
+## 9. Testing and Validation
+
+### Test Policy Application
+```bash
+# Send policy
+curl -X POST http://agent:7070/policies -d @policy.json
+
+# Test enforcement
+ping 8.8.8.8  # Should be blocked
+
+# Check statistics
+curl http://agent:7070/stats
+```
+
+### Verify eBPF Maps
+```bash
+# Check map contents
+sudo bpftool map dump id 8
+
+# Monitor statistics
+sudo bpftool map dump id 9
+```
+
+## 10. Production Deployment
+
+### Backend Integration Points
+- **Policy Distribution**: Central policy management system
+- **Telemetry Collection**: SIEM/monitoring integration
+- **Alert Generation**: Real-time security alerts
+- **Compliance Reporting**: Policy violation reports
+
+### Monitoring
+- Agent health checks
+- eBPF program status
+- Policy enforcement metrics
+- System performance impact
+
+### Security Considerations
+- mTLS for backend communication
+- Policy signature verification
+- Agent certificate management
+- Secure key distribution
+
+## Conclusion
+
+The AEGIS eBPF agent provides a complete backend-integrated solution for real-time network policy enforcement using kernel-space eBPF programs. The system offers:
+
+- **Real-time enforcement** via eBPF programs
+- **Dynamic policy updates** through BPF maps
+- **Comprehensive telemetry** for observability
+- **RESTful API** for backend integration
+- **High performance** kernel-level processing
+- **Production-ready** security and monitoring
+
+This architecture enables centralized policy management with distributed, high-performance enforcement at the host level.

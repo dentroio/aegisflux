@@ -232,3 +232,4 @@ func (as *AuthService) GetBackendPrivateKey() ed25519.PrivateKey {
 	return as.privateKey
 }
 
+
