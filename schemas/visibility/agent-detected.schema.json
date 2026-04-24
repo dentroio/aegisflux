@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aegisflux.local/schemas/visibility/agent-detected.schema.json",
+  "title": "Aegis Agent Detected",
+  "allOf": [
+    {
+      "$ref": "common-envelope.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "aegis.agent.detected"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "detection_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "process_guid": {
+              "type": ["string", "null"]
+            },
+            "flow_id": {
+              "type": ["string", "null"]
+            },
+            "classification": {
+              "type": "string",
+              "minLength": 1
+            },
+            "agent_likelihood": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "risk_score": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "detected_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": ["type", "value", "confidence"],
+                "additionalProperties": false
+              }
+            },
+            "recommended_action": {
+              "type": "string",
+              "enum": ["monitor", "review", "policy_candidate"]
+            }
+          },
+          "required": [
+            "detection_id",
+            "classification",
+            "agent_likelihood",
+            "confidence",
+            "risk_score",
+            "detected_patterns",
+            "evidence",
+            "recommended_action"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

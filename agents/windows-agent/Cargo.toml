@@ -1,0 +1,21 @@
+[package]
+name = "aegis-windows-agent"
+version = "0.1.0"
+edition = "2024"
+license = "BSD-2-Clause"
+description = "Aegis Windows visibility agent"
+
+[dependencies]
+sysinfo = { version = "0.38.4", default-features = false, features = ["system"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+dbg_macro = "deny"
+undocumented_unsafe_blocks = "deny"

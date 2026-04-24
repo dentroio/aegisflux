@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aegisflux.local/schemas/visibility/flow-started.schema.json",
+  "title": "Aegis Flow Started",
+  "allOf": [
+    {
+      "$ref": "common-envelope.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "aegis.flow.started"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "flow_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "process_guid": {
+              "type": ["string", "null"]
+            },
+            "pid": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "process_name": {
+              "type": ["string", "null"]
+            },
+            "user": {
+              "type": ["string", "null"]
+            },
+            "protocol": {
+              "type": "string",
+              "enum": ["tcp", "udp", "icmp", "other"]
+            },
+            "direction": {
+              "type": "string",
+              "enum": ["outbound", "inbound", "local", "unknown"]
+            },
+            "local_ip": {
+              "type": "string"
+            },
+            "local_port": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "remote_ip": {
+              "type": "string"
+            },
+            "remote_port": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "remote_hostname": {
+              "type": ["string", "null"]
+            },
+            "attribution_method": {
+              "type": "string",
+              "minLength": 1
+            },
+            "attribution_confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "flow_id",
+            "protocol",
+            "direction",
+            "local_ip",
+            "remote_ip",
+            "attribution_method",
+            "attribution_confidence"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

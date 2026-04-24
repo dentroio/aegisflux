@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aegisflux.local/schemas/visibility/collector-status.schema.json",
+  "title": "Aegis Collector Status",
+  "allOf": [
+    {
+      "$ref": "common-envelope.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "aegis.collector.status"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "collector": {
+              "type": "string",
+              "minLength": 1
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "starting", "healthy", "degraded", "error", "disabled"]
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": ["collector", "status", "message"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

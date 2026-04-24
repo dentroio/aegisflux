@@ -1,0 +1,29 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "windows-agent-dev-1777062016000-41",
+  "event_type": "aegis.risk_finding.created",
+  "timestamp_ms": 1777062016000,
+  "source": "aegis-windows-agent",
+  "device_id": "windows-dev-agent-01",
+  "agent_id": "windows-agent-dev",
+  "sensor_version": "0.1.0",
+  "sequence": 41,
+  "payload": {
+    "finding_id": "finding-windows-dev-agent-01-1777062016000-1",
+    "severity": "medium",
+    "risk_score": 42,
+    "title": "Likely local AI agent script observed",
+    "description": "Python process launched from developer tooling made an outbound model gateway connection with agent-runner command-line indicators.",
+    "process_guid": "windows-dev-agent-01:1777062000000:9324",
+    "flow_id": "windows-dev-agent-01:1777062010000:9324:tcp:10.10.20.55:52944:203.0.113.10:443",
+    "detection_id": "det-windows-dev-agent-01-1777062015000-1",
+    "evidence": [
+      {
+        "type": "classification",
+        "value": "script_or_agent_runtime",
+        "confidence": 0.82
+      }
+    ],
+    "recommended_action": "review"
+  }
+}

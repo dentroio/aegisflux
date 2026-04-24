@@ -1,0 +1,44 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "windows-agent-dev-1777062015000-40",
+  "event_type": "aegis.agent.detected",
+  "timestamp_ms": 1777062015000,
+  "source": "aegis-windows-agent",
+  "device_id": "windows-dev-agent-01",
+  "agent_id": "windows-agent-dev",
+  "sensor_version": "0.1.0",
+  "sequence": 40,
+  "payload": {
+    "detection_id": "det-windows-dev-agent-01-1777062015000-1",
+    "process_guid": "windows-dev-agent-01:1777062000000:9324",
+    "flow_id": "windows-dev-agent-01:1777062010000:9324:tcp:10.10.20.55:52944:203.0.113.10:443",
+    "classification": "script_or_agent_runtime",
+    "agent_likelihood": 0.87,
+    "confidence": 0.82,
+    "risk_score": 42,
+    "detected_patterns": [
+      "python_runtime",
+      "agent_runner_command_line",
+      "model_api_destination",
+      "repo_path_access"
+    ],
+    "evidence": [
+      {
+        "type": "parent_process",
+        "value": "cursor.exe",
+        "confidence": 0.8
+      },
+      {
+        "type": "command_line",
+        "value": "python C:\\AegisLab\\scripts\\agent_runner.py --tools web,repo,llm",
+        "confidence": 0.9
+      },
+      {
+        "type": "destination",
+        "value": "api.model-gateway.lab:443",
+        "confidence": 0.96
+      }
+    ],
+    "recommended_action": "review"
+  }
+}

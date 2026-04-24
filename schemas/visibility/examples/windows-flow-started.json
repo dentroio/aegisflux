@@ -1,0 +1,27 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "windows-agent-dev-1777062010000-20",
+  "event_type": "aegis.flow.started",
+  "timestamp_ms": 1777062010000,
+  "source": "aegis-windows-agent",
+  "device_id": "windows-dev-agent-01",
+  "agent_id": "windows-agent-dev",
+  "sensor_version": "0.1.0",
+  "sequence": 20,
+  "payload": {
+    "flow_id": "windows-dev-agent-01:1777062010000:9324:tcp:10.10.20.55:52944:203.0.113.10:443",
+    "process_guid": "windows-dev-agent-01:1777062000000:9324",
+    "pid": 9324,
+    "process_name": "python.exe",
+    "user": "WINDOWS-DEV-AGENT-01\\aegis-lab",
+    "protocol": "tcp",
+    "direction": "outbound",
+    "local_ip": "10.10.20.55",
+    "local_port": 52944,
+    "remote_ip": "203.0.113.10",
+    "remote_port": 443,
+    "remote_hostname": "api.model-gateway.lab",
+    "attribution_method": "windows.etw.tcpip.pid",
+    "attribution_confidence": 0.96
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aegisflux.local/schemas/visibility/process-started.schema.json",
+  "title": "Aegis Process Started",
+  "allOf": [
+    {
+      "$ref": "common-envelope.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "aegis.process.started"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "process_guid": {
+              "type": "string",
+              "minLength": 1
+            },
+            "parent_process_guid": {
+              "type": ["string", "null"]
+            },
+            "pid": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ppid": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": ["string", "null"]
+            },
+            "command_line": {
+              "type": ["string", "null"]
+            },
+            "user": {
+              "type": ["string", "null"]
+            },
+            "logon_session_id": {
+              "type": ["string", "null"]
+            },
+            "integrity_level": {
+              "type": ["string", "null"]
+            },
+            "sha256": {
+              "type": ["string", "null"],
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            },
+            "publisher": {
+              "type": ["string", "null"]
+            },
+            "collection_method": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["process_guid", "pid", "name", "collection_method"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

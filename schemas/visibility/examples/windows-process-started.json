@@ -1,0 +1,26 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "windows-agent-dev-1777062000000-10",
+  "event_type": "aegis.process.started",
+  "timestamp_ms": 1777062000000,
+  "source": "aegis-windows-agent",
+  "device_id": "windows-dev-agent-01",
+  "agent_id": "windows-agent-dev",
+  "sensor_version": "0.1.0",
+  "sequence": 10,
+  "payload": {
+    "process_guid": "windows-dev-agent-01:1777062000000:9324",
+    "parent_process_guid": "windows-dev-agent-01:1777061995000:2100",
+    "pid": 9324,
+    "ppid": 2100,
+    "name": "python.exe",
+    "path": "C:\\Users\\AegisLab\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+    "command_line": "python C:\\AegisLab\\scripts\\agent_runner.py --tools web,repo,llm",
+    "user": "WINDOWS-DEV-AGENT-01\\aegis-lab",
+    "logon_session_id": "0x3e7",
+    "integrity_level": "medium",
+    "sha256": null,
+    "publisher": "Python Software Foundation",
+    "collection_method": "windows.etw.process"
+  }
+}

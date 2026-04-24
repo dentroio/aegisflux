@@ -1,0 +1,22 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "macos-agent-dev-1777062242731-1",
+  "event_type": "aegis.agent.heartbeat",
+  "timestamp_ms": 1777062242731,
+  "source": "aegis-macos-agent",
+  "device_id": "macos-agent-01",
+  "agent_id": "macos-agent-dev",
+  "sensor_version": "0.1.0",
+  "sequence": 1,
+  "payload": {
+    "status": "starting",
+    "message": "macOS visibility agent initialized",
+    "os": "macos",
+    "arch": "aarch64",
+    "capabilities": [
+      "process.status",
+      "flow.status",
+      "dns.status"
+    ]
+  }
+}

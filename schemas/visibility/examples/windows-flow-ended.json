@@ -1,0 +1,21 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "windows-agent-dev-1777062025000-21",
+  "event_type": "aegis.flow.ended",
+  "timestamp_ms": 1777062025000,
+  "source": "aegis-windows-agent",
+  "device_id": "windows-dev-agent-01",
+  "agent_id": "windows-agent-dev",
+  "sensor_version": "0.1.0",
+  "sequence": 21,
+  "payload": {
+    "flow_id": "windows-dev-agent-01:1777062010000:9324:tcp:10.10.20.55:52944:203.0.113.10:443",
+    "process_guid": "windows-dev-agent-01:1777062000000:9324",
+    "pid": 9324,
+    "bytes_sent": 18400,
+    "bytes_received": 92200,
+    "duration_ms": 15000,
+    "connection_state": "closed",
+    "collection_method": "windows.etw.tcpip"
+  }
+}

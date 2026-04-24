@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aegisflux.local/schemas/visibility/flow-ended.schema.json",
+  "title": "Aegis Flow Ended",
+  "allOf": [
+    {
+      "$ref": "common-envelope.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "aegis.flow.ended"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "flow_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "process_guid": {
+              "type": ["string", "null"]
+            },
+            "pid": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "bytes_sent": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "bytes_received": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "duration_ms": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "connection_state": {
+              "type": ["string", "null"]
+            },
+            "collection_method": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["flow_id", "collection_method"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

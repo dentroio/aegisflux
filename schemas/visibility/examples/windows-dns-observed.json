@@ -1,0 +1,23 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "windows-agent-dev-1777062009000-30",
+  "event_type": "aegis.dns.observed",
+  "timestamp_ms": 1777062009000,
+  "source": "aegis-windows-agent",
+  "device_id": "windows-dev-agent-01",
+  "agent_id": "windows-agent-dev",
+  "sensor_version": "0.1.0",
+  "sequence": 30,
+  "payload": {
+    "query": "api.model-gateway.lab",
+    "query_type": "A",
+    "answers": [
+      "203.0.113.10"
+    ],
+    "resolver": "10.10.20.1",
+    "process_guid": "windows-dev-agent-01:1777062000000:9324",
+    "pid": 9324,
+    "correlation_method": "windows.dnsclient.etw.pid",
+    "correlation_confidence": 0.9
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "windows-agent-dev-1777062060000-11",
+  "event_type": "aegis.process.ended",
+  "timestamp_ms": 1777062060000,
+  "source": "aegis-windows-agent",
+  "device_id": "windows-dev-agent-01",
+  "agent_id": "windows-agent-dev",
+  "sensor_version": "0.1.0",
+  "sequence": 11,
+  "payload": {
+    "process_guid": "windows-dev-agent-01:1777062000000:9324",
+    "pid": 9324,
+    "name": "python.exe",
+    "exit_code": 0,
+    "duration_ms": 60000,
+    "collection_method": "windows.etw.process"
+  }
+}

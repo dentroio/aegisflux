@@ -1,0 +1,22 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "windows-agent-dev-1777061930304-1",
+  "event_type": "aegis.agent.heartbeat",
+  "timestamp_ms": 1777061930304,
+  "source": "aegis-windows-agent",
+  "device_id": "windows-dev-agent-01",
+  "agent_id": "windows-agent-dev",
+  "sensor_version": "0.1.0",
+  "sequence": 1,
+  "payload": {
+    "status": "starting",
+    "message": "windows visibility agent initialized",
+    "os": "windows",
+    "arch": "x86_64",
+    "capabilities": [
+      "process.status",
+      "flow.status",
+      "dns.status"
+    ]
+  }
+}

@@ -67,6 +67,9 @@ logs/
 # Node modules (if any)
 node_modules/
 
+# Rust / Cargo
+target/
+
 # Temporary files
 tmp/
 temp/

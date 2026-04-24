@@ -1,0 +1,16 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "windows-agent-dev-1777061930304-2",
+  "event_type": "aegis.collector.status",
+  "timestamp_ms": 1777061930304,
+  "source": "aegis-windows-agent",
+  "device_id": "windows-dev-agent-01",
+  "agent_id": "windows-agent-dev",
+  "sensor_version": "0.1.0",
+  "sequence": 2,
+  "payload": {
+    "collector": "windows.process",
+    "status": "pending",
+    "message": "process inventory collector requires ETW/Win32 implementation"
+  }
+}

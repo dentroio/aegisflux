@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aegisflux.local/schemas/visibility/risk-finding-created.schema.json",
+  "title": "Aegis Risk Finding Created",
+  "allOf": [
+    {
+      "$ref": "common-envelope.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "aegis.risk_finding.created"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "finding_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "severity": {
+              "type": "string",
+              "enum": ["info", "low", "medium", "high", "critical"]
+            },
+            "risk_score": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "process_guid": {
+              "type": ["string", "null"]
+            },
+            "flow_id": {
+              "type": ["string", "null"]
+            },
+            "detection_id": {
+              "type": ["string", "null"]
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "recommended_action": {
+              "type": "string",
+              "enum": ["monitor", "review", "policy_candidate"]
+            }
+          },
+          "required": [
+            "finding_id",
+            "severity",
+            "risk_score",
+            "title",
+            "description",
+            "evidence",
+            "recommended_action"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}
