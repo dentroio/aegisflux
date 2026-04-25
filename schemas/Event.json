@@ -12,8 +12,7 @@
     "type": {
       "type": "string",
       "description": "Type of the event",
-      "minLength": 1,
-      "enum": ["security", "audit", "performance", "application", "system"]
+      "minLength": 1
     },
     "source": {
       "type": "string",
@@ -34,11 +33,9 @@
     },
     "payload": {
       "type": "string",
-      "description": "Base64 encoded payload data",
-      "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+      "description": "Serialized event payload"
     }
   },
   "required": ["id", "type", "source", "timestamp"],
   "additionalProperties": false
 }
-

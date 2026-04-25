@@ -13,7 +13,7 @@ import (
 func TestSchemaValidator_ValidateEvent(t *testing.T) {
 	// Create a test logger
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	
+
 	// Create validator
 	validator, err := NewSchemaValidator(logger)
 	if err != nil {
@@ -90,14 +90,14 @@ func TestSchemaValidator_ValidateEvent(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "invalid event type",
+			name: "valid visibility event type",
 			event: &protos.Event{
 				Id:        "test-103",
-				Type:      "invalid-type",
-				Source:    "firewall",
+				Type:      "aegis.process.started",
+				Source:    "aegis-windows-agent",
 				Timestamp: 1640995200000,
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "negative timestamp",
@@ -154,7 +154,7 @@ func TestSchemaValidator_ValidateEvent(t *testing.T) {
 func TestSchemaValidator_Concurrency(t *testing.T) {
 	// Create a test logger
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	
+
 	// Create validator
 	validator, err := NewSchemaValidator(logger)
 	if err != nil {
@@ -162,10 +162,10 @@ func TestSchemaValidator_Concurrency(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// Test concurrent access
 	done := make(chan bool, 10)
-	
+
 	for i := 0; i < 10; i++ {
 		go func(id int) {
 			event := &protos.Event{
@@ -174,16 +174,16 @@ func TestSchemaValidator_Concurrency(t *testing.T) {
 				Source:    "firewall",
 				Timestamp: 1640995200000,
 			}
-			
+
 			err := validator.ValidateEvent(ctx, event)
 			if err != nil {
 				t.Errorf("Concurrent validation failed: %v", err)
 			}
-			
+
 			done <- true
 		}(i)
 	}
-	
+
 	// Wait for all goroutines to complete
 	for i := 0; i < 10; i++ {
 		<-done
@@ -193,7 +193,7 @@ func TestSchemaValidator_Concurrency(t *testing.T) {
 func TestSchemaValidator_ReloadSchema(t *testing.T) {
 	// Create a test logger
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	
+
 	// Create validator
 	validator, err := NewSchemaValidator(logger)
 	if err != nil {

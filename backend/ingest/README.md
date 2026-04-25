@@ -1,11 +1,11 @@
 # Ingest Service
 
-A gRPC service for ingesting events with streaming support, JSON Schema validation, and NATS publishing.
+A gRPC and HTTP service for ingesting events with streaming support, JSON Schema validation, and NATS publishing.
 
 ## Features
 
 - gRPC server for streaming event ingestion
-- HTTP health check and readiness endpoints
+- HTTP health check, readiness, metrics, and visibility event endpoints
 - Prometheus metrics collection
 - JSON Schema validation for events
 - NATS publishing with automatic reconnection
@@ -104,21 +104,47 @@ service Ingest {
 }
 ```
 
+### HTTP Visibility Event Ingest
+
+Windows and macOS visibility agents can post Phase 1 visibility events as newline-delimited JSON or as a JSON array:
+
+```bash
+curl -sS -X POST \
+  --data-binary @events.jsonl \
+  http://localhost:9090/v1/visibility/events
+```
+
+Successful responses use HTTP `202`:
+
+```json
+{"ok":true,"accepted":169,"message":"visibility events accepted"}
+```
+
+The HTTP endpoint maps visibility envelopes to the existing ingest `Event` shape:
+
+- `event_id` -> `id`
+- `event_type` -> `type`
+- `timestamp_ms` -> `timestamp`
+- `source` -> `source`
+- `payload` -> `payload`
+- `device_id`, `agent_id`, `schema_version`, `sensor_version`, and `sequence` -> metadata
+
 ### Event Schema
 
 Events are validated against a JSON Schema with the following requirements:
 
 - **Required fields**: `id`, `type`, `source`, `timestamp`
-- **Event types**: `["security", "audit", "performance", "application", "system"]`
+- **Event types**: Any non-empty event type string, including `aegis.*` visibility event types
 - **Timestamp**: Unix timestamp in milliseconds (minimum: 1)
 - **Metadata**: Optional key-value string pairs
-- **Payload**: Optional base64-encoded string
+- **Payload**: Optional serialized payload string
 
 ### Health Endpoints
 
 - **GET /healthz**: Returns `200 {"ok":true}` if both gRPC and NATS are healthy
 - **GET /readyz**: Returns `200 {"ok":true}` when NATS is connected and schema is compiled
 - **GET /metrics**: Returns Prometheus metrics in text format
+- **POST /v1/visibility/events**: Accepts visibility JSONL or JSON arrays and publishes accepted events to NATS
 
 ### Prometheus Metrics
 
@@ -164,6 +190,7 @@ go test ./internal/nats/ -v
 
 - `cmd/ingest/main.go`: Application entry point
 - `internal/server/grpc.go`: gRPC server implementation
+- `internal/server/http.go`: HTTP visibility event ingest implementation
 - `internal/validate/schema.go`: JSON Schema validation
 - `internal/nats/publish.go`: NATS publishing
 - `internal/health/`: Health check endpoints and status management

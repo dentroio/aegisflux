@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/santhosh-tekuri/jsonschema/v5"
 	"aegisflux/backend/ingest/protos"
+	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 
 // SchemaValidator implements JSON schema validation for events
@@ -23,7 +23,10 @@ type SchemaValidator struct {
 // NewSchemaValidator creates a new schema validator
 func NewSchemaValidator(logger *slog.Logger) (*SchemaValidator, error) {
 	// Load the schema file
-	schemaPath := filepath.Join("schemas", "Event.json")
+	schemaPath, err := findEventSchemaPath()
+	if err != nil {
+		return nil, err
+	}
 	schemaData, err := os.ReadFile(schemaPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read schema file %s: %w", schemaPath, err)
@@ -59,8 +62,8 @@ func (v *SchemaValidator) ValidateEvent(ctx context.Context, e *protos.Event) er
 
 	// Validate against schema
 	if err := v.schema.Validate(eventMap); err != nil {
-		v.logger.Warn("Event validation failed", 
-			"event_id", e.Id, 
+		v.logger.Warn("Event validation failed",
+			"event_id", e.Id,
 			"error", err.Error())
 		return fmt.Errorf("validation failed: %w", err)
 	}
@@ -102,7 +105,10 @@ func (v *SchemaValidator) ReloadSchema() error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
-	schemaPath := filepath.Join("schemas", "Event.json")
+	schemaPath, err := findEventSchemaPath()
+	if err != nil {
+		return err
+	}
 	schemaData, err := os.ReadFile(schemaPath)
 	if err != nil {
 		return fmt.Errorf("failed to read schema file %s: %w", schemaPath, err)
@@ -122,4 +128,20 @@ func (v *SchemaValidator) ReloadSchema() error {
 	v.schema = schema
 	v.logger.Info("Schema reloaded successfully", "schema_path", schemaPath)
 	return nil
+}
+
+func findEventSchemaPath() (string, error) {
+	candidates := []string{
+		filepath.Join("schemas", "Event.json"),
+		filepath.Join("..", "..", "schemas", "Event.json"),
+		filepath.Join("backend", "ingest", "schemas", "Event.json"),
+	}
+
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf("failed to locate Event.json schema")
 }

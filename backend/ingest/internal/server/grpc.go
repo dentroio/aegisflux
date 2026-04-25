@@ -2,8 +2,8 @@ package server
 
 import (
 	"context"
+	"errors"
 	"log/slog"
-	"time"
 
 	"aegisflux/backend/ingest/internal/health"
 	"aegisflux/backend/ingest/internal/metrics"
@@ -38,10 +38,10 @@ type IngestServer struct {
 func NewIngestServer(natsURL string, logger *slog.Logger) (*IngestServer, error) {
 	// Create metrics
 	metricsInstance := metrics.NewMetrics()
-	
+
 	// Create health checker
 	checker := health.NewServiceChecker(logger)
-	
+
 	// Create schema validator
 	schemaValidator, err := validate.NewSchemaValidator(logger)
 	if err != nil {
@@ -89,47 +89,17 @@ func (s *IngestServer) PostEvents(stream protos.Ingest_PostEventsServer) error {
 			hostID = h
 		}
 
-		// Log event processing start
-		s.logger.Info("Processing event", 
-			"event_id", event.Id, 
-			"event_type", event.Type, 
-			"host_id", hostID)
-
-		// Validate the event
-		if err := s.validator.ValidateEvent(stream.Context(), event); err != nil {
-			s.logger.Warn("Event validation failed", 
-				"event_id", event.Id, 
-				"event_type", event.Type, 
-				"host_id", hostID, 
+		if err := s.processEvent(stream.Context(), event); err != nil {
+			s.logger.Warn("Stream event processing failed",
+				"event_id", event.Id,
+				"event_type", event.Type,
+				"host_id", hostID,
 				"error", err)
-			s.metrics.IncrementEventsInvalid()
-			// Return InvalidArgument status for validation errors
-			return status.Errorf(codes.InvalidArgument, "event validation failed: %v", err)
+			if errors.Is(err, errEventPublish) {
+				return status.Errorf(codes.Unavailable, "event processing failed: %v", err)
+			}
+			return status.Errorf(codes.InvalidArgument, "event processing failed: %v", err)
 		}
-
-		// Create context with timeout for publishing
-		publishCtx, cancel := context.WithTimeout(stream.Context(), 2*time.Second)
-		defer cancel()
-
-		// Publish the event
-		if err := s.publisher.PublishEvent(publishCtx, event); err != nil {
-			s.logger.Error("Failed to publish event", 
-				"event_id", event.Id, 
-				"event_type", event.Type, 
-				"host_id", hostID, 
-				"error", err)
-			s.metrics.IncrementNatsPublishErrors()
-			// Return Unavailable status for publish failures
-			return status.Errorf(codes.Unavailable, "failed to publish event: %v", err)
-		}
-
-		// Increment successful event counter
-		s.metrics.IncrementEventsTotal()
-
-		s.logger.Info("Event processed successfully", 
-			"event_id", event.Id, 
-			"event_type", event.Type, 
-			"host_id", hostID)
 	}
 
 	// Return success acknowledgment
@@ -152,7 +122,7 @@ func (s *IngestServer) SetGRPCReady(ready bool) {
 // Close gracefully shuts down the server and closes connections
 func (s *IngestServer) Close() error {
 	s.logger.Info("Closing ingest server...")
-	
+
 	// Close NATS connection if it's a NATS publisher
 	if natsPublisher, ok := s.publisher.(*nats.Publisher); ok {
 		if err := natsPublisher.Close(); err != nil {
@@ -161,9 +131,7 @@ func (s *IngestServer) Close() error {
 		}
 		s.checker.SetNATSReady(false)
 	}
-	
+
 	s.logger.Info("Ingest server closed")
 	return nil
 }
-
-

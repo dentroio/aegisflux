@@ -37,7 +37,7 @@ func main() {
 
 	// Create gRPC server
 	grpcServer := grpc.NewServer()
-	
+
 	// Register the ingest service
 	ingestServer, err := server.NewIngestServer(natsURL, logger)
 	if err != nil {
@@ -65,11 +65,12 @@ func main() {
 
 	// Start HTTP server for health checks and metrics
 	httpMux := http.NewServeMux()
-	
+	ingestServer.RegisterHTTPRoutes(httpMux)
+
 	// Create health server
 	healthServer := health.NewHealthServer(ingestServer.GetHealthChecker(), logger)
 	healthServer.RegisterRoutes(httpMux)
-	
+
 	// Add Prometheus metrics handler
 	httpMux.Handle("/metrics", promhttp.Handler())
 

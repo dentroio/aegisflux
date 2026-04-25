@@ -70,6 +70,10 @@ node_modules/
 # Rust / Cargo
 target/
 
+# Local agent telemetry evidence
+events.jsonl
+*.events.jsonl
+
 # Temporary files
 tmp/
 temp/
