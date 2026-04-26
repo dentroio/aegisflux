@@ -51,7 +51,7 @@ npm install
 npm run dev
 ```
 
-The console will be available at `http://localhost:3030`
+The console will be available at `http://127.0.0.1:3030`
 
 ### Environment Configuration
 

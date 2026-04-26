@@ -115,7 +115,7 @@ graph TB
    ```
 
 5. **Access the system**
-   - Web UI: http://localhost:3000
+   - Web UI: http://127.0.0.1:3030
    - API: http://localhost:8083
    - WebSocket: ws://localhost:8080/ws/agent
 

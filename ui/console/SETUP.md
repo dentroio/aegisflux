@@ -66,7 +66,7 @@ npm run dev
 
 ### 4. Access the Console
 
-Open your browser and navigate to: **http://localhost:3030**
+Open your browser and navigate to: **http://127.0.0.1:3030**
 
 ## Configuration
 

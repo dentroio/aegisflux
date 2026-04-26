@@ -57,7 +57,7 @@ check_service "orchestrator" 8084 "Orchestrator"
 
 echo ""
 echo "🎯 Starting development server..."
-echo "📱 Console will be available at: http://localhost:3030"
+echo "📱 Console will be available at: http://127.0.0.1:3030"
 echo "🔗 Backend services should be running on:"
 echo "   • Actions API: http://localhost:8083"
 echo "   • BPF Registry: http://localhost:8090"
