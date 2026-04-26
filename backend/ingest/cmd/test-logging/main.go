@@ -13,16 +13,16 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	
+
 	// Create validator and metrics
 	validator, err := validate.NewSchemaValidator(logger)
 	if err != nil {
 		logger.Error("Failed to create validator", "error", err)
 		os.Exit(1)
 	}
-	
+
 	metrics := metrics.NewMetrics()
-	
+
 	// Test events
 	events := []*protos.Event{
 		{
@@ -54,44 +54,43 @@ func main() {
 			},
 		},
 	}
-	
+
 	ctx := context.Background()
-	
+
 	for _, event := range events {
 		// Extract host_id for logging
 		hostID := "unknown"
 		if h, exists := event.Metadata["host_id"]; exists {
 			hostID = h
 		}
-		
+
 		// Log event processing start
-		logger.Info("Processing event", 
-			"event_id", event.Id, 
-			"event_type", event.Type, 
+		logger.Info("Processing event",
+			"event_id", event.Id,
+			"event_type", event.Type,
 			"host_id", hostID)
-		
+
 		// Validate the event
 		if err := validator.ValidateEvent(ctx, event); err != nil {
-			logger.Warn("Event validation failed", 
-				"event_id", event.Id, 
-				"event_type", event.Type, 
-				"host_id", hostID, 
+			logger.Warn("Event validation failed",
+				"event_id", event.Id,
+				"event_type", event.Type,
+				"host_id", hostID,
 				"error", err)
 			metrics.IncrementEventsInvalid()
 			continue
 		}
-		
+
 		// Simulate successful processing
 		metrics.IncrementEventsTotal()
-		
-		logger.Info("Event processed successfully", 
-			"event_id", event.Id, 
-			"event_type", event.Type, 
+
+		logger.Info("Event processed successfully",
+			"event_id", event.Id,
+			"event_type", event.Type,
 			"host_id", hostID)
-		
+
 		time.Sleep(100 * time.Millisecond)
 	}
-	
+
 	logger.Info("Logging test completed")
 }
-

@@ -12,7 +12,7 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	
+
 	// Test NATS publisher
 	publisher, err := nats.NewPublisher("nats://localhost:4222", "events.raw", logger)
 	if err != nil {
@@ -51,4 +51,3 @@ func main() {
 
 	logger.Info("Event published successfully", "event_id", event.Id)
 }
-

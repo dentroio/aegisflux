@@ -27,6 +27,7 @@ Welcome to the AegisFlux documentation. This directory contains comprehensive gu
 - **[Backend Safety Shim](BACKEND_SAFETY_SHIM.md)** - Safety mechanisms and safeguards
 - **[Testing Strategy](TESTING_STRATEGY.md)** - Testing approach and methodologies
 - **[Testing Status](TESTING_STATUS.md)** - Current testing status and coverage
+- **[Project Management](project_management/README.md)** - Active plans and executable work orders
 
 ## 🔧 Operational Documentation
 

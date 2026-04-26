@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"os"
 
 	"aegisflux/backend/ingest/internal/health"
 	"aegisflux/backend/ingest/internal/metrics"
@@ -30,6 +31,8 @@ type IngestServer struct {
 	logger    *slog.Logger
 	validator Validator
 	publisher Publisher
+	dedupe    *duplicateTracker
+	store     visibilityStore
 	metrics   *metrics.Metrics
 	checker   *health.ServiceChecker
 }
@@ -56,10 +59,17 @@ func NewIngestServer(natsURL string, logger *slog.Logger) (*IngestServer, error)
 	}
 	checker.SetNATSReady(natsPublisher.IsReady())
 
+	visibilityStore, err := newFileVisibilityStore(os.Getenv("AEGIS_VISIBILITY_STORE_PATH"))
+	if err != nil {
+		return nil, err
+	}
+
 	return &IngestServer{
 		logger:    logger,
 		validator: schemaValidator,
 		publisher: natsPublisher,
+		dedupe:    newDuplicateTracker(10000),
+		store:     visibilityStore,
 		metrics:   metricsInstance,
 		checker:   checker,
 	}, nil
@@ -130,6 +140,13 @@ func (s *IngestServer) Close() error {
 			return err
 		}
 		s.checker.SetNATSReady(false)
+	}
+
+	if s.store != nil {
+		if err := s.store.Close(); err != nil {
+			s.logger.Error("Failed to close visibility store", "error", err)
+			return err
+		}
 	}
 
 	s.logger.Info("Ingest server closed")

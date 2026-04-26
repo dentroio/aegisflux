@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,6 +36,7 @@ type visibilityEvent struct {
 	SensorVersion string          `json:"sensor_version"`
 	Sequence      int64           `json:"sequence"`
 	Payload       json.RawMessage `json:"payload"`
+	ReceivedAtMS  int64           `json:"received_at_ms,omitempty"`
 }
 
 type visibilityIngestResponse struct {
@@ -43,14 +45,30 @@ type visibilityIngestResponse struct {
 	Message  string `json:"message"`
 }
 
+type visibilityQueryResponse struct {
+	OK     bool              `json:"ok"`
+	Count  int               `json:"count"`
+	Events []visibilityEvent `json:"events"`
+}
+
 // RegisterHTTPRoutes registers HTTP endpoints owned by the ingest service.
 func (s *IngestServer) RegisterHTTPRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/visibility/events", s.handleVisibilityEvents)
+	mux.HandleFunc("/v1/visibility/processes", s.handleVisibilityProcesses)
+	mux.HandleFunc("/v1/visibility/flows", s.handleVisibilityFlows)
+	mux.HandleFunc("/v1/visibility/dns", s.handleVisibilityDNS)
+	mux.HandleFunc("/v1/visibility/findings", s.handleVisibilityFindings)
+	mux.HandleFunc("/v1/visibility/investigation", s.handleVisibilityInvestigation)
 }
 
 func (s *IngestServer) handleVisibilityEvents(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
+	switch r.Method {
+	case http.MethodPost:
+	case http.MethodGet:
+		s.handleVisibilityEventQuery(w, r)
+		return
+	default:
+		w.Header().Set("Allow", "GET, POST")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -69,14 +87,7 @@ func (s *IngestServer) handleVisibilityEvents(w http.ResponseWriter, r *http.Req
 	}
 
 	for _, event := range events {
-		protoEvent, err := event.toProtoEvent()
-		if err != nil {
-			s.metrics.IncrementEventsInvalid()
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		if err := s.processEvent(r.Context(), protoEvent); err != nil {
+		if err := s.processVisibilityEvent(r.Context(), event); err != nil {
 			if errors.Is(err, errEventValidation) {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -91,6 +102,88 @@ func (s *IngestServer) handleVisibilityEvents(w http.ResponseWriter, r *http.Req
 		Accepted: len(events),
 		Message:  "visibility events accepted",
 	})
+}
+
+func (s *IngestServer) handleVisibilityEventQuery(w http.ResponseWriter, r *http.Request) {
+	if s.store == nil {
+		http.Error(w, "visibility store is not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	limit, err := parseQueryLimit(r.URL.Query().Get("limit"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	events, err := s.store.Query(r.Context(), visibilityQueryFilter{
+		EventID:   r.URL.Query().Get("event_id"),
+		DeviceID:  r.URL.Query().Get("device_id"),
+		AgentID:   r.URL.Query().Get("agent_id"),
+		EventType: r.URL.Query().Get("event_type"),
+		Limit:     limit,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, visibilityQueryResponse{
+		OK:     true,
+		Count:  len(events),
+		Events: events,
+	})
+}
+
+func parseQueryLimit(raw string) (int, error) {
+	if raw == "" {
+		return defaultVisibilityQueryLimit, nil
+	}
+	limit, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("limit must be an integer")
+	}
+	if limit <= 0 {
+		return 0, fmt.Errorf("limit must be positive")
+	}
+	if limit > maxVisibilityQueryLimit {
+		return maxVisibilityQueryLimit, nil
+	}
+	return limit, nil
+}
+
+func (s *IngestServer) processVisibilityEvent(ctx context.Context, event visibilityEvent) error {
+	protoEvent, err := event.toProtoEvent()
+	if err != nil {
+		s.metrics.IncrementEventsInvalid()
+		return err
+	}
+
+	if s.store != nil {
+		exists, err := s.store.Has(ctx, event.EventID)
+		if err != nil {
+			return err
+		}
+		if exists {
+			s.logger.Info("Duplicate persisted event ignored",
+				"event_id", event.EventID,
+				"event_type", event.EventType,
+				"host_id", event.DeviceID)
+			return nil
+		}
+	}
+
+	if err := s.processEvent(ctx, protoEvent); err != nil {
+		return err
+	}
+
+	if s.store != nil {
+		if err := s.store.Append(ctx, event); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *IngestServer) processEvent(ctx context.Context, event *protos.Event) error {
@@ -114,6 +207,14 @@ func (s *IngestServer) processEvent(ctx context.Context, event *protos.Event) er
 		return fmt.Errorf("%w: %v", errEventValidation, err)
 	}
 
+	if s.dedupe != nil && s.dedupe.has(event.Id) {
+		s.logger.Info("Duplicate event ignored",
+			"event_id", event.Id,
+			"event_type", event.Type,
+			"host_id", hostID)
+		return nil
+	}
+
 	publishCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
@@ -125,6 +226,10 @@ func (s *IngestServer) processEvent(ctx context.Context, event *protos.Event) er
 			"error", err)
 		s.metrics.IncrementNatsPublishErrors()
 		return fmt.Errorf("%w: %v", errEventPublish, err)
+	}
+
+	if s.dedupe != nil {
+		s.dedupe.add(event.Id)
 	}
 
 	s.metrics.IncrementEventsTotal()

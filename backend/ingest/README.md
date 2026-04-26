@@ -25,7 +25,7 @@ A gRPC and HTTP service for ingesting events with streaming support, JSON Schema
 
 ```bash
 # Navigate to the ingest service directory
-cd backend/ingest/backend/ingest
+cd backend/ingest
 
 # Build the service
 go build ./cmd/ingest
@@ -144,13 +144,36 @@ Events are validated against a JSON Schema with the following requirements:
 - **GET /healthz**: Returns `200 {"ok":true}` if both gRPC and NATS are healthy
 - **GET /readyz**: Returns `200 {"ok":true}` when NATS is connected and schema is compiled
 - **GET /metrics**: Returns Prometheus metrics in text format
-- **POST /v1/visibility/events**: Accepts visibility JSONL or JSON arrays and publishes accepted events to NATS
+- **POST /v1/visibility/events**: Accepts visibility JSONL or JSON arrays, publishes accepted events to NATS, and appends them to the local visibility event store
+- **GET /v1/visibility/events**: Returns recent stored visibility events, optionally filtered by `event_id`, `device_id`, `agent_id`, `event_type`, and `limit`
+- **GET /v1/visibility/processes**: Returns normalized process start/end events, optionally filtered by `device_id`, `agent_id`, `process_guid`, `pid`, and `limit`
+- **GET /v1/visibility/flows**: Returns normalized flow start/end events, optionally filtered by `device_id`, `agent_id`, `flow_id`, `process_guid`, `pid`, `remote_ip`, `remote_hostname`, and `limit`
+- **GET /v1/visibility/dns**: Returns normalized DNS observations, optionally filtered by `device_id`, `agent_id`, `process_guid`, `pid`, `query`, `answer`, and `limit`
+- **GET /v1/visibility/findings**: Returns normalized AI-agent detections and risk findings, optionally filtered by `device_id`, `agent_id`, `process_guid`, `flow_id`, `detection_id`, `finding_id`, `severity`, and `limit`
+- **GET /v1/visibility/investigation**: Returns a combined process, flow, DNS, and findings investigation path for a `device_id`, optionally narrowed by `agent_id`, `process_guid`, `pid`, and `limit`
 
 ### Prometheus Metrics
 
 - **events_total**: Total number of events processed successfully
 - **events_invalid_total**: Total number of invalid events rejected
 - **nats_publish_errors_total**: Total number of NATS publish errors
+
+### Local Visibility Event Store
+
+The ingest service keeps a durable lab event log for Phase 1 visibility validation. Set `AEGIS_VISIBILITY_STORE_PATH` to control the JSONL file location. If unset, the service writes to `data/visibility-events.jsonl` relative to its working directory.
+
+Query recent stored events:
+
+```bash
+curl -sS 'http://localhost:9090/v1/visibility/events?device_id=RMARTINEZ-WS&limit=50'
+curl -sS 'http://localhost:9090/v1/visibility/processes?device_id=RMARTINEZ-WS&limit=50'
+curl -sS 'http://localhost:9090/v1/visibility/flows?device_id=RMARTINEZ-WS&pid=9324&limit=50'
+curl -sS 'http://localhost:9090/v1/visibility/dns?device_id=RMARTINEZ-WS&query=api.model-gateway.lab&limit=50'
+curl -sS 'http://localhost:9090/v1/visibility/findings?device_id=RMARTINEZ-WS&process_guid=windows-dev-agent-01:1777062000000:9324&limit=50'
+curl -sS 'http://localhost:9090/v1/visibility/investigation?device_id=RMARTINEZ-WS&process_guid=windows-dev-agent-01:1777062000000:9324&limit=50'
+```
+
+This store is intended for lab validation and replay protection. Production normalized storage should move to the database-backed visibility model.
 
 ### NATS Publishing
 
@@ -186,11 +209,28 @@ go test ./internal/validate/ -v
 go test ./internal/nats/ -v
 ```
 
+Manual smoke utilities live under `cmd/` so they compile cleanly with the rest of the module:
+
+```bash
+go run ./cmd/test-logging
+go run ./cmd/test-metrics
+go run ./cmd/test-nats
+```
+
+Run the repeatable visibility investigation smoke test with a fixture-backed process -> flow -> DNS -> findings path:
+
+```bash
+./scripts/smoke_visibility_investigation.sh
+```
+
+The script requires a reachable NATS server at `NATS_URL` and uses test ports `127.0.0.1:19090` and `127.0.0.1:15051` by default.
+
 ## Architecture
 
 - `cmd/ingest/main.go`: Application entry point
 - `internal/server/grpc.go`: gRPC server implementation
-- `internal/server/http.go`: HTTP visibility event ingest implementation
+- `internal/server/http.go`: HTTP visibility event ingest and query implementation
+- `internal/server/visibility_store.go`: JSONL-backed lab visibility event store
 - `internal/validate/schema.go`: JSON Schema validation
 - `internal/nats/publish.go`: NATS publishing
 - `internal/health/`: Health check endpoints and status management
