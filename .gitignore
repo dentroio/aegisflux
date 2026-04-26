@@ -110,3 +110,7 @@ config/prod.yaml
 
 # Prompts directory (contains sensitive prompt templates)
 prompts/
+# Next.js build output
+.next/
+out/
+
