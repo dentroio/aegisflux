@@ -51,7 +51,7 @@ npm install
 npm run dev
 ```
 
-The console will be available at `http://localhost:3000`
+The console will be available at `http://localhost:3030`
 
 ### Environment Configuration
 
@@ -190,7 +190,7 @@ COPY package*.json ./
 RUN npm ci --only=production
 COPY . .
 RUN npm run build
-EXPOSE 3000
+EXPOSE 3030
 CMD ["npm", "start"]
 ```
 

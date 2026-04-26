@@ -4,9 +4,9 @@
   "description": "AegisFlux Management Console - Agent Management and Policy Builder",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3030",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3030",
     "lint": "next lint"
   },
   "dependencies": {

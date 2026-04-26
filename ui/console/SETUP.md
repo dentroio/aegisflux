@@ -66,7 +66,7 @@ npm run dev
 
 ### 4. Access the Console
 
-Open your browser and navigate to: **http://localhost:3000**
+Open your browser and navigate to: **http://localhost:3030**
 
 ## Configuration
 
@@ -193,7 +193,7 @@ npm run dev fails to start
 **Solutions:**
 - Check Node.js version: `node -v` (should be 18+)
 - Clear node_modules: `rm -rf node_modules && npm install`
-- Check port 3000 is available
+- Check port 3030 is available
 - Verify package.json dependencies
 
 ### Debug Mode

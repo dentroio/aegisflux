@@ -127,7 +127,7 @@ services:
     build: backend/bpf-registry
     depends_on: [vault, nats]
     ports:
-      - "8081:8081"
+      - "8090:8090"
     environment:
       - NATS_URL=nats://nats:4222
       - VAULT_ADDR=http://vault:8200
