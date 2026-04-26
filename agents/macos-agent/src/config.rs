@@ -16,6 +16,10 @@ pub struct AgentConfig {
     pub backend_url: Option<String>,
     /// Local JSONL event spool path.
     pub event_spool: PathBuf,
+    /// Whether command-line collection is enabled.
+    pub collect_command_line: bool,
+    /// Maximum process snapshot records emitted per run.
+    pub process_snapshot_limit: usize,
 }
 
 impl AgentConfig {
@@ -30,6 +34,8 @@ impl AgentConfig {
         let event_spool = env::var("AEGIS_EVENT_SPOOL")
             .map(PathBuf::from)
             .unwrap_or_else(|_| default_spool_path());
+        let collect_command_line = env_bool("AEGIS_COLLECT_COMMAND_LINE", false)?;
+        let process_snapshot_limit = env_usize("AEGIS_PROCESS_SNAPSHOT_LIMIT", 256)?;
 
         require_safe_identifier("AEGIS_AGENT_ID", &agent_id)?;
         require_safe_identifier("AEGIS_DEVICE_ID", &device_id)?;
@@ -40,12 +46,41 @@ impl AgentConfig {
             sensor_version,
             backend_url,
             event_spool,
+            collect_command_line,
+            process_snapshot_limit,
         })
     }
 }
 
 fn env_or_default(name: &str, default: &str) -> String {
     env::var(name).unwrap_or_else(|_| default.to_string())
+}
+
+fn env_bool(name: &str, default: bool) -> Result<bool, String> {
+    match env::var(name) {
+        Ok(value) => match value.to_ascii_lowercase().as_str() {
+            "1" | "true" | "yes" | "on" => Ok(true),
+            "0" | "false" | "no" | "off" => Ok(false),
+            _ => Err(format!("{name} must be a boolean value")),
+        },
+        Err(_) => Ok(default),
+    }
+}
+
+fn env_usize(name: &str, default: usize) -> Result<usize, String> {
+    match env::var(name) {
+        Ok(value) => value
+            .parse::<usize>()
+            .map_err(|_| format!("{name} must be a positive integer"))
+            .and_then(|parsed| {
+                if parsed == 0 {
+                    Err(format!("{name} must be greater than zero"))
+                } else {
+                    Ok(parsed)
+                }
+            }),
+        Err(_) => Ok(default),
+    }
 }
 
 fn require_safe_identifier(name: &str, value: &str) -> Result<(), String> {

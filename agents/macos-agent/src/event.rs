@@ -55,6 +55,35 @@ pub enum EventPayload {
         /// Human-readable status message.
         message: String,
     },
+    /// Process started or observed in a snapshot payload.
+    ProcessStarted {
+        /// Stable local process instance identifier.
+        process_guid: String,
+        /// Stable local parent process instance identifier when known.
+        parent_process_guid: Option<String>,
+        /// Process ID.
+        pid: u32,
+        /// Parent process ID when known.
+        ppid: Option<u32>,
+        /// Process image name.
+        name: String,
+        /// Executable path when available.
+        path: Option<String>,
+        /// Command line when collection is enabled.
+        command_line: Option<String>,
+        /// User or account when available.
+        user: Option<String>,
+        /// Logon session when available.
+        logon_session_id: Option<String>,
+        /// Integrity level when available.
+        integrity_level: Option<String>,
+        /// SHA-256 hash when available.
+        sha256: Option<String>,
+        /// Publisher or signer when available.
+        publisher: Option<String>,
+        /// Collection method.
+        collection_method: String,
+    },
 }
 
 impl AegisEvent {
@@ -111,6 +140,36 @@ impl AegisEvent {
                 escape_json(status),
                 escape_json(message)
             ),
+            EventPayload::ProcessStarted {
+                process_guid,
+                parent_process_guid,
+                pid,
+                ppid,
+                name,
+                path,
+                command_line,
+                user,
+                logon_session_id,
+                integrity_level,
+                sha256,
+                publisher,
+                collection_method,
+            } => format!(
+                r#"{{"process_guid":"{}","parent_process_guid":{},"pid":{},"ppid":{},"name":"{}","path":{},"command_line":{},"user":{},"logon_session_id":{},"integrity_level":{},"sha256":{},"publisher":{},"collection_method":"{}"}}"#,
+                escape_json(process_guid),
+                option_json(parent_process_guid.as_deref()),
+                pid,
+                option_u32_json(*ppid),
+                escape_json(name),
+                option_json(path.as_deref()),
+                option_json(command_line.as_deref()),
+                option_json(user.as_deref()),
+                option_json(logon_session_id.as_deref()),
+                option_json(integrity_level.as_deref()),
+                option_json(sha256.as_deref()),
+                option_json(publisher.as_deref()),
+                escape_json(collection_method)
+            ),
         };
 
         format!(
@@ -126,6 +185,20 @@ impl AegisEvent {
             self.sequence,
             payload
         )
+    }
+}
+
+fn option_json(value: Option<&str>) -> String {
+    match value {
+        Some(value) => format!("\"{}\"", escape_json(value)),
+        None => "null".to_string(),
+    }
+}
+
+fn option_u32_json(value: Option<u32>) -> String {
+    match value {
+        Some(value) => value.to_string(),
+        None => "null".to_string(),
     }
 }
 

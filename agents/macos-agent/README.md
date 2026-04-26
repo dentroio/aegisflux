@@ -5,7 +5,8 @@ The Aegis macOS Agent is the planned macOS visibility component for AegisFlux. I
 ## Phase 1 Scope
 
 - Agent heartbeat and local event spool
-- Process visibility design for Endpoint Security Framework integration
+- No-dependency process snapshot events in lab mode
+- Process visibility design for future Endpoint Security Framework integration
 - Network and DNS visibility design
 - Non-blocking automation and AI-agent evidence
 
@@ -19,7 +20,7 @@ The macOS agent emits Phase 1 visibility events that must conform to:
 ../../schemas/visibility/
 ```
 
-The scaffold currently emits [../../schemas/visibility/agent-heartbeat.schema.json](../../schemas/visibility/agent-heartbeat.schema.json) and collector status events. Process, network, and DNS events should use the same shared visibility contracts as Windows once implemented.
+The scaffold currently emits heartbeat events, collector status events, and `aegis.process.started` process snapshot events. Process snapshots use the same payload shape as the Windows Phase 1 collector and are intended for lab visibility only until Endpoint Security collection is implemented.
 
 ## Security Baseline
 
@@ -57,6 +58,12 @@ cargo build
 cargo run -- --once --stdout
 ```
 
+To limit snapshot volume during a lab run:
+
+```bash
+AEGIS_PROCESS_SNAPSHOT_LIMIT=25 cargo run -- --once --stdout
+```
+
 By default, local events are written to:
 
 ```text
@@ -77,4 +84,6 @@ Production service packaging may use a system-owned path after code signing, lau
 | `AEGIS_DEVICE_ID` | hostname fallback | Device identity reported in event envelopes |
 | `AEGIS_SENSOR_VERSION` | crate version | Sensor version in event envelopes |
 | `AEGIS_EVENT_SPOOL` | platform default | JSONL event spool path |
+| `AEGIS_COLLECT_COMMAND_LINE` | `false` | Include sanitized command lines in process snapshot events |
+| `AEGIS_PROCESS_SNAPSHOT_LIMIT` | `256` | Maximum process snapshot events per `--once` run |
 | `AEGIS_BACKEND_URL` | empty | Reserved for future outbound telemetry |

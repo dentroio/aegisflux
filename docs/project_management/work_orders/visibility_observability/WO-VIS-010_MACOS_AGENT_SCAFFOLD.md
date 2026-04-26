@@ -1,8 +1,8 @@
 # WO-VIS-010: macOS Agent Scaffold
 
-**Status:** Draft  
-**Phase:** Visibility and Observability  
-**Primary owner:** Agent  
+**Status:** Complete
+**Phase:** Visibility and Observability
+**Primary owner:** Agent
 **Target environment:** macOS Apple Silicon first, Intel compatibility later
 
 ## Goal
@@ -19,7 +19,8 @@ Scaffold only. No Endpoint Security entitlement request, system extension, Netwo
 - `unsafe_code = "forbid"`
 - No third-party dependencies in the initial skeleton
 - Agent heartbeat event
-- Collector status placeholders for process, network, and DNS visibility
+- Process snapshot events for lab visibility without privileged install
+- Collector status placeholders for network and DNS visibility
 - Local JSONL event spool
 - Security baseline documentation
 - Lab-mode run command
@@ -29,6 +30,7 @@ Scaffold only. No Endpoint Security entitlement request, system extension, Netwo
 - Crate builds on Apple Silicon macOS.
 - Crate runs in `--once --stdout` lab mode without root.
 - Event envelope includes OS and architecture.
+- Lab mode emits `aegis.process.started` snapshot events with command-line collection disabled by default.
 - README documents Endpoint Security and entitlement constraints.
 - Security doc explicitly excludes enforcement from Phase 1.
 
@@ -44,7 +46,12 @@ Scaffold only. No Endpoint Security entitlement request, system extension, Netwo
 
 ## Completion Evidence
 
+Completed April 26, 2026.
+
 - `cargo fmt --check`
 - `cargo check`
 - `cargo test`
-- `cargo run -- --once --stdout`
+- `git diff --check`
+- `AEGIS_EVENT_SPOOL=/tmp/aegis-macos-agent-smoke/events.jsonl AEGIS_PROCESS_SNAPSHOT_LIMIT=5 cargo run -- --once --stdout`
+
+The smoke run emitted heartbeat, process collector status, five `aegis.process.started` snapshot events, and pending network/DNS collector status events without requiring root or an installed agent.
