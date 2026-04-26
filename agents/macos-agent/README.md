@@ -64,6 +64,16 @@ To limit snapshot volume during a lab run:
 AEGIS_PROCESS_SNAPSHOT_LIMIT=25 cargo run -- --once --stdout
 ```
 
+To post the same `--once` batch to a local Aegis ingest service in lab mode:
+
+```bash
+AEGIS_BACKEND_URL=http://127.0.0.1:9090 \
+AEGIS_PROCESS_SNAPSHOT_LIMIT=25 \
+cargo run -- --once --stdout --post
+```
+
+The no-dependency Phase 1 publisher only supports localhost HTTP. Production transport still requires signed telemetry and TLS/mTLS design.
+
 By default, local events are written to:
 
 ```text
@@ -86,4 +96,4 @@ Production service packaging may use a system-owned path after code signing, lau
 | `AEGIS_EVENT_SPOOL` | platform default | JSONL event spool path |
 | `AEGIS_COLLECT_COMMAND_LINE` | `false` | Include sanitized command lines in process snapshot events |
 | `AEGIS_PROCESS_SNAPSHOT_LIMIT` | `256` | Maximum process snapshot events per `--once` run |
-| `AEGIS_BACKEND_URL` | empty | Reserved for future outbound telemetry |
+| `AEGIS_BACKEND_URL` | empty | Local ingest URL used by `--post`, for example `http://127.0.0.1:9090` |

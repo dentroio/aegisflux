@@ -16,7 +16,7 @@ use std::time::SystemTime;
 use collector::CollectorSet;
 use config::AgentConfig;
 use event::{AegisEvent, EventPayload};
-use transport::JsonlSpool;
+use transport::{JsonlSpool, LabHttpPublisher};
 
 fn main() -> ExitCode {
     match run() {
@@ -59,6 +59,14 @@ fn run() -> Result<(), String> {
         }
     }
 
+    if args.post {
+        let backend_url = config
+            .backend_url
+            .as_deref()
+            .ok_or_else(|| "--post requires AEGIS_BACKEND_URL".to_string())?;
+        LabHttpPublisher::new(backend_url)?.post_events(&events)?;
+    }
+
     if !args.once {
         return Err(
             "long-running service mode is not implemented yet; use --once for Phase 1 lab runs"
@@ -73,6 +81,7 @@ fn run() -> Result<(), String> {
 struct Args {
     once: bool,
     stdout: bool,
+    post: bool,
 }
 
 impl Args {
@@ -85,6 +94,7 @@ impl Args {
             match arg.as_str() {
                 "--once" => parsed.once = true,
                 "--stdout" => parsed.stdout = true,
+                "--post" => parsed.post = true,
                 _ => {}
             }
         }

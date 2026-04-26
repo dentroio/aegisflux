@@ -24,6 +24,7 @@ Scaffold only. No Endpoint Security entitlement request, system extension, Netwo
 - Local JSONL event spool
 - Security baseline documentation
 - Lab-mode run command
+- Optional localhost-only `--post` to Aegis ingest
 
 ## Acceptance Criteria
 
@@ -31,6 +32,7 @@ Scaffold only. No Endpoint Security entitlement request, system extension, Netwo
 - Crate runs in `--once --stdout` lab mode without root.
 - Event envelope includes OS and architecture.
 - Lab mode emits `aegis.process.started` snapshot events with command-line collection disabled by default.
+- `--post` can send the `--once` batch to local Aegis ingest without installing an agent service.
 - README documents Endpoint Security and entitlement constraints.
 - Security doc explicitly excludes enforcement from Phase 1.
 
@@ -53,5 +55,6 @@ Completed April 26, 2026.
 - `cargo test`
 - `git diff --check`
 - `AEGIS_EVENT_SPOOL=/tmp/aegis-macos-agent-smoke/events.jsonl AEGIS_PROCESS_SNAPSHOT_LIMIT=5 cargo run -- --once --stdout`
+- `AEGIS_BACKEND_URL=http://127.0.0.1:19091 AEGIS_EVENT_SPOOL=/tmp/aegis-macos-agent-smoke/events.jsonl AEGIS_PROCESS_SNAPSHOT_LIMIT=5 cargo run -- --once --post`
 
 The smoke run emitted heartbeat, process collector status, five `aegis.process.started` snapshot events, and pending network/DNS collector status events without requiring root or an installed agent.
