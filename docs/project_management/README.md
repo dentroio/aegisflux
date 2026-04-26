@@ -5,6 +5,7 @@ This directory is the active project-management home for AegisFlux planning and 
 ## Active Plans
 
 - [Aegis Development and Clarion Integration Plan](plans/AEGIS_DEVELOPMENT_AND_CLARION_INTEGRATION_PLAN.md)
+- [Aegis and Clarion Integration Contract](plans/AEGIS_CLARION_INTEGRATION_CONTRACT.md)
 
 ## Active Work Orders
 
