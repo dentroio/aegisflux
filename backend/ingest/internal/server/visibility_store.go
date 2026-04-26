@@ -23,6 +23,7 @@ type visibilityStore interface {
 
 type visibilityQueryFilter struct {
 	EventID   string
+	TenantID  string
 	DeviceID  string
 	AgentID   string
 	EventType string
@@ -169,6 +170,9 @@ func (s *fileVisibilityStore) Query(ctx context.Context, filter visibilityQueryF
 	for i := len(s.events) - 1; i >= 0 && len(results) < limit; i-- {
 		event := s.events[i]
 		if filter.EventID != "" && event.EventID != filter.EventID {
+			continue
+		}
+		if filter.TenantID != "" && event.TenantID != filter.TenantID {
 			continue
 		}
 		if filter.DeviceID != "" && event.DeviceID != filter.DeviceID {

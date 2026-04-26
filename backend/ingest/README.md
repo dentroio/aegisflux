@@ -127,7 +127,7 @@ The HTTP endpoint maps visibility envelopes to the existing ingest `Event` shape
 - `timestamp_ms` -> `timestamp`
 - `source` -> `source`
 - `payload` -> `payload`
-- `device_id`, `agent_id`, `schema_version`, `sensor_version`, and `sequence` -> metadata
+- `device_id`, `agent_id`, `tenant_id`, `schema_version`, `sensor_version`, and `sequence` -> metadata
 
 ### Event Schema
 
@@ -151,6 +151,7 @@ Events are validated against a JSON Schema with the following requirements:
 - **GET /v1/visibility/dns**: Returns normalized DNS observations, optionally filtered by `device_id`, `agent_id`, `process_guid`, `pid`, `query`, `answer`, and `limit`
 - **GET /v1/visibility/findings**: Returns normalized AI-agent detections and risk findings, optionally filtered by `device_id`, `agent_id`, `process_guid`, `flow_id`, `detection_id`, `finding_id`, `severity`, and `limit`
 - **GET /v1/visibility/investigation**: Returns a combined process, flow, DNS, and findings investigation path for a `device_id`, optionally narrowed by `agent_id`, `process_guid`, `pid`, and `limit`
+- **GET /v1/clarion/events**: Exports stored Aegis visibility events in the `aegis-clarion.export.v1` lab contract, optionally filtered by `tenant_id`, `device_id`, `agent_id`, `event_id`, `event_type`, and `limit`
 
 ### Prometheus Metrics
 
@@ -174,6 +175,16 @@ curl -sS 'http://localhost:9090/v1/visibility/investigation?device_id=RMARTINEZ-
 ```
 
 This store is intended for lab validation and replay protection. Production normalized storage should move to the database-backed visibility model.
+
+### Clarion Lab Export
+
+Aegis and Clarion remain independent products. For Phase 1 lab integration, Clarion can pull a contract-shaped export from the Aegis ingest visibility store without reading Aegis internals:
+
+```bash
+curl -sS 'http://localhost:9090/v1/clarion/events?tenant_id=tenant-a&limit=100'
+```
+
+The response preserves the raw Aegis visibility event envelope and payload, adds `contract_version: aegis-clarion.export.v1`, and includes `clarion_context_objects` hints such as `Device`, `Agent`, `Process`, `Flow`, `Destination`, or `AI-agent or automation finding`. This endpoint is intended for observe-only contract validation before a production event transport is selected.
 
 ### NATS Publishing
 

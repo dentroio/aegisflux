@@ -31,6 +31,7 @@ type visibilityEvent struct {
 	EventType     string          `json:"event_type"`
 	TimestampMS   int64           `json:"timestamp_ms"`
 	Source        string          `json:"source"`
+	TenantID      string          `json:"tenant_id,omitempty"`
 	DeviceID      string          `json:"device_id"`
 	AgentID       string          `json:"agent_id"`
 	SensorVersion string          `json:"sensor_version"`
@@ -59,6 +60,7 @@ func (s *IngestServer) RegisterHTTPRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/visibility/dns", s.handleVisibilityDNS)
 	mux.HandleFunc("/v1/visibility/findings", s.handleVisibilityFindings)
 	mux.HandleFunc("/v1/visibility/investigation", s.handleVisibilityInvestigation)
+	mux.HandleFunc("/v1/clarion/events", s.handleClarionEventExport)
 }
 
 func (s *IngestServer) handleVisibilityEvents(w http.ResponseWriter, r *http.Request) {
@@ -118,6 +120,7 @@ func (s *IngestServer) handleVisibilityEventQuery(w http.ResponseWriter, r *http
 
 	events, err := s.store.Query(r.Context(), visibilityQueryFilter{
 		EventID:   r.URL.Query().Get("event_id"),
+		TenantID:  r.URL.Query().Get("tenant_id"),
 		DeviceID:  r.URL.Query().Get("device_id"),
 		AgentID:   r.URL.Query().Get("agent_id"),
 		EventType: r.URL.Query().Get("event_type"),
@@ -303,6 +306,7 @@ func (e visibilityEvent) toProtoEvent() (*protos.Event, error) {
 
 	metadata := map[string]string{
 		"schema_version": e.SchemaVersion,
+		"tenant_id":      e.TenantID,
 		"device_id":      e.DeviceID,
 		"agent_id":       e.AgentID,
 		"sensor_version": e.SensorVersion,

@@ -170,14 +170,14 @@ Clarion orchestration examples:
 
 1. Keep Aegis and Clarion as separate repos/products.
 2. Keep Aegis visibility event schemas in Aegis.
-3. Add a Clarion-facing event export contract from Aegis ingest.
+3. Use the Aegis ingest lab export endpoint, `GET /v1/clarion/events`, to validate the first Clarion-facing event contract.
 4. Add a Clarion-side importer later that consumes Aegis events into Clarion context objects.
 5. Build macOS and Windows agent telemetry in observe-only mode first.
 6. Validate investigation paths before adding enforcement decisions.
 
 ## Open Decisions
 
-- Transport for Aegis-to-Clarion events: HTTP pull, HTTP push, NATS, Kafka, or file export for lab mode.
+- Production transport for Aegis-to-Clarion events after the lab HTTP pull contract: HTTP push, NATS, Kafka, or file export.
 - Whether Clarion should store raw Aegis events, normalized context objects, or both.
 - Canonical tenant/device identity source when Aegis and Clarion see the same host through different systems.
 - Minimum evidence required before Clarion may send an endpoint enforcement decision.

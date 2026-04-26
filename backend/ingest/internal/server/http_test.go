@@ -447,6 +447,55 @@ func TestHandleVisibilityInvestigationIncludesFindings(t *testing.T) {
 	}
 }
 
+func TestHandleClarionEventExportReturnsContractEvents(t *testing.T) {
+	store, err := newFileVisibilityStore(t.TempDir() + "/visibility-events.jsonl")
+	if err != nil {
+		t.Fatalf("newFileVisibilityStore returned error: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	server := &IngestServer{
+		logger:    slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
+		validator: mockValidator{},
+		publisher: &mockPublisher{},
+		dedupe:    newDuplicateTracker(100),
+		store:     store,
+		metrics:   sharedTestMetrics,
+		checker:   health.NewServiceChecker(slog.Default()),
+	}
+
+	body := `{"schema_version":"visibility.v1","event_id":"evt-flow-1","event_type":"aegis.flow.started","timestamp_ms":1777075005616,"source":"aegis-windows-agent","tenant_id":"tenant-a","device_id":"RMARTINEZ-WS","agent_id":"windows-agent-dev","sensor_version":"0.1.0","sequence":4,"payload":{"flow_id":"flow-abc","process_guid":"proc-abc","pid":3084,"remote_hostname":"api.model-gateway.lab"}}
+` +
+		`{"schema_version":"visibility.v1","event_id":"evt-dns-1","event_type":"aegis.dns.observed","timestamp_ms":1777075005617,"source":"aegis-windows-agent","tenant_id":"tenant-b","device_id":"RMARTINEZ-WS","agent_id":"windows-agent-dev","sensor_version":"0.1.0","sequence":5,"payload":{"query":"api.model-gateway.lab","answers":["203.0.113.10"]}}`
+	postReq := httptest.NewRequest(http.MethodPost, "/v1/visibility/events", bytes.NewBufferString(body))
+	postRec := httptest.NewRecorder()
+	server.handleVisibilityEvents(postRec, postReq)
+	if postRec.Code != http.StatusAccepted {
+		t.Fatalf("expected POST status %d, got %d: %s", http.StatusAccepted, postRec.Code, postRec.Body.String())
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/v1/clarion/events?tenant_id=tenant-a&limit=10", nil)
+	getRec := httptest.NewRecorder()
+	server.handleClarionEventExport(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected GET status %d, got %d: %s", http.StatusOK, getRec.Code, getRec.Body.String())
+	}
+	for _, expected := range [][]byte{
+		[]byte(`"contract_version":"aegis-clarion.export.v1"`),
+		[]byte(`"count":1`),
+		[]byte(`"tenant_id":"tenant-a"`),
+		[]byte(`"event_id":"evt-flow-1"`),
+		[]byte(`"clarion_context_objects":["Device","Agent","User","Process","Flow","Destination"]`),
+	} {
+		if !bytes.Contains(getRec.Body.Bytes(), expected) {
+			t.Fatalf("expected Clarion export response to include %s, got %s", expected, getRec.Body.String())
+		}
+	}
+	if bytes.Contains(getRec.Body.Bytes(), []byte(`evt-dns-1`)) {
+		t.Fatalf("expected tenant filter to exclude tenant-b event, got %s", getRec.Body.String())
+	}
+}
+
 func TestHandleVisibilityEventsRejectsValidationFailure(t *testing.T) {
 	server := &IngestServer{
 		logger:    slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
