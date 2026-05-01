@@ -11,42 +11,36 @@ import (
 
 // WebSocketConnWrapper wraps gorilla websocket connection to implement our interface
 type WebSocketConnWrapper struct {
-	conn *websocket.Conn
-	mu   sync.RWMutex
+	conn    *websocket.Conn
+	writeMu sync.Mutex
 }
 
 // ReadMessage reads a message from the WebSocket connection
 func (w *WebSocketConnWrapper) ReadMessage() (messageType int, p []byte, err error) {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
 	return w.conn.ReadMessage()
 }
 
 // WriteMessage writes a message to the WebSocket connection
 func (w *WebSocketConnWrapper) WriteMessage(messageType int, data []byte) error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	w.writeMu.Lock()
+	defer w.writeMu.Unlock()
 	return w.conn.WriteMessage(messageType, data)
 }
 
 // Close closes the WebSocket connection
 func (w *WebSocketConnWrapper) Close() error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	return w.conn.Close()
 }
 
 // SetReadDeadline sets the read deadline for the WebSocket connection
 func (w *WebSocketConnWrapper) SetReadDeadline(t time.Time) error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	return w.conn.SetReadDeadline(t)
 }
 
 // SetWriteDeadline sets the write deadline for the WebSocket connection
 func (w *WebSocketConnWrapper) SetWriteDeadline(t time.Time) error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	w.writeMu.Lock()
+	defer w.writeMu.Unlock()
 	return w.conn.SetWriteDeadline(t)
 }
 
@@ -131,7 +125,7 @@ func (cm *ConnectionManager) SendToAgent(agentID string, message []byte) error {
 // BroadcastToAllAgents sends a message to all connected agents
 func (cm *ConnectionManager) BroadcastToAllAgents(message []byte) error {
 	connections := cm.GetAllConnections()
-	
+
 	var errors []error
 	for agentID, conn := range connections {
 		if conn.Connection != nil {

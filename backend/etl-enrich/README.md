@@ -161,7 +161,16 @@ python test_pkg_cve_enrichment.py
 
 # Generate sample data
 python sample_pkg_cve_data.py
+
+# Run the Compose pipeline smoke test
+backend/etl-enrich/scripts/smoke_pipeline.sh
 ```
+
+The smoke test starts `nats`, `timescale`, `neo4j`, `ingest`, and `etl-enrich`,
+posts a deterministic `connect` visibility event, and verifies ETL processing,
+Timescale persistence, and the Neo4j `COMMUNICATES` edge. It defaults to
+alternate host ports for NATS and Neo4j so it can run beside the Clarion stack:
+`14222`, `18222`, `17474`, and `17687`.
 
 ### Docker Usage
 ```bash
@@ -178,6 +187,10 @@ docker run -e NATS_URL=nats://nats:4222 aegisflux/etl-enrich
 - `NATS_URL`: NATS server URL (default: `nats://localhost:4222`)
 - `AF_ENV`: Environment name (default: `dev`)
 - `AF_FAKE_RDNS`: Generate fake reverse DNS (default: `true`)
+- `ETL_HTTP_HOST`: Health/metrics bind address (default: `0.0.0.0`)
+- `ETL_HTTP_PORT`: Health/metrics port (default: `8088`)
+- `DEPENDENCY_CONNECT_ATTEMPTS`: Dependency startup retry attempts (default: `12`)
+- `DEPENDENCY_CONNECT_WAIT_SECONDS`: Delay between dependency startup retries (default: `5`)
 
 ### Database Configuration
 - `PG_HOST`: TimescaleDB host (default: `localhost`)

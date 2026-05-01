@@ -8,16 +8,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nats-io/nats.go"
 	"aegisflux/backend/orchestrator/internal/rollout"
+	"github.com/nats-io/nats.go"
 )
 
 // DecisionRolloutIntegration handles integration between decision engine and rollout system
 type DecisionRolloutIntegration struct {
-	logger        *slog.Logger
-	nc            *nats.Conn
-	rolloutMgr    *rollout.BPFRolloutManager
-	decisionURL   string
+	logger            *slog.Logger
+	nc                *nats.Conn
+	rolloutMgr        *rollout.BPFRolloutManager
+	decisionURL       string
 	activeDeployments map[string]*DeploymentResponse
 	deploymentMutex   sync.RWMutex
 }
@@ -25,10 +25,10 @@ type DecisionRolloutIntegration struct {
 // NewDecisionRolloutIntegration creates a new decision rollout integration
 func NewDecisionRolloutIntegration(logger *slog.Logger, nc *nats.Conn, rolloutMgr *rollout.BPFRolloutManager, decisionURL string) *DecisionRolloutIntegration {
 	return &DecisionRolloutIntegration{
-		logger:        logger,
-		nc:            nc,
-		rolloutMgr:    rolloutMgr,
-		decisionURL:   decisionURL,
+		logger:            logger,
+		nc:                nc,
+		rolloutMgr:        rolloutMgr,
+		decisionURL:       decisionURL,
 		activeDeployments: make(map[string]*DeploymentResponse),
 	}
 }
@@ -63,7 +63,7 @@ func (dri *DecisionRolloutIntegration) subscribeToDecisionEvents(ctx context.Con
 	planSub, err := dri.nc.Subscribe(planUpdateSubject, func(msg *nats.Msg) {
 		dri.handlePlanUpdate(msg)
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to plan updates: %w", err)
 	}
@@ -75,7 +75,7 @@ func (dri *DecisionRolloutIntegration) subscribeToDecisionEvents(ctx context.Con
 	controlSub, err := dri.nc.Subscribe(controlUpdateSubject, func(msg *nats.Msg) {
 		dri.handleControlUpdate(msg)
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to control updates: %w", err)
 	}
@@ -99,7 +99,7 @@ func (dri *DecisionRolloutIntegration) subscribeToRolloutUpdates(ctx context.Con
 	rolloutSub, err := dri.nc.Subscribe(rolloutStatusSubject, func(msg *nats.Msg) {
 		dri.handleRolloutStatusUpdate(msg)
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to rollout status: %w", err)
 	}
@@ -121,7 +121,7 @@ func (dri *DecisionRolloutIntegration) subscribeToTelemetryEvents(ctx context.Co
 	violationSub, err := dri.nc.Subscribe(violationSubject, func(msg *nats.Msg) {
 		dri.handleHighViolations(msg)
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to violation events: %w", err)
 	}
@@ -131,7 +131,7 @@ func (dri *DecisionRolloutIntegration) subscribeToTelemetryEvents(ctx context.Co
 	errorSub, err := dri.nc.Subscribe(errorSubject, func(msg *nats.Msg) {
 		dri.handleHighErrors(msg)
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to error events: %w", err)
 	}
@@ -179,8 +179,8 @@ func (dri *DecisionRolloutIntegration) handlePlanUpdate(msg *nats.Msg) {
 
 	// Notify decision engine of processing completion
 	dri.notifyDecisionEngine("plan.processed", map[string]interface{}{
-		"plan_id":    planUpdate.PlanID,
-		"status":     "completed",
+		"plan_id":      planUpdate.PlanID,
+		"status":       "completed",
 		"processed_at": time.Now(),
 	})
 }
@@ -209,7 +209,7 @@ func (dri *DecisionRolloutIntegration) handleControlUpdate(msg *nats.Msg) {
 	case "rollback":
 		dri.handleControlRollback(control)
 	case "update":
-		dri.handleControlUpdate(control)
+		dri.handleControlUpdateRequest(control)
 	default:
 		dri.logger.Debug("Unknown control status", "status", control.Status)
 	}
@@ -273,7 +273,8 @@ func (dri *DecisionRolloutIntegration) handleControlRollback(control Control) {
 	// In a real implementation, you'd call the rollback manager
 	dri.logger.Info("Control rollback initiated",
 		"control_id", control.ID,
-		"target", control.Target)
+		"target", control.Target,
+		"request_id", rollbackReq.RequestID)
 }
 
 // handleControlUpdateRequest handles control update requests
@@ -303,20 +304,20 @@ func (dri *DecisionRolloutIntegration) handleRolloutStatusUpdate(msg *nats.Msg) 
 	// Update deployment tracking
 	dri.deploymentMutex.Lock()
 	dri.activeDeployments[statusUpdate.RequestID] = &DeploymentResponse{
-		PlanID:        statusUpdate.PlanID,
-		DeploymentID:  statusUpdate.RequestID,
-		Status:        statusUpdate.Status,
-		DeployedAt:    statusUpdate.AppliedAt,
-		Error:         statusUpdate.Error,
+		PlanID:       statusUpdate.PlanID,
+		DeploymentID: statusUpdate.RequestID,
+		Status:       statusUpdate.Status,
+		DeployedAt:   statusUpdate.AppliedAt,
+		Error:        statusUpdate.Error,
 	}
 	dri.deploymentMutex.Unlock()
 
 	// Notify decision engine of status change
 	dri.notifyDecisionEngine("rollout.status.updated", map[string]interface{}{
-		"plan_id":     statusUpdate.PlanID,
-		"request_id":  statusUpdate.RequestID,
-		"status":      statusUpdate.Status,
-		"updated_at":  time.Now(),
+		"plan_id":    statusUpdate.PlanID,
+		"request_id": statusUpdate.RequestID,
+		"status":     statusUpdate.Status,
+		"updated_at": time.Now(),
 	})
 
 	// Handle rollback if deployment failed
@@ -404,11 +405,11 @@ func (dri *DecisionRolloutIntegration) handleDeploymentFailure(statusUpdate roll
 
 	// Notify decision engine of deployment failure
 	dri.notifyDecisionEngine("deployment.failed", map[string]interface{}{
-		"plan_id":     statusUpdate.PlanID,
-		"request_id":  statusUpdate.RequestID,
-		"status":      statusUpdate.Status,
-		"error":       statusUpdate.Error,
-		"failed_at":   time.Now(),
+		"plan_id":    statusUpdate.PlanID,
+		"request_id": statusUpdate.RequestID,
+		"status":     statusUpdate.Status,
+		"error":      statusUpdate.Error,
+		"failed_at":  time.Now(),
 	})
 }
 

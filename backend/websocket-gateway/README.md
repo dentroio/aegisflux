@@ -79,6 +79,7 @@ The WebSocket Gateway Service provides secure, bidirectional communication betwe
 - `WEBSOCKET_PRIVATE_KEY_PATH` - Path to Ed25519 private key
 - `WEBSOCKET_PUBLIC_KEY_PATH` - Path to Ed25519 public key
 - `WEBSOCKET_DATABASE_URL` - Database connection URL
+- `ACTIONS_API_URL` - Actions API base URL (default: `http://actions-api:8083`)
 - `WEBSOCKET_LOG_LEVEL` - Log level (debug, info, warn, error)
 
 ### Command Line Flags
@@ -89,6 +90,7 @@ The WebSocket Gateway Service provides secure, bidirectional communication betwe
   --heartbeat 30s \
   --connection-timeout 60s \
   --session-timeout 24h \
+  --actions-api-url http://actions-api:8083 \
   --log-level info
 ```
 
@@ -158,6 +160,33 @@ services:
 ```bash
 curl http://localhost:8080/health
 ```
+
+### Actions API Proxy Smoke Test
+```bash
+backend/websocket-gateway/scripts/smoke_actions_api_proxy.sh
+```
+
+The smoke test starts `nats`, `actions-api`, and `websocket-gateway`, then posts
+a registration-init request through the gateway to verify the configured
+Actions API handoff.
+
+### Actions API NATS Send Smoke Test
+```bash
+backend/websocket-gateway/scripts/smoke_actions_send_nats.sh
+```
+
+This smoke test registers an agent with Actions API, posts an agent send request,
+and validates the typed `websocket.messages` payload that the gateway subscribes
+to.
+
+### Live Agent Receive Smoke Test
+```bash
+backend/websocket-gateway/scripts/smoke_live_agent_receive.sh
+```
+
+This smoke test registers an agent, authenticates a WebSocket connection, posts
+an Actions API send request, and validates the encrypted `SecureMessage` delivered
+to the live socket.
 
 ### WebSocket Connection Test
 ```bash
@@ -259,5 +288,3 @@ websocket-gateway/
 ## License
 
 This service is part of the AegisFlux project and follows the same licensing terms.
-
-

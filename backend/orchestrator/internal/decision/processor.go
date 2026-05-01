@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
-	"github.com/nats-io/nats.go"
 	"aegisflux/backend/orchestrator/internal/ebpf"
 	"aegisflux/backend/orchestrator/internal/rollout"
+	"github.com/nats-io/nats.go"
 )
 
 // DecisionProcessor handles integration between decision engine and eBPF orchestration
@@ -292,7 +291,7 @@ func (dp *DecisionProcessor) rollbackControl(ctx context.Context, planID, contro
 		"plan_id", planID,
 		"control_id", controlID,
 		"targets", targets)
-	
+
 	// Publish rollback action via NATS
 	rollbackAction := map[string]interface{}{
 		"request_id": rollbackReq.RequestID,
@@ -304,7 +303,7 @@ func (dp *DecisionProcessor) rollbackControl(ctx context.Context, planID, contro
 
 	// In a real implementation, you'd marshal and publish this
 	_ = rollbackAction
-	
+
 	return nil
 }
 
@@ -341,10 +340,10 @@ func (dp *DecisionProcessor) getPlan(ctx context.Context, planID string) (*Plan,
 				Type:   "ebpf_drop_egress_by_cgroup",
 				Target: "host-1",
 				Parameters: map[string]interface{}{
-					"dst_ip":     "8.8.8.8",
-					"dst_port":   "53",
-					"cgroup_id":  "12345",
-					"ttl":        "3600",
+					"dst_ip":    "8.8.8.8",
+					"dst_port":  "53",
+					"cgroup_id": "12345",
+					"ttl":       "3600",
 				},
 				Status: "pending",
 			},
@@ -370,11 +369,11 @@ func (dp *DecisionProcessor) GetPlanStatus(ctx context.Context, planID string) (
 	// Get status for each control
 	for _, control := range plan.Controls {
 		controlStatus := ControlStatus{
-			ControlID:    control.ID,
-			Status:       control.Status,
-			ArtifactID:   control.ArtifactID,
-			LastUpdate:   time.Now(),
-			Error:        control.Error,
+			ControlID:  control.ID,
+			Status:     control.Status,
+			ArtifactID: control.ArtifactID,
+			LastUpdate: time.Now(),
+			Error:      control.Error,
 		}
 
 		// Get deployment status if applicable

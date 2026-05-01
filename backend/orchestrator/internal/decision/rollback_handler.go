@@ -12,28 +12,28 @@ import (
 
 // RollbackHandler manages rollback operations for decision integration
 type RollbackHandler struct {
-	logger       *slog.Logger
-	rolloutMgr   *rollout.BPFRolloutManager
+	logger          *slog.Logger
+	rolloutMgr      *rollout.BPFRolloutManager
 	activeRollbacks map[string]*RollbackOperation
 	rollbackMutex   sync.RWMutex
-	callbacks        []RollbackCallback
-	callbackMutex    sync.RWMutex
+	callbacks       []RollbackCallback
+	callbackMutex   sync.RWMutex
 }
 
 // RollbackOperation represents an active rollback operation
 type RollbackOperation struct {
-	OperationID     string            `json:"operation_id"`
-	PlanID          string            `json:"plan_id"`
-	ControlID       string            `json:"control_id"`
-	DeploymentID    string            `json:"deployment_id"`
-	Status          string            `json:"status"` // "initiated", "in_progress", "completed", "failed"
-	Strategy        string            `json:"strategy"`
-	Targets         []string          `json:"targets"`
-	Reason          string            `json:"reason"`
-	InitiatedAt     time.Time         `json:"initiated_at"`
-	CompletedAt     *time.Time        `json:"completed_at,omitempty"`
-	Error           string            `json:"error,omitempty"`
-	Metadata        map[string]interface{} `json:"metadata,omitempty"`
+	OperationID  string                 `json:"operation_id"`
+	PlanID       string                 `json:"plan_id"`
+	ControlID    string                 `json:"control_id"`
+	DeploymentID string                 `json:"deployment_id"`
+	Status       string                 `json:"status"` // "initiated", "in_progress", "completed", "failed"
+	Strategy     string                 `json:"strategy"`
+	Targets      []string               `json:"targets"`
+	Reason       string                 `json:"reason"`
+	InitiatedAt  time.Time              `json:"initiated_at"`
+	CompletedAt  *time.Time             `json:"completed_at,omitempty"`
+	Error        string                 `json:"error,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // RollbackCallback is a function called when rollback events occur
@@ -42,10 +42,10 @@ type RollbackCallback func(operationID string, operation *RollbackOperation)
 // NewRollbackHandler creates a new rollback handler
 func NewRollbackHandler(logger *slog.Logger, rolloutMgr *rollout.BPFRolloutManager) *RollbackHandler {
 	return &RollbackHandler{
-		logger:           logger,
-		rolloutMgr:       rolloutMgr,
-		activeRollbacks:  make(map[string]*RollbackOperation),
-		callbacks:        make([]RollbackCallback, 0),
+		logger:          logger,
+		rolloutMgr:      rolloutMgr,
+		activeRollbacks: make(map[string]*RollbackOperation),
+		callbacks:       make([]RollbackCallback, 0),
 	}
 }
 
@@ -60,13 +60,13 @@ func (rh *RollbackHandler) InitiateRollback(ctx context.Context, req RollbackReq
 
 	// Create rollback operation
 	operation := &RollbackOperation{
-		OperationID:  operationID,
-		PlanID:       req.PlanID,
-		Status:       "initiated",
-		Strategy:     string(req.Strategy),
-		Reason:       req.Reason,
-		InitiatedAt:  time.Now(),
-		Metadata:     make(map[string]interface{}),
+		OperationID: operationID,
+		PlanID:      req.PlanID,
+		Status:      "initiated",
+		Strategy:    string(req.Strategy),
+		Reason:      req.Reason,
+		InitiatedAt: time.Now(),
+		Metadata:    make(map[string]interface{}),
 	}
 
 	// Store operation
@@ -281,8 +281,10 @@ func (rh *RollbackHandler) rollbackDeployment(ctx context.Context, deployment *D
 
 	// In a real implementation, you'd call the rollback manager
 	// For now, we'll simulate the rollback
-	rh.logger.Info("Simulating rollback for deployment", "deployment_id", deployment.DeploymentID)
-	
+	rh.logger.Info("Simulating rollback for deployment",
+		"deployment_id", deployment.DeploymentID,
+		"request_id", rollbackReq.RequestID)
+
 	// Simulate rollback time
 	time.Sleep(2 * time.Second)
 
@@ -296,18 +298,18 @@ func (rh *RollbackHandler) getActiveDeploymentsForPlan(planID string) ([]*Deploy
 	// For now, return placeholder data
 	deployments := []*DeploymentResponse{
 		{
-			PlanID:        planID,
-			DeploymentID:  "deploy-1",
-			Status:        "active",
-			Targets:       []string{"host-1", "host-2"},
-			DeployedAt:    time.Now().Add(-1 * time.Hour),
+			PlanID:       planID,
+			DeploymentID: "deploy-1",
+			Status:       "active",
+			Targets:      []string{"host-1", "host-2"},
+			DeployedAt:   time.Now().Add(-1 * time.Hour),
 		},
 		{
-			PlanID:        planID,
-			DeploymentID:  "deploy-2",
-			Status:        "failed",
-			Targets:       []string{"host-3"},
-			DeployedAt:    time.Now().Add(-30 * time.Minute),
+			PlanID:       planID,
+			DeploymentID: "deploy-2",
+			Status:       "failed",
+			Targets:      []string{"host-3"},
+			DeployedAt:   time.Now().Add(-30 * time.Minute),
 		},
 	}
 
@@ -317,7 +319,7 @@ func (rh *RollbackHandler) getActiveDeploymentsForPlan(planID string) ([]*Deploy
 // filterDeploymentsByControls filters deployments by control IDs
 func (rh *RollbackHandler) filterDeploymentsByControls(deployments []*DeploymentResponse, controlIDs []string) []*DeploymentResponse {
 	filtered := make([]*DeploymentResponse, 0)
-	
+
 	for _, deployment := range deployments {
 		// In a real implementation, you'd check if the deployment is for one of the specified controls
 		// For now, we'll include all deployments

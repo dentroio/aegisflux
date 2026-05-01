@@ -3,20 +3,20 @@
 ## 🚨 CRITICAL PRIORITIES (Must Complete First)
 
 ### 1. **Backend Service Integration**
-- [ ] **Add actions-api to docker-compose.yml** (port 8083)
-  - Currently missing from compose file
+- [x] **Add actions-api to docker-compose.yml** (port 8083)
+  - Included in compose file
   - Essential for agent registration and management
   - Already implemented and working
-- [ ] **Implement segmenter service** (port 8086)
-  - Currently just a stub in `backend/segmenter/`
+- [x] **Add segmenter service to docker-compose.yml** (port 8086)
+  - Implemented in `backend/segmenter/`
   - Needed for policy planning and segmentation
   - Core component for policy deployment
 
 ### 2. **Service Completion**
 - [ ] **Complete etl-enrich service**
-  - Python service needs full integration
+  - Dockerized service and exposed health/readiness/metrics on port 8088
   - Integrate moved feeds/ directory
-  - Add proper error handling and monitoring
+  - Continue hardening processing error handling and monitoring
 - [ ] **Enhance ingest service**
   - Complete gRPC service implementation
   - Better telemetry handling
@@ -46,9 +46,13 @@
 - [ ] **End-to-End Pipeline Testing**
   - Agent → Ingest → ETL → Correlator → Decision
   - Policy deployment → Orchestrator → Registry → Agent
+  - Orchestrator `/seg/maps` → `actions.seg.maps` smoke coverage added
   - Complete data flow validation
 - [ ] **Agent Communication**
-  - WebSocket Gateway ↔ Actions API integration
+  - WebSocket Gateway ↔ Actions API typed NATS handoff contract added
+  - Gateway → Actions API registration proxy uses configurable base URL with smoke coverage
+  - Actions API `/agents/{uid}/send` → `websocket.messages` smoke coverage added
+  - Live WebSocket agent receive smoke coverage added
   - Real-time policy updates
   - Heartbeat and health monitoring
 
@@ -174,4 +178,3 @@
 
 *Last Updated: $(date)*
 *Priority: Critical items should be completed first*
-

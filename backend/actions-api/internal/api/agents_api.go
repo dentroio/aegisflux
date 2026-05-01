@@ -10,6 +10,18 @@ import (
 	"time"
 )
 
+const websocketMessagesSubject = "websocket.messages"
+
+type websocketGatewayMessage struct {
+	ID          string            `json:"id"`
+	Type        string            `json:"type"`
+	Channel     string            `json:"channel"`
+	Payload     string            `json:"payload"`
+	Timestamp   int64             `json:"timestamp"`
+	Headers     map[string]string `json:"headers"`
+	TargetAgent string            `json:"target_agent"`
+}
+
 // AgentListResponse represents the response for listing agents
 type AgentListResponse struct {
 	Agents []AgentInfo `json:"agents"`
@@ -18,35 +30,35 @@ type AgentListResponse struct {
 
 // AgentInfo represents agent information for list responses (without sensitive data)
 type AgentInfo struct {
-	AgentUID      string                 `json:"agent_uid"`
-	OrgID         string                 `json:"org_id"`
-	HostID        string                 `json:"host_id"`
-	Hostname      string                 `json:"hostname,omitempty"`
-	MachineIDHash string                 `json:"machine_id_hash,omitempty"`
-	AgentVersion  string                 `json:"agent_version,omitempty"`
-	Platform      map[string]any         `json:"platform,omitempty"`
-	Network       map[string]any         `json:"network,omitempty"`
-	Labels        []string               `json:"labels"`
-	Note          string                 `json:"note,omitempty"`
-	Created       time.Time              `json:"created"`
-	LastSeen      time.Time              `json:"last_seen"`
+	AgentUID      string         `json:"agent_uid"`
+	OrgID         string         `json:"org_id"`
+	HostID        string         `json:"host_id"`
+	Hostname      string         `json:"hostname,omitempty"`
+	MachineIDHash string         `json:"machine_id_hash,omitempty"`
+	AgentVersion  string         `json:"agent_version,omitempty"`
+	Platform      map[string]any `json:"platform,omitempty"`
+	Network       map[string]any `json:"network,omitempty"`
+	Labels        []string       `json:"labels"`
+	Note          string         `json:"note,omitempty"`
+	Created       time.Time      `json:"created"`
+	LastSeen      time.Time      `json:"last_seen"`
 }
 
 // AgentDetailResponse represents the full agent response
 type AgentDetailResponse struct {
-	AgentUID      string                 `json:"agent_uid"`
-	OrgID         string                 `json:"org_id"`
-	HostID        string                 `json:"host_id"`
-	Hostname      string                 `json:"hostname,omitempty"`
-	MachineIDHash string                 `json:"machine_id_hash,omitempty"`
-	AgentVersion  string                 `json:"agent_version,omitempty"`
-	Capabilities  map[string]any         `json:"capabilities,omitempty"`
-	Platform      map[string]any         `json:"platform,omitempty"`
-	Network       map[string]any         `json:"network,omitempty"`
-	Labels        []string               `json:"labels"`
-	Note          string                 `json:"note,omitempty"`
-	Created       time.Time              `json:"created"`
-	LastSeen      time.Time              `json:"last_seen"`
+	AgentUID      string         `json:"agent_uid"`
+	OrgID         string         `json:"org_id"`
+	HostID        string         `json:"host_id"`
+	Hostname      string         `json:"hostname,omitempty"`
+	MachineIDHash string         `json:"machine_id_hash,omitempty"`
+	AgentVersion  string         `json:"agent_version,omitempty"`
+	Capabilities  map[string]any `json:"capabilities,omitempty"`
+	Platform      map[string]any `json:"platform,omitempty"`
+	Network       map[string]any `json:"network,omitempty"`
+	Labels        []string       `json:"labels"`
+	Note          string         `json:"note,omitempty"`
+	Created       time.Time      `json:"created"`
+	LastSeen      time.Time      `json:"last_seen"`
 }
 
 // LabelsUpdateRequest represents a request to update agent labels
@@ -62,24 +74,24 @@ type NoteUpdateRequest struct {
 
 // AgentConfigRequest represents a request to configure agent settings
 type AgentConfigRequest struct {
-	Channels    []string               `json:"channels,omitempty"`
-	Settings    map[string]interface{} `json:"settings,omitempty"`
-	Policies    []string               `json:"policies,omitempty"`
-	HeartbeatInterval int              `json:"heartbeat_interval,omitempty"`
-	ReconnectInterval int              `json:"reconnect_interval,omitempty"`
-	MessageQueueSize  int              `json:"message_queue_size,omitempty"`
+	Channels          []string               `json:"channels,omitempty"`
+	Settings          map[string]interface{} `json:"settings,omitempty"`
+	Policies          []string               `json:"policies,omitempty"`
+	HeartbeatInterval int                    `json:"heartbeat_interval,omitempty"`
+	ReconnectInterval int                    `json:"reconnect_interval,omitempty"`
+	MessageQueueSize  int                    `json:"message_queue_size,omitempty"`
 }
 
 // AgentStatusResponse represents agent connection status
 type AgentStatusResponse struct {
-	AgentID         string    `json:"agent_id"`
-	Connected       bool      `json:"connected"`
-	LastSeen        time.Time `json:"last_seen"`
-	Channels        []string  `json:"channels"`
-	SessionExpires  time.Time `json:"session_expires"`
-	WebSocketURL    string    `json:"websocket_url,omitempty"`
-	MessageCount    int       `json:"message_count,omitempty"`
-	Uptime          string    `json:"uptime,omitempty"`
+	AgentID        string    `json:"agent_id"`
+	Connected      bool      `json:"connected"`
+	LastSeen       time.Time `json:"last_seen"`
+	Channels       []string  `json:"channels"`
+	SessionExpires time.Time `json:"session_expires"`
+	WebSocketURL   string    `json:"websocket_url,omitempty"`
+	MessageCount   int       `json:"message_count,omitempty"`
+	Uptime         string    `json:"uptime,omitempty"`
 }
 
 // SendMessageRequest represents a request to send a message to an agent
@@ -102,7 +114,7 @@ type SendMessageResponse struct {
 type BroadcastRequest struct {
 	Channel     string                 `json:"channel"`
 	Message     map[string]interface{} `json:"message"`
-	MessageType string                 `json:"message_type"` // request, response, event
+	MessageType string                 `json:"message_type"`           // request, response, event
 	AgentFilter []string               `json:"agent_filter,omitempty"` // specific agents only
 	Priority    int                    `json:"priority,omitempty"`
 	TTL         int                    `json:"ttl,omitempty"` // seconds
@@ -193,14 +205,14 @@ func (s *Server) agentDispatch(w http.ResponseWriter, r *http.Request) {
 	// Extract agent UID from path: /agents/{uid} or /agents/{uid}/labels or /agents/{uid}/note
 	path := strings.TrimPrefix(r.URL.Path, "/agents/")
 	parts := strings.Split(path, "/")
-	
+
 	if len(parts) == 0 || parts[0] == "" {
 		http.Error(w, "Agent UID required", http.StatusBadRequest)
 		return
 	}
-	
+
 	agentUID := parts[0]
-	
+
 	// Route to appropriate handler based on path
 	if len(parts) == 1 {
 		// /agents/{uid}
@@ -407,12 +419,12 @@ func (s *Server) getAgentStatus(w http.ResponseWriter, r *http.Request, agentUID
 	// Check if agent is connected via WebSocket (this would integrate with WebSocket gateway)
 	// For now, we'll simulate the status
 	connected := time.Since(agent.LastSeen) < 5*time.Minute // Consider connected if seen within 5 minutes
-	
+
 	response := AgentStatusResponse{
 		AgentID:        agentUID,
 		Connected:      connected,
 		LastSeen:       agent.LastSeen,
-		Channels:       []string{}, // Would be populated from WebSocket gateway
+		Channels:       []string{},                         // Would be populated from WebSocket gateway
 		SessionExpires: agent.LastSeen.Add(24 * time.Hour), // 24 hour session
 		WebSocketURL:   "ws://localhost:8080/ws/agent",
 		MessageCount:   0, // Would be populated from WebSocket gateway
@@ -482,13 +494,13 @@ func (s *Server) sendMessageToAgent(w http.ResponseWriter, r *http.Request, agen
 
 	// Check if agent is connected
 	connected := time.Since(agent.LastSeen) < 5*time.Minute
-	
+
 	var response SendMessageResponse
 	messageID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
-	
+
 	if connected {
 		// Send message to WebSocket Gateway
-		err := s.sendMessageToWebSocketGateway(agentUID, req.Channel, req.Message, req.MessageType)
+		err := s.sendMessageToWebSocketGateway(agentUID, req.Channel, req.Message, req.MessageType, messageID)
 		if err != nil {
 			response = SendMessageResponse{
 				MessageID: messageID,
@@ -530,6 +542,7 @@ func (s *Server) broadcastToAgents(w http.ResponseWriter, r *http.Request) {
 
 	var sentTo []string
 	var failed []string
+	messageID := fmt.Sprintf("broadcast_%d", time.Now().UnixNano())
 
 	// Send to all agents or filtered agents
 	for agentUID, agent := range s.store.agents {
@@ -555,7 +568,7 @@ func (s *Server) broadcastToAgents(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Actually send the message via NATS to WebSocket Gateway
-		err := s.sendMessageToWebSocketGateway(agentUID, req.Channel, req.Message, req.MessageType)
+		err := s.sendMessageToWebSocketGateway(agentUID, req.Channel, req.Message, req.MessageType, messageID)
 		if err != nil {
 			log.Printf("Failed to send message to agent %s: %v", agentUID, err)
 			failed = append(failed, agentUID)
@@ -565,7 +578,7 @@ func (s *Server) broadcastToAgents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := BroadcastResponse{
-		MessageID: fmt.Sprintf("broadcast_%d", time.Now().UnixNano()),
+		MessageID: messageID,
 		SentTo:    sentTo,
 		Failed:    failed,
 		TotalSent: len(sentTo),
@@ -575,17 +588,27 @@ func (s *Server) broadcastToAgents(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// sendMessageToWebSocketGateway sends a message to the WebSocket Gateway via NATS
-func (s *Server) sendMessageToWebSocketGateway(agentUID, channel string, message map[string]interface{}, messageType string) error {
-	// Check if NATS is connected
-	if s.nc == nil {
-		return fmt.Errorf("NATS not connected")
+func buildWebSocketGatewayMessage(agentUID, channel string, message map[string]interface{}, messageType, messageID string, now time.Time) ([]byte, error) {
+	if agentUID == "" {
+		return nil, fmt.Errorf("agent UID is required")
+	}
+	if channel == "" {
+		return nil, fmt.Errorf("channel is required")
+	}
+	if messageID == "" {
+		return nil, fmt.Errorf("message ID is required")
+	}
+	if messageType == "" {
+		messageType = "event"
+	}
+	if message == nil {
+		message = map[string]interface{}{}
 	}
 
 	// Convert message to JSON string for agent's SecureMessage structure
 	messageJSON, err := json.Marshal(message)
 	if err != nil {
-		return fmt.Errorf("failed to marshal message payload: %w", err)
+		return nil, fmt.Errorf("failed to marshal message payload: %w", err)
 	}
 
 	// For now, send the JSON as base64-encoded string to match agent expectations
@@ -593,25 +616,39 @@ func (s *Server) sendMessageToWebSocketGateway(agentUID, channel string, message
 	payload := base64.StdEncoding.EncodeToString(messageJSON)
 
 	// Create the message payload
-	messageData := map[string]interface{}{
-		"id":        fmt.Sprintf("msg_%d", time.Now().UnixNano()),
-		"type":      messageType,
-		"channel":   channel,
-		"payload":   payload, // Send as base64-encoded string to match SecureMessage format
-		"timestamp": time.Now().Unix(),
-		"headers":   make(map[string]string),
-		"target_agent": agentUID, // Add target agent for routing
+	messageData := websocketGatewayMessage{
+		ID:          messageID,
+		Type:        messageType,
+		Channel:     channel,
+		Payload:     payload,
+		Timestamp:   now.Unix(),
+		Headers:     map[string]string{},
+		TargetAgent: agentUID,
 	}
 
 	// Convert to JSON
 	jsonData, err := json.Marshal(messageData)
 	if err != nil {
-		return fmt.Errorf("failed to marshal message: %w", err)
+		return nil, fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	return jsonData, nil
+}
+
+// sendMessageToWebSocketGateway sends a message to the WebSocket Gateway via NATS
+func (s *Server) sendMessageToWebSocketGateway(agentUID, channel string, message map[string]interface{}, messageType, messageID string) error {
+	// Check if NATS is connected
+	if s.nc == nil {
+		return fmt.Errorf("NATS not connected")
+	}
+
+	jsonData, err := buildWebSocketGatewayMessage(agentUID, channel, message, messageType, messageID, time.Now())
+	if err != nil {
+		return err
 	}
 
 	// Publish to NATS subject for WebSocket Gateway
-	subject := "websocket.messages"
-	err = s.nc.Publish(subject, jsonData)
+	err = s.nc.Publish(websocketMessagesSubject, jsonData)
 	if err != nil {
 		return fmt.Errorf("failed to publish to NATS: %w", err)
 	}
@@ -658,10 +695,10 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if agent, exists := s.store.agents[heartbeatData.AgentUID]; exists {
 		agent.LastSeen = lastSeen
 		log.Printf("Updated heartbeat for agent %s: last_seen=%s", heartbeatData.AgentUID, heartbeatData.LastSeen)
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status": "updated",
+			"status":    "updated",
 			"agent_uid": heartbeatData.AgentUID,
 			"last_seen": heartbeatData.LastSeen,
 		})
@@ -682,20 +719,15 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if foundAgent != nil {
 		foundAgent.LastSeen = lastSeen
 		log.Printf("Updated heartbeat for agent %s (hostname %s): last_seen=%s", foundUID, heartbeatData.AgentUID, heartbeatData.LastSeen)
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status": "updated",
+			"status":    "updated",
 			"agent_uid": foundUID,
-			"hostname": heartbeatData.AgentUID,
+			"hostname":  heartbeatData.AgentUID,
 			"last_seen": heartbeatData.LastSeen,
 		})
 	} else {
 		http.Error(w, "Agent not found", http.StatusNotFound)
 	}
 }
-
-
-
-
-

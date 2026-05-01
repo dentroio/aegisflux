@@ -2,8 +2,8 @@ services:
   nats:
     image: nats:2.10-alpine
     ports:
-      - "4222:4222"   # client port
-      - "8222:8222"   # monitoring port
+      - "${NATS_CLIENT_PORT:-4222}:4222"   # client port
+      - "${NATS_MONITOR_PORT:-8222}:8222"   # monitoring port
     command: ["--jetstream", "-m", "8222", "-DV"]
 
   timescale:
@@ -23,8 +23,8 @@ services:
       - NEO4J_AUTH=neo4j/password
       - NEO4J_PLUGINS=["apoc"]
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
     volumes:
       - neo4j_data:/data
 
@@ -75,8 +75,12 @@ services:
   etl-enrich:
     build: backend/etl-enrich
     depends_on: [nats, timescale, neo4j]
+    ports:
+      - "8088:8088"
     environment:
       - NATS_URL=nats://nats:4222
+      - ETL_HTTP_HOST=0.0.0.0
+      - ETL_HTTP_PORT=8088
       - PG_HOST=timescale
       - PG_PORT=5432
       - PG_DB=aegisflux
@@ -112,13 +116,23 @@ services:
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=password
 
+  segmenter:
+    build: backend/segmenter
+    ports:
+      - "8086:8086"
+    environment:
+      - SEG_HTTP_ADDR=:8086
+
   orchestrator:
-    build: backend/orchestrator
+    build:
+      context: .
+      dockerfile: backend/orchestrator/Dockerfile
     depends_on: [vault, nats]
     ports:
-      - "8084:8084"
+      - "${ORCHESTRATOR_HTTP_PORT:-8084}:8084"
     environment:
       - NATS_URL=nats://nats:4222
+      - ORCH_HTTP_ADDR=:8084
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
       - ORCHESTRATOR_LOG_LEVEL=INFO
@@ -142,6 +156,7 @@ services:
       - "8080:8080"
     environment:
       - NATS_URL=nats://nats:4222
+      - ACTIONS_API_URL=${ACTIONS_API_URL:-http://actions-api:8083}
       - WS_GATEWAY_PORT=8080
       - WS_GATEWAY_HOST=0.0.0.0
       - PG_HOST=timescale

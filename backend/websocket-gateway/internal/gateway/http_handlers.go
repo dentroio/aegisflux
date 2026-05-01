@@ -23,22 +23,22 @@ func NewHTTPHandlers(wsg *WebSocketGateway) *HTTPHandlers {
 // RegisterHTTPRoutes registers HTTP routes with the gateway
 func (h *HTTPHandlers) RegisterHTTPRoutes() {
 	log.Println("Registering HTTP routes...")
-	
+
 	// Health check endpoint
 	http.HandleFunc("/health", h.handleHealth)
 	log.Println("Registered /health endpoint")
-	
+
 	// Agent registration endpoints
 	http.HandleFunc("/agents/register/init", h.handleRegisterInit)
 	log.Println("Registered /agents/register/init endpoint")
-	
+
 	http.HandleFunc("/agents/register/complete", h.handleRegisterComplete)
 	log.Println("Registered /agents/register/complete endpoint")
-	
+
 	// WebSocket endpoint
 	http.HandleFunc("/ws/agent", h.handleWebSocketUpgrade)
 	log.Println("Registered /ws/agent endpoint")
-	
+
 	log.Println("HTTP routes registered successfully")
 }
 
@@ -55,10 +55,10 @@ func (h *HTTPHandlers) handleHealth(w http.ResponseWriter, r *http.Request) {
 	h.wsg.mu.RUnlock()
 
 	response := map[string]interface{}{
-		"status":            "healthy",
+		"status":             "healthy",
 		"active_connections": activeConnections,
-		"timestamp":         time.Now().Unix(),
-		"uptime":            time.Since(h.wsg.metrics.LastReset).String(),
+		"timestamp":          time.Now().Unix(),
+		"uptime":             time.Since(h.wsg.metrics.LastReset).String(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -100,18 +100,18 @@ func (h *HTTPHandlers) handleRegisterInit(w http.ResponseWriter, r *http.Request
 
 	// Create registration request for Actions API
 	registrationRequest := map[string]interface{}{
-		"org_id":         orgID,
-		"host_id":        hostID,
-		"agent_pubkey":   agentPubKey,
+		"org_id":          orgID,
+		"host_id":         hostID,
+		"agent_pubkey":    agentPubKey,
 		"machine_id_hash": req["machine_id_hash"],
-		"agent_version":  agentVersion,
-		"capabilities":   req["capabilities"],
-		"platform":       map[string]interface{}{"os": "linux", "arch": "arm64"},
-		"network":        map[string]interface{}{"interface": "eth0"},
+		"agent_version":   agentVersion,
+		"capabilities":    req["capabilities"],
+		"platform":        map[string]interface{}{"os": "linux", "arch": "arm64"},
+		"network":         map[string]interface{}{"interface": "eth0"},
 	}
 
 	// Call Actions API to register the agent
-	actionsAPIURL := "http://host.docker.internal:8083/agents/register/init"
+	actionsAPIURL := h.wsg.actionsAPIEndpoint("/agents/register/init")
 	jsonData, err := json.Marshal(registrationRequest)
 	if err != nil {
 		log.Printf("Failed to marshal registration request: %v", err)
@@ -182,7 +182,7 @@ func (h *HTTPHandlers) handleRegisterComplete(w http.ResponseWriter, r *http.Req
 	log.Printf("Received registration complete request: %+v", req)
 
 	// Forward to Actions API
-	actionsAPIURL := "http://host.docker.internal:8083/agents/register/complete"
+	actionsAPIURL := h.wsg.actionsAPIEndpoint("/agents/register/complete")
 	jsonData, err := json.Marshal(req)
 	if err != nil {
 		log.Printf("Failed to marshal completion request: %v", err)

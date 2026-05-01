@@ -1,1 +1,6 @@
 nats-py
+neo4j
+orjson
+psycopg[binary,pool]
+python-dotenv
+tenacity

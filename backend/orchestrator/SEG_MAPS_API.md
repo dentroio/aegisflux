@@ -102,9 +102,9 @@ go run cmd/orchestrator/main.go
 ```
 
 ### Testing the API
-Use the provided test script:
+Use the provided smoke test:
 ```bash
-./example_usage.sh
+backend/orchestrator/scripts/smoke_seg_maps_nats.sh
 ```
 
 Or test manually with curl:
@@ -155,6 +155,9 @@ Tests cover:
 - Invalid JSON handling
 - Schema validation errors
 - NATS publishing (with mock connection)
+
+The smoke test starts NATS and orchestrator, posts a valid `MapSnapshot`, and
+subscribes to `actions.seg.maps` to validate the published event.
 
 ## Dependencies
 

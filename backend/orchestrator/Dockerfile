@@ -23,7 +23,7 @@ FROM alpine:3.20 AS ebpf-build
 RUN apk add --no-cache clang llvm bpftools make zstd
 WORKDIR /app
 # Templates will be bind-mounted at runtime
-COPY ../../bpf-templates /app/bpf-templates
+COPY bpf-templates /app/bpf-templates
 
 # Pre-build one template to prove toolchain
 RUN make -C /app/bpf-templates/drop_egress_by_cgroup

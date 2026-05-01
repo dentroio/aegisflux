@@ -29,6 +29,8 @@ class Config:
     # Application configuration
     AF_ENV: str = os.getenv("AF_ENV", "dev")
     AF_FAKE_RDNS: bool = os.getenv("AF_FAKE_RDNS", "false").lower() == "true"
+    ETL_HTTP_HOST: str = os.getenv("ETL_HTTP_HOST", "0.0.0.0")
+    ETL_HTTP_PORT: int = int(os.getenv("ETL_HTTP_PORT", "8088"))
     
     # NATS subjects
     RAW_EVENTS_SUBJECT: str = "events.raw"
@@ -40,6 +42,8 @@ class Config:
     # Processing configuration
     MAX_BATCH_SIZE: int = int(os.getenv("MAX_BATCH_SIZE", "100"))
     PROCESSING_TIMEOUT: int = int(os.getenv("PROCESSING_TIMEOUT", "30"))
+    DEPENDENCY_CONNECT_ATTEMPTS: int = int(os.getenv("DEPENDENCY_CONNECT_ATTEMPTS", "12"))
+    DEPENDENCY_CONNECT_WAIT_SECONDS: float = float(os.getenv("DEPENDENCY_CONNECT_WAIT_SECONDS", "5"))
     
     @property
     def pg_connection_string(self) -> str:
@@ -54,8 +58,6 @@ class Config:
 
 # Global config instance
 config = Config()
-
-
 
 
 

@@ -14,6 +14,8 @@ from nats.aio.client import Client as NATS
 
 from .config import config
 from .enrich import enrich_event, enrich_pkg_cve_event
+from .payload import decode_payload_args
+from .runtime import RuntimeState
 
 logger = logging.getLogger(__name__)
 
@@ -25,27 +27,51 @@ shutdown_event = asyncio.Event()
 class EventConsumer:
     """NATS consumer for processing raw events and package CVE data."""
     
-    def __init__(self, max_inflight: int = 100):
+    def __init__(self, max_inflight: int = 100, runtime_state: Optional[RuntimeState] = None):
         self.max_inflight = max_inflight
         self.semaphore = asyncio.Semaphore(max_inflight)
         self.timescale_writer = None
         self.neo4j_writer = None
         self.nats_client = None
         self.running = False
+        self.runtime_state = runtime_state or RuntimeState()
         # CVE cache for storing CVE documents
         self.cve_cache = {}
         # Package CVE cache for storing package CVE mappings
         self.pkg_cve_cache = {}
+
+    async def _with_connect_retry(self, label: str, operation):
+        """Run a dependency connect operation with bounded startup retries."""
+        last_error = None
+        for attempt in range(1, config.DEPENDENCY_CONNECT_ATTEMPTS + 1):
+            try:
+                return await operation()
+            except Exception as e:
+                last_error = e
+                self.runtime_state.record_error(e)
+                if attempt >= config.DEPENDENCY_CONNECT_ATTEMPTS:
+                    break
+                logger.warning(
+                    "Failed to connect to %s; retrying",
+                    label,
+                    extra={"attempt": attempt, "error": str(e)},
+                )
+                await asyncio.sleep(config.DEPENDENCY_CONNECT_WAIT_SECONDS)
+        raise last_error
     
     async def connect(self):
         """Connect to NATS and initialize database writers."""
         try:
             # Connect to NATS
-            self.nats_client = await nats.connect(
-                config.NATS_URL,
-                max_reconnect_attempts=5,
-                reconnect_time_wait=2
+            self.nats_client = await self._with_connect_retry(
+                "NATS",
+                lambda: nats.connect(
+                    config.NATS_URL,
+                    max_reconnect_attempts=5,
+                    reconnect_time_wait=2
+                ),
             )
+            self.runtime_state.set_nats_connected(True)
             logger.info(f"Connected to NATS at {config.NATS_URL}")
             
             # Initialize database writers
@@ -53,14 +79,18 @@ class EventConsumer:
             from .writers.neo4j import Neo4jWriter
             
             self.timescale_writer = TimescaleWriter()
-            await self.timescale_writer.connect()
+            await self._with_connect_retry("TimescaleDB", self.timescale_writer.connect)
+            self.runtime_state.set_timescale_connected(True)
             logger.info("Connected to TimescaleDB")
             
             self.neo4j_writer = Neo4jWriter()
-            await self.neo4j_writer.connect()
+            await self._with_connect_retry("Neo4j", self.neo4j_writer.connect)
+            self.runtime_state.set_neo4j_connected(True)
+            self.runtime_state.clear_error()
             logger.info("Connected to Neo4j")
             
         except Exception as e:
+            self.runtime_state.record_error(e)
             logger.error(f"Failed to connect: {e}")
             raise
     
@@ -70,22 +100,26 @@ class EventConsumer:
             if self.nats_client and not self.nats_client.is_closed:
                 await self.nats_client.drain()
                 await self.nats_client.close()
+                self.runtime_state.set_nats_connected(False)
                 logger.info("Disconnected from NATS")
             
             if self.timescale_writer:
                 await self.timescale_writer.close()
+                self.runtime_state.set_timescale_connected(False)
                 logger.info("Closed TimescaleDB connection")
             
             if self.neo4j_writer:
                 await self.neo4j_writer.close()
+                self.runtime_state.set_neo4j_connected(False)
                 logger.info("Closed Neo4j connection")
                 
         except Exception as e:
+            self.runtime_state.record_error(e)
             logger.error(f"Error during disconnect: {e}")
     
     async def _process_message(self, msg):
         """Process a single NATS message."""
-        logger.info(f"🎯 RECEIVED MESSAGE: subject={msg.subject}, data_length={len(msg.data)}")
+        logger.info("Received NATS message", extra={"subject": msg.subject, "data_length": len(msg.data)})
         async with self.semaphore:
             try:
                 # Set per-message timeout
@@ -95,10 +129,12 @@ class EventConsumer:
                 )
             except asyncio.TimeoutError:
                 logger.error(f"Message processing timeout for subject {msg.subject}")
+                self.runtime_state.record_error(f"message processing timeout for subject {msg.subject}")
                 # Acknowledge the message even on timeout to avoid reprocessing
                 await msg.ack()
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
+                self.runtime_state.record_error(e)
                 # Acknowledge the message to avoid reprocessing
                 await msg.ack()
     
@@ -184,23 +220,20 @@ class EventConsumer:
             
         except Exception as e:
             logger.error(f"Error processing package CVE enrichment: {e}")
-    
+
     async def _handle_message(self, msg):
         """Handle a single message with full processing pipeline."""
-        logger.info("🔧 Starting message processing...")
         try:
             # 1) Parse JSON with orjson
-            logger.info("🔧 Parsing JSON...")
             try:
                 event_data = orjson.loads(msg.data)
-                logger.info(f"🔧 JSON parsed successfully: {event_data.get('id', 'unknown')}")
             except orjson.JSONDecodeError as e:
                 logger.error(f"Failed to parse JSON: {e}")
+                self.runtime_state.record_error(e)
                 await msg.ack()
                 return
             
             # 2) Extract required fields from protobuf Event format
-            logger.info("🔧 Extracting event fields...")
             event_id = event_data.get("id")
             event_type = event_data.get("type")
             source = event_data.get("source")
@@ -210,22 +243,22 @@ class EventConsumer:
             
             # Extract host_id from metadata
             host_id = metadata.get("host_id") if isinstance(metadata, dict) else None
-            logger.info(f"🔧 Extracted fields: id={event_id}, type={event_type}, host_id={host_id}")
-            
-            logger.info(f"🔧 Validating required fields...")
+
             if not all([event_id, event_type, source, timestamp]):
                 logger.warning(f"Missing required fields - id: {event_id}, type: {event_type}, source: {source}, timestamp: {timestamp}")
+                self.runtime_state.record_error("missing required event fields")
                 try:
                     await msg.ack()
                 except Exception as e:
                     logger.debug(f"Message acknowledgment not needed: {e}")
                 return
-            logger.info(f"🔧 Field validation passed!")
             
-            logger.debug(f"Processing event: {event_type} from {host_id} at {timestamp}")
+            logger.info(
+                "Processing event",
+                extra={"event_id": event_id, "event_type": event_type, "host_id": host_id},
+            )
             
             # 3) Write raw event to TimescaleDB
-            logger.info(f"🔧 Writing to TimescaleDB...")
             try:
                 # Convert timestamp to milliseconds if needed
                 if isinstance(timestamp, str):
@@ -241,58 +274,39 @@ class EventConsumer:
                     event_type=event_type,
                     payload_json=orjson.dumps(event_data).decode('utf-8')
                 )
-                logger.info(f"🔧 Successfully wrote to TimescaleDB: {event_type}")
+                logger.debug("Wrote raw event to TimescaleDB", extra={"event_id": event_id})
             except Exception as e:
                 logger.error(f"Failed to write raw event to TimescaleDB: {e}")
+                self.runtime_state.record_error(e)
                 # Continue processing even if raw write fails
             
             # 4) Handle connect events for graph database
-            logger.info(f"🔧 Processing connect event for graph database...")
             if event_type == "connect":
                 try:
-                    # Extract destination information from connect event
-                    # Try to parse payload as JSON for args
-                    logger.info(f"🔧 Parsing payload for graph processing: {payload[:50]}...")
-                    args = {}
-                    if payload:
-                        try:
-                            import base64
-                            import json
-                            payload_bytes = base64.b64decode(payload)
-                            logger.info(f"🔧 First decode successful, length: {len(payload_bytes)}")
-                            # Try to decode again (double encoded)
-                            try:
-                                double_decoded = base64.b64decode(payload_bytes.decode('utf-8'))
-                                args = json.loads(double_decoded.decode('utf-8'))
-                                logger.info(f"🔧 Double decode successful, args: {args}")
-                            except Exception as e2:
-                                # Try single decode
-                                args = json.loads(payload_bytes.decode('utf-8'))
-                                logger.info(f"🔧 Single decode successful, args: {args}")
-                        except Exception as e:
-                            logger.error(f"Could not parse payload as JSON for connect event: {e}")
+                    args = decode_payload_args(payload)
                     
                     dst_ip = args.get("dst_ip")
                     dst_port = args.get("dst_port")
-                    logger.info(f"🔧 Extracted dst_ip: {dst_ip}, dst_port: {dst_port}")
                     
                     if dst_ip:
                         # Derive destination host ID
                         dst_host_id = self.neo4j_writer._derive_dst_host_id(dst_ip, dst_port)
-                        logger.info(f"🔧 Derived dst_host_id: {dst_host_id}")
                         
                         # Upsert communication edge
                         await self.neo4j_writer.upsert_comm_edge(host_id, dst_host_id)
-                        logger.info(f"🔧 Successfully upserted communication edge: {host_id} -> {dst_host_id}")
+                        logger.debug(
+                            "Upserted communication edge",
+                            extra={"src_host_id": host_id, "dst_host_id": dst_host_id},
+                        )
                     else:
-                        logger.info(f"🔧 No dst_ip found, skipping graph processing")
+                        logger.debug("Skipping graph update for connect event without dst_ip", extra={"event_id": event_id})
                     
                 except Exception as e:
                     logger.error(f"Failed to process connect event for graph: {e}")
+                    self.runtime_state.record_error(e)
                     # Continue processing even if graph update fails
             
             # 5) Enrich event and publish to events.enriched
-            logger.info(f"🔧 Starting enrichment process...")
             try:
                 # Reconstruct the original event format for enrichment
                 original_event = {
@@ -308,31 +322,17 @@ class EventConsumer:
                 # Try to parse payload as JSON for args
                 if payload:
                     try:
-                        import base64
-                        import json
-                        payload_bytes = base64.b64decode(payload)
-                        # Try double decode first (as used by ingest service)
-                        try:
-                            double_decoded = base64.b64decode(payload_bytes.decode('utf-8'))
-                            payload_json = json.loads(double_decoded.decode('utf-8'))
-                        except Exception:
-                            # Fall back to single decode
-                            payload_json = json.loads(payload_bytes.decode('utf-8'))
-                        original_event["args"] = payload_json
-                        logger.info(f"🔧 Parsed args for enrichment: {payload_json}")
+                        original_event["args"] = decode_payload_args(payload)
                     except Exception as e:
                         logger.debug(f"Could not parse payload as JSON: {e}")
                 
-                logger.info(f"🔧 Calling enrich_event...")
                 enriched_event = enrich_event(
                     original_event,
                     env=config.AF_ENV,
                     fake_rdns=config.AF_FAKE_RDNS
                 )
-                logger.info(f"🔧 Enrichment completed successfully")
                 
                 # Publish enriched event
-                logger.info(f"🔧 Publishing enriched event to events.enriched...")
                 enriched_json = orjson.dumps(enriched_event)
                 await self.nats_client.publish(
                     "events.enriched",
@@ -344,23 +344,28 @@ class EventConsumer:
                         "x-enriched": "true"
                     }
                 )
-                logger.info(f"🔧 Successfully published enriched event to events.enriched")
-                logger.debug(f"Published enriched event: {event_type}")
+                logger.debug("Published enriched event", extra={"event_id": event_id, "event_type": event_type})
                 
             except Exception as e:
                 logger.error(f"Failed to enrich and publish event: {e}")
+                self.runtime_state.record_error(e)
                 # Continue processing even if enrichment fails
             
             # Acknowledge the message (only for JetStream messages)
+            self.runtime_state.record_processed()
+            logger.info(
+                "Processed event",
+                extra={"event_id": event_id, "event_type": event_type, "host_id": host_id},
+            )
             try:
                 await msg.ack()
-                logger.debug(f"Successfully processed event: {event_type}")
             except Exception as e:
                 logger.debug(f"Message acknowledgment not needed: {e}")
                 # For non-JetStream messages, we don't need to ack
             
         except Exception as e:
             logger.error(f"Unexpected error in message handling: {e}")
+            self.runtime_state.record_error(e)
             try:
                 await msg.ack()  # Acknowledge to avoid reprocessing
             except Exception as ack_error:
@@ -369,12 +374,13 @@ class EventConsumer:
     async def start(self):
         """Start consuming messages from NATS."""
         try:
-            # Subscribe to events.raw WITHOUT queue group (temporarily for debugging)
+            # Subscribe to events.raw with a queue group so ETL workers can scale horizontally.
             await self.nats_client.subscribe(
                 "events.raw",
+                queue=config.ETL_QUEUE_GROUP,
                 cb=self._process_message
             )
-            logger.info("Subscribed to events.raw WITHOUT queue group")
+            logger.info("Subscribed to events.raw", extra={"queue_group": config.ETL_QUEUE_GROUP})
             
             # Subscribe to CVE updates
             await self.nats_client.subscribe(
@@ -391,6 +397,7 @@ class EventConsumer:
             logger.info("Subscribed to feeds.pkg.cve")
             
             self.running = True
+            self.runtime_state.set_running(True)
             
             # Wait for shutdown signal
             await shutdown_event.wait()
@@ -401,11 +408,13 @@ class EventConsumer:
             raise
         finally:
             self.running = False
+            self.runtime_state.set_running(False)
     
     async def stop(self):
         """Stop the consumer gracefully."""
         logger.info("Stopping consumer...")
         self.running = False
+        self.runtime_state.set_running(False)
         shutdown_event.set()
 
 

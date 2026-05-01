@@ -24,6 +24,7 @@ var (
 	privateKeyPath    = flag.String("private-key", "", "Path to Ed25519 private key")
 	publicKeyPath     = flag.String("public-key", "", "Path to Ed25519 public key")
 	databaseURL       = flag.String("database", "", "Database connection URL")
+	actionsAPIURL     = flag.String("actions-api-url", getenv("ACTIONS_API_URL", "http://actions-api:8083"), "Actions API base URL")
 	logLevel          = flag.String("log-level", "info", "Log level (debug, info, warn, error)")
 )
 
@@ -42,6 +43,7 @@ func main() {
 		PrivateKeyPath:    *privateKeyPath,
 		PublicKeyPath:     *publicKeyPath,
 		DatabaseURL:       *databaseURL,
+		ActionsAPIURL:     *actionsAPIURL,
 		LogLevel:          *logLevel,
 	}
 
@@ -103,6 +105,8 @@ func printUsage() {
 	fmt.Println("        Path to Ed25519 public key")
 	fmt.Println("  -database string")
 	fmt.Println("        Database connection URL")
+	fmt.Println("  -actions-api-url string")
+	fmt.Println("        Actions API base URL (default http://actions-api:8083)")
 	fmt.Println("  -log-level string")
 	fmt.Println("        Log level: debug, info, warn, error (default info)")
 	fmt.Println()
@@ -115,7 +119,13 @@ func printUsage() {
 	fmt.Println("  WEBSOCKET_PRIVATE_KEY_PATH  Path to Ed25519 private key")
 	fmt.Println("  WEBSOCKET_PUBLIC_KEY_PATH   Path to Ed25519 public key")
 	fmt.Println("  WEBSOCKET_DATABASE_URL      Database connection URL")
+	fmt.Println("  ACTIONS_API_URL             Actions API base URL")
 	fmt.Println("  WEBSOCKET_LOG_LEVEL         Log level")
 }
 
-
+func getenv(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
+}
