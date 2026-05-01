@@ -76,6 +76,16 @@ On non-Windows development machines the default spool path is:
 /tmp/aegis-windows-agent/events.jsonl
 ```
 
+To send the same event batch directly to the Phase 1 ingest API during lab runs:
+
+```bash
+AEGIS_BACKEND_URL=http://127.0.0.1:9090 cargo run -- --once
+```
+
+The agent appends `/v1/visibility/events` to `AEGIS_BACKEND_URL` unless the URL
+already ends with that path. The built-in lab transport supports plain `http://`
+only; use it with localhost or a trusted lab tunnel.
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -84,5 +94,5 @@ On non-Windows development machines the default spool path is:
 | `AEGIS_DEVICE_ID` | hostname fallback | Device identity reported in event envelopes |
 | `AEGIS_SENSOR_VERSION` | crate version | Sensor version in event envelopes |
 | `AEGIS_EVENT_SPOOL` | platform default | JSONL event spool path |
-| `AEGIS_BACKEND_URL` | empty | Reserved for future outbound telemetry |
+| `AEGIS_BACKEND_URL` | empty | Optional Phase 1 ingest base URL for outbound lab telemetry |
 | `AEGIS_COLLECT_COMMAND_LINE` | `false` | Opt-in command-line collection for lab scenarios; values are sanitized and truncated |

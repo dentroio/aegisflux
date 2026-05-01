@@ -16,7 +16,7 @@ use std::time::SystemTime;
 use collector::CollectorSet;
 use config::AgentConfig;
 use event::{AegisEvent, EventPayload};
-use transport::JsonlSpool;
+use transport::{HttpVisibilityTransport, JsonlSpool};
 
 fn main() -> ExitCode {
     match run() {
@@ -57,6 +57,11 @@ fn run() -> Result<(), String> {
         if args.stdout {
             println!("{}", event.to_json());
         }
+    }
+
+    if let Some(backend_url) = &config.backend_url {
+        let transport = HttpVisibilityTransport::new(backend_url)?;
+        transport.post_events(&events)?;
     }
 
     if !args.once {
