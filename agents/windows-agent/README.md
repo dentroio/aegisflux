@@ -12,6 +12,14 @@ The Aegis Windows Agent is the planned Windows visibility and local-control comp
 
 No blocking, quarantine, WFP enforcement, SGT changes, or inbound listener is in Phase 1 scope.
 
+Current Windows lab collection uses:
+
+- `sysinfo` process snapshots for process inventory and lineage
+- `netstat -ano` snapshots for TCP/UDP socket to PID attribution
+- `ipconfig /displaydns` snapshots for DNS cache observations
+
+The network and DNS collectors are intended for Phase 1 evidence capture. ETW/IP Helper and DNS Client ETW collectors should replace these snapshot methods before production use.
+
 ## Event Contract
 
 The Windows agent emits Phase 1 visibility events that must conform to:

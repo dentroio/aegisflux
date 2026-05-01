@@ -84,6 +84,58 @@ pub enum EventPayload {
         /// Collection method.
         collection_method: String,
     },
+    /// Network flow started or observed in a snapshot payload.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    FlowStarted {
+        /// Stable local flow identifier.
+        flow_id: String,
+        /// Stable local process instance identifier when known.
+        process_guid: Option<String>,
+        /// Process ID when known.
+        pid: Option<u32>,
+        /// Process image name when known.
+        process_name: Option<String>,
+        /// User or account when available.
+        user: Option<String>,
+        /// IP protocol.
+        protocol: String,
+        /// Flow direction.
+        direction: String,
+        /// Local IP address.
+        local_ip: String,
+        /// Local port when applicable.
+        local_port: Option<u16>,
+        /// Remote IP address.
+        remote_ip: String,
+        /// Remote port when applicable.
+        remote_port: Option<u16>,
+        /// Remote hostname when correlated.
+        remote_hostname: Option<String>,
+        /// Attribution method.
+        attribution_method: String,
+        /// Attribution confidence.
+        attribution_confidence: f32,
+    },
+    /// DNS observation payload.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    DnsObserved {
+        /// Queried hostname.
+        query: String,
+        /// DNS query type when known.
+        query_type: Option<String>,
+        /// DNS answers.
+        answers: Vec<String>,
+        /// Resolver address when known.
+        resolver: Option<String>,
+        /// Stable local process instance identifier when known.
+        process_guid: Option<String>,
+        /// Process ID when known.
+        pid: Option<u32>,
+        /// Correlation method.
+        correlation_method: String,
+        /// Correlation confidence.
+        correlation_confidence: f32,
+    },
 }
 
 impl AegisEvent {
@@ -170,6 +222,58 @@ impl AegisEvent {
                 option_json(publisher.as_deref()),
                 escape_json(collection_method)
             ),
+            EventPayload::FlowStarted {
+                flow_id,
+                process_guid,
+                pid,
+                process_name,
+                user,
+                protocol,
+                direction,
+                local_ip,
+                local_port,
+                remote_ip,
+                remote_port,
+                remote_hostname,
+                attribution_method,
+                attribution_confidence,
+            } => format!(
+                r#"{{"flow_id":"{}","process_guid":{},"pid":{},"process_name":{},"user":{},"protocol":"{}","direction":"{}","local_ip":"{}","local_port":{},"remote_ip":"{}","remote_port":{},"remote_hostname":{},"attribution_method":"{}","attribution_confidence":{}}}"#,
+                escape_json(flow_id),
+                option_json(process_guid.as_deref()),
+                option_u32_json(*pid),
+                option_json(process_name.as_deref()),
+                option_json(user.as_deref()),
+                escape_json(protocol),
+                escape_json(direction),
+                escape_json(local_ip),
+                option_u16_json(*local_port),
+                escape_json(remote_ip),
+                option_u16_json(*remote_port),
+                option_json(remote_hostname.as_deref()),
+                escape_json(attribution_method),
+                finite_f32_json(*attribution_confidence)
+            ),
+            EventPayload::DnsObserved {
+                query,
+                query_type,
+                answers,
+                resolver,
+                process_guid,
+                pid,
+                correlation_method,
+                correlation_confidence,
+            } => format!(
+                r#"{{"query":"{}","query_type":{},"answers":{},"resolver":{},"process_guid":{},"pid":{},"correlation_method":"{}","correlation_confidence":{}}}"#,
+                escape_json(query),
+                option_json(query_type.as_deref()),
+                string_array_json(answers),
+                option_json(resolver.as_deref()),
+                option_json(process_guid.as_deref()),
+                option_u32_json(*pid),
+                escape_json(correlation_method),
+                finite_f32_json(*correlation_confidence)
+            ),
         };
 
         format!(
@@ -218,12 +322,74 @@ fn option_u32_json(value: Option<u32>) -> String {
     }
 }
 
+fn option_u16_json(value: Option<u16>) -> String {
+    match value {
+        Some(value) => value.to_string(),
+        None => "null".to_string(),
+    }
+}
+
+fn string_array_json(values: &[String]) -> String {
+    let escaped = values
+        .iter()
+        .map(|value| format!("\"{}\"", escape_json(value)))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("[{escaped}]")
+}
+
+fn finite_f32_json(value: f32) -> String {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0).to_string()
+    } else {
+        "0".to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::escape_json;
+    use super::{EventPayload, escape_json};
 
     #[test]
     fn escapes_json_control_characters() {
         assert_eq!(escape_json("a\"b\\c\n"), "a\\\"b\\\\c\\n");
+    }
+
+    #[test]
+    fn flow_payload_variant_is_constructible_on_development_hosts() {
+        let payload = EventPayload::FlowStarted {
+            flow_id: "flow-1".to_string(),
+            process_guid: Some("proc-1".to_string()),
+            pid: Some(42),
+            process_name: Some("python.exe".to_string()),
+            user: None,
+            protocol: "tcp".to_string(),
+            direction: "outbound".to_string(),
+            local_ip: "10.10.20.55".to_string(),
+            local_port: Some(52944),
+            remote_ip: "203.0.113.10".to_string(),
+            remote_port: Some(443),
+            remote_hostname: Some("api.model-gateway.lab".to_string()),
+            attribution_method: "test".to_string(),
+            attribution_confidence: 0.9,
+        };
+
+        assert!(matches!(payload, EventPayload::FlowStarted { .. }));
+    }
+
+    #[test]
+    fn dns_payload_variant_is_constructible_on_development_hosts() {
+        let payload = EventPayload::DnsObserved {
+            query: "api.model-gateway.lab".to_string(),
+            query_type: Some("A".to_string()),
+            answers: vec!["203.0.113.10".to_string()],
+            resolver: None,
+            process_guid: None,
+            pid: None,
+            correlation_method: "test".to_string(),
+            correlation_confidence: 0.4,
+        };
+
+        assert!(matches!(payload, EventPayload::DnsObserved { .. }));
     }
 }
