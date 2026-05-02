@@ -168,11 +168,6 @@ fn collector_status(
     )
 }
 
-#[cfg(windows)]
-fn windows_only_message(message: &str) -> String {
-    message.to_string()
-}
-
 #[cfg(not(windows))]
 fn windows_only_message(message: &str) -> String {
     format!("{message}; running on non-Windows development host")

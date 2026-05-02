@@ -136,6 +136,63 @@ pub enum EventPayload {
         /// Correlation confidence.
         correlation_confidence: f32,
     },
+    /// Non-blocking AI-agent or automation detection payload.
+    AgentDetected {
+        /// Stable detection identifier.
+        detection_id: String,
+        /// Related process identifier when known.
+        process_guid: Option<String>,
+        /// Related flow identifier when known.
+        flow_id: Option<String>,
+        /// Detection classification.
+        classification: String,
+        /// Likelihood that the activity is agentic automation.
+        agent_likelihood: f32,
+        /// Detection confidence.
+        confidence: f32,
+        /// Risk score from 0-100.
+        risk_score: u8,
+        /// Pattern names that fired.
+        detected_patterns: Vec<String>,
+        /// Explainable evidence.
+        evidence: Vec<DetectionEvidence>,
+        /// Recommended non-blocking action.
+        recommended_action: String,
+    },
+    /// Risk finding payload.
+    RiskFindingCreated {
+        /// Stable finding identifier.
+        finding_id: String,
+        /// Severity.
+        severity: String,
+        /// Risk score from 0-100.
+        risk_score: u8,
+        /// Finding title.
+        title: String,
+        /// Finding description.
+        description: String,
+        /// Related process identifier when known.
+        process_guid: Option<String>,
+        /// Related flow identifier when known.
+        flow_id: Option<String>,
+        /// Related detection identifier when known.
+        detection_id: Option<String>,
+        /// Explainable evidence.
+        evidence: Vec<DetectionEvidence>,
+        /// Recommended non-blocking action.
+        recommended_action: String,
+    },
+}
+
+/// Evidence item attached to detections and findings.
+#[derive(Debug, Clone)]
+pub struct DetectionEvidence {
+    /// Evidence type.
+    pub evidence_type: String,
+    /// Evidence value.
+    pub value: String,
+    /// Evidence confidence.
+    pub confidence: f32,
 }
 
 impl AegisEvent {
@@ -274,6 +331,54 @@ impl AegisEvent {
                 escape_json(correlation_method),
                 finite_f32_json(*correlation_confidence)
             ),
+            EventPayload::AgentDetected {
+                detection_id,
+                process_guid,
+                flow_id,
+                classification,
+                agent_likelihood,
+                confidence,
+                risk_score,
+                detected_patterns,
+                evidence,
+                recommended_action,
+            } => format!(
+                r#"{{"detection_id":"{}","process_guid":{},"flow_id":{},"classification":"{}","agent_likelihood":{},"confidence":{},"risk_score":{},"detected_patterns":{},"evidence":{},"recommended_action":"{}"}}"#,
+                escape_json(detection_id),
+                option_json(process_guid.as_deref()),
+                option_json(flow_id.as_deref()),
+                escape_json(classification),
+                finite_f32_json(*agent_likelihood),
+                finite_f32_json(*confidence),
+                risk_score,
+                string_array_json(detected_patterns),
+                evidence_array_json(evidence),
+                escape_json(recommended_action)
+            ),
+            EventPayload::RiskFindingCreated {
+                finding_id,
+                severity,
+                risk_score,
+                title,
+                description,
+                process_guid,
+                flow_id,
+                detection_id,
+                evidence,
+                recommended_action,
+            } => format!(
+                r#"{{"finding_id":"{}","severity":"{}","risk_score":{},"title":"{}","description":"{}","process_guid":{},"flow_id":{},"detection_id":{},"evidence":{},"recommended_action":"{}"}}"#,
+                escape_json(finding_id),
+                escape_json(severity),
+                risk_score,
+                escape_json(title),
+                escape_json(description),
+                option_json(process_guid.as_deref()),
+                option_json(flow_id.as_deref()),
+                option_json(detection_id.as_deref()),
+                evidence_array_json(evidence),
+                escape_json(recommended_action)
+            ),
         };
 
         format!(
@@ -344,6 +449,22 @@ fn finite_f32_json(value: f32) -> String {
     } else {
         "0".to_string()
     }
+}
+
+fn evidence_array_json(values: &[DetectionEvidence]) -> String {
+    let escaped = values
+        .iter()
+        .map(|value| {
+            format!(
+                r#"{{"type":"{}","value":"{}","confidence":{}}}"#,
+                escape_json(&value.evidence_type),
+                escape_json(&value.value),
+                finite_f32_json(value.confidence)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("[{escaped}]")
 }
 
 #[cfg(test)]
