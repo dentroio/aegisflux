@@ -94,6 +94,45 @@ The agent appends `/v1/visibility/events` to `AEGIS_BACKEND_URL` unless the URL
 already ends with that path. The built-in lab transport supports plain `http://`
 only; use it with localhost or a trusted lab tunnel.
 
+## Windows Lab Scheduled Task
+
+Phase 1 does not implement native service mode yet. For repeatable Windows lab
+collection, install the built release binary as a scheduled task that runs one
+collection batch per interval:
+
+```powershell
+cd C:\AegisLab\aegisflux\agents\windows-agent
+cargo build --release
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-lab-scheduled-task.ps1 -RunNow
+```
+
+The task runs:
+
+```text
+scripts\run-lab-once.ps1
+```
+
+Defaults are tuned for the SSH reverse tunnel lab path:
+
+```text
+AEGIS_BACKEND_URL=http://127.0.0.1:9091
+AEGIS_AGENT_ID=windows-dev-agent-01
+AEGIS_DEVICE_ID=windows-dev-agent-01
+AEGIS_EVENT_SPOOL=C:\ProgramData\Aegis\Agent\spool\events.jsonl
+```
+
+Task logs are appended to:
+
+```text
+C:\ProgramData\Aegis\Agent\logs\scheduled-task.log
+```
+
+Remove the lab scheduled task with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\uninstall-lab-scheduled-task.ps1
+```
+
 ## Configuration
 
 | Variable | Default | Description |
