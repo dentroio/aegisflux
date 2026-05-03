@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 )
@@ -18,6 +19,7 @@ type visibilityStore interface {
 	Has(ctx context.Context, eventID string) (bool, error)
 	Append(ctx context.Context, event visibilityEvent) error
 	Query(ctx context.Context, filter visibilityQueryFilter) ([]visibilityEvent, error)
+	ListDevices(ctx context.Context, filter visibilityDeviceFilter) ([]visibilityDeviceRecord, error)
 	Close() error
 }
 
@@ -28,6 +30,25 @@ type visibilityQueryFilter struct {
 	AgentID   string
 	EventType string
 	Limit     int
+}
+
+type visibilityDeviceFilter struct {
+	TenantID string
+	Limit    int
+}
+
+type visibilityDeviceRecord struct {
+	DeviceID       string         `json:"device_id"`
+	AgentID        string         `json:"agent_id"`
+	Source         string         `json:"source"`
+	TenantID       string         `json:"tenant_id,omitempty"`
+	SensorVersion  string         `json:"sensor_version"`
+	FirstSeenMS    int64          `json:"first_seen_ms"`
+	LastSeenMS     int64          `json:"last_seen_ms"`
+	LastEventType  string         `json:"last_event_type"`
+	LastSequence   int64          `json:"last_sequence"`
+	EventCount     int            `json:"event_count"`
+	EventTypeCount map[string]int `json:"event_type_count"`
 }
 
 type fileVisibilityStore struct {
@@ -187,6 +208,89 @@ func (s *fileVisibilityStore) Query(ctx context.Context, filter visibilityQueryF
 		results = append(results, event)
 	}
 	return results, nil
+}
+
+func (s *fileVisibilityStore) ListDevices(ctx context.Context, filter visibilityDeviceFilter) ([]visibilityDeviceRecord, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = defaultVisibilityQueryLimit
+	}
+	if limit > maxVisibilityQueryLimit {
+		limit = maxVisibilityQueryLimit
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	byDevice := make(map[string]*visibilityDeviceRecord)
+	for _, event := range s.events {
+		if event.DeviceID == "" {
+			continue
+		}
+		if filter.TenantID != "" && event.TenantID != filter.TenantID {
+			continue
+		}
+
+		seenMS := event.ReceivedAtMS
+		if seenMS == 0 {
+			seenMS = event.TimestampMS
+		}
+
+		record, exists := byDevice[event.DeviceID]
+		if !exists {
+			record = &visibilityDeviceRecord{
+				DeviceID:       event.DeviceID,
+				AgentID:        event.AgentID,
+				Source:         event.Source,
+				TenantID:       event.TenantID,
+				SensorVersion:  event.SensorVersion,
+				FirstSeenMS:    seenMS,
+				LastSeenMS:     seenMS,
+				LastEventType:  event.EventType,
+				LastSequence:   event.Sequence,
+				EventTypeCount: make(map[string]int),
+			}
+			byDevice[event.DeviceID] = record
+		}
+
+		if seenMS < record.FirstSeenMS || record.FirstSeenMS == 0 {
+			record.FirstSeenMS = seenMS
+		}
+		if seenMS >= record.LastSeenMS {
+			record.LastSeenMS = seenMS
+			record.LastEventType = event.EventType
+			record.LastSequence = event.Sequence
+			record.AgentID = event.AgentID
+			record.Source = event.Source
+			record.SensorVersion = event.SensorVersion
+			record.TenantID = event.TenantID
+		}
+		record.EventCount++
+		record.EventTypeCount[event.EventType]++
+	}
+
+	devices := make([]visibilityDeviceRecord, 0, len(byDevice))
+	for _, record := range byDevice {
+		devices = append(devices, *record)
+	}
+
+	sort.Slice(devices, func(i, j int) bool {
+		if devices[i].LastSeenMS == devices[j].LastSeenMS {
+			return devices[i].DeviceID < devices[j].DeviceID
+		}
+		return devices[i].LastSeenMS > devices[j].LastSeenMS
+	})
+
+	if len(devices) > limit {
+		devices = devices[:limit]
+	}
+	return devices, nil
 }
 
 func (s *fileVisibilityStore) Close() error {

@@ -55,6 +55,7 @@ type visibilityQueryResponse struct {
 // RegisterHTTPRoutes registers HTTP endpoints owned by the ingest service.
 func (s *IngestServer) RegisterHTTPRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/visibility/events", s.handleVisibilityEvents)
+	mux.HandleFunc("/v1/visibility/devices", s.handleVisibilityDevices)
 	mux.HandleFunc("/v1/visibility/processes", s.handleVisibilityProcesses)
 	mux.HandleFunc("/v1/visibility/flows", s.handleVisibilityFlows)
 	mux.HandleFunc("/v1/visibility/dns", s.handleVisibilityDNS)

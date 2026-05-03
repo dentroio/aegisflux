@@ -146,6 +146,7 @@ Events are validated against a JSON Schema with the following requirements:
 - **GET /metrics**: Returns Prometheus metrics in text format
 - **POST /v1/visibility/events**: Accepts visibility JSONL or JSON arrays, publishes accepted events to NATS, and appends them to the local visibility event store
 - **GET /v1/visibility/events**: Returns recent stored visibility events, optionally filtered by `event_id`, `device_id`, `agent_id`, `event_type`, and `limit`
+- **GET /v1/visibility/devices**: Returns device summaries derived from stored visibility events, optionally filtered by `tenant_id` and `limit`
 - **GET /v1/visibility/processes**: Returns normalized process start/end events, optionally filtered by `device_id`, `agent_id`, `process_guid`, `pid`, and `limit`
 - **GET /v1/visibility/flows**: Returns normalized flow start/end events, optionally filtered by `device_id`, `agent_id`, `flow_id`, `process_guid`, `pid`, `remote_ip`, `remote_hostname`, and `limit`
 - **GET /v1/visibility/dns**: Returns normalized DNS observations, optionally filtered by `device_id`, `agent_id`, `process_guid`, `pid`, `query`, `answer`, and `limit`

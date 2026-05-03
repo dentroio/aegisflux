@@ -81,7 +81,17 @@ type VisibilityData = {
   findings: FindingRecord[]
 }
 
-const knownDevices = ['windows-dev-agent-01', 'linux-dev-agent-01']
+type DeviceRecord = {
+  device_id: string
+  agent_id: string
+  source: string
+  sensor_version: string
+  first_seen_ms: number
+  last_seen_ms: number
+  last_event_type: string
+  event_count: number
+  event_type_count: Record<string, number>
+}
 
 const tabs = [
   { id: 'processes', label: 'Processes', icon: TerminalSquare },
@@ -111,7 +121,8 @@ const wedgeIdeas = [
 ]
 
 export default function VisibilityConsole() {
-  const [selectedDevice, setSelectedDevice] = useState(knownDevices[0])
+  const [devices, setDevices] = useState<DeviceRecord[]>([])
+  const [selectedDevice, setSelectedDevice] = useState('')
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]['id']>('processes')
   const [query, setQuery] = useState('')
   const [data, setData] = useState<VisibilityData>({
@@ -126,6 +137,11 @@ export default function VisibilityConsole() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
 
   useEffect(() => {
+    fetchDevices()
+  }, [])
+
+  useEffect(() => {
+    if (!selectedDevice) return
     fetchVisibility()
     const interval = setInterval(fetchVisibility, 15000)
     return () => clearInterval(interval)
@@ -139,7 +155,29 @@ export default function VisibilityConsole() {
     return response.json()
   }
 
+  async function fetchDevices() {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetchJson<{ devices?: DeviceRecord[] }>('/api/visibility/devices?limit=50')
+      const nextDevices = response.devices || []
+      setDevices(nextDevices)
+      if (!selectedDevice && nextDevices.length > 0) {
+        setSelectedDevice(nextDevices[0].device_id)
+      }
+      if (selectedDevice && !nextDevices.some((device) => device.device_id === selectedDevice) && nextDevices.length > 0) {
+        setSelectedDevice(nextDevices[0].device_id)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load devices')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function fetchVisibility() {
+    if (!selectedDevice) return
+
     try {
       setLoading(true)
       setError(null)
@@ -203,7 +241,8 @@ export default function VisibilityConsole() {
     }
   }, [data])
 
-  const platform = selectedDevice.includes('windows') ? 'Windows' : 'Linux'
+  const selectedDeviceRecord = devices.find((device) => device.device_id === selectedDevice)
+  const platform = platformName(selectedDeviceRecord?.source || selectedDevice)
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
@@ -219,17 +258,21 @@ export default function VisibilityConsole() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {knownDevices.map((device) => (
+            {devices.length === 0 ? (
+              <span className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                No reporting devices
+              </span>
+            ) : devices.map((device) => (
               <button
-                key={device}
-                onClick={() => setSelectedDevice(device)}
+                key={device.device_id}
+                onClick={() => setSelectedDevice(device.device_id)}
                 className={`rounded-md border px-3 py-2 text-sm font-medium ${
-                  selectedDevice === device
+                  selectedDevice === device.device_id
                     ? 'border-slate-950 bg-slate-950 text-white'
                     : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
                 }`}
               >
-                {device.includes('windows') ? 'Windows' : 'Linux'}
+                {platformName(device.source || device.device_id)}
               </button>
             ))}
             <button
@@ -252,7 +295,7 @@ export default function VisibilityConsole() {
         )}
 
         <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
-          <Metric icon={Server} label="Device" value={platform} detail={selectedDevice} />
+          <Metric icon={Server} label="Device" value={platform} detail={selectedDevice || 'waiting for telemetry'} />
           <Metric icon={Activity} label="Latest" value={stats.latestAge} detail={lastRefresh ? `UI ${lastRefresh.toLocaleTimeString()}` : 'waiting'} />
           <Metric icon={TerminalSquare} label="Processes" value={stats.processes.toString()} detail="snapshot rows" />
           <Metric icon={ArrowDownUp} label="Flows" value={stats.flows.toString()} detail="socket evidence" />
@@ -345,9 +388,9 @@ export default function VisibilityConsole() {
                 <h2 className="text-base font-semibold">Next Build Slice</h2>
               </div>
               <ol className="space-y-2 text-sm text-slate-700">
-                <li>1. Add device inventory endpoint so this screen discovers agents automatically.</li>
-                <li>2. Add investigation drill-in: process to flows to DNS to finding.</li>
-                <li>3. Add draft control actions from a finding, still observe-only.</li>
+                <li>1. Add investigation drill-in: process to flows to DNS to finding.</li>
+                <li>2. Add draft control actions from a finding, still observe-only.</li>
+                <li>3. Add device health scoring from event freshness and collector status.</li>
               </ol>
             </div>
           </aside>
@@ -577,4 +620,12 @@ function ageFromMs(ms?: number) {
   const minutes = Math.round(seconds / 60)
   if (minutes < 60) return `${minutes}m ago`
   return `${Math.round(minutes / 60)}h ago`
+}
+
+function platformName(value: string) {
+  const normalized = value.toLowerCase()
+  if (normalized.includes('windows')) return 'Windows'
+  if (normalized.includes('linux')) return 'Linux'
+  if (normalized.includes('macos') || normalized.includes('darwin')) return 'macOS'
+  return value || 'Unknown'
 }

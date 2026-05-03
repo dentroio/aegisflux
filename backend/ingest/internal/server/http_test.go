@@ -496,6 +496,54 @@ func TestHandleClarionEventExportReturnsContractEvents(t *testing.T) {
 	}
 }
 
+func TestHandleVisibilityDevicesReturnsDeviceSummaries(t *testing.T) {
+	store, err := newFileVisibilityStore(t.TempDir() + "/visibility-events.jsonl")
+	if err != nil {
+		t.Fatalf("newFileVisibilityStore returned error: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	server := &IngestServer{
+		logger:    slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
+		validator: mockValidator{},
+		publisher: &mockPublisher{},
+		dedupe:    newDuplicateTracker(100),
+		store:     store,
+		metrics:   sharedTestMetrics,
+		checker:   health.NewServiceChecker(slog.Default()),
+	}
+
+	body := `{"schema_version":"visibility.v1","event_id":"evt-win-1","event_type":"aegis.process.started","timestamp_ms":1777075005616,"source":"aegis-windows-agent","tenant_id":"tenant-a","device_id":"windows-dev-agent-01","agent_id":"windows-dev-agent-01","sensor_version":"0.1.0","sequence":3,"payload":{"pid":3084,"name":"svchost.exe"}}
+` +
+		`{"schema_version":"visibility.v1","event_id":"evt-linux-1","event_type":"aegis.flow.started","timestamp_ms":1777075005617,"source":"aegis-linux-agent","tenant_id":"tenant-a","device_id":"linux-dev-agent-01","agent_id":"linux-dev-agent-01","sensor_version":"0.1.0","sequence":4,"payload":{"flow_id":"flow-abc","remote_ip":"203.0.113.10"}}
+` +
+		`{"schema_version":"visibility.v1","event_id":"evt-win-2","event_type":"aegis.dns.observed","timestamp_ms":1777075005618,"source":"aegis-windows-agent","tenant_id":"tenant-a","device_id":"windows-dev-agent-01","agent_id":"windows-dev-agent-01","sensor_version":"0.1.0","sequence":5,"payload":{"query":"api.model-gateway.lab"}}`
+	postReq := httptest.NewRequest(http.MethodPost, "/v1/visibility/events", bytes.NewBufferString(body))
+	postRec := httptest.NewRecorder()
+	server.handleVisibilityEvents(postRec, postReq)
+	if postRec.Code != http.StatusAccepted {
+		t.Fatalf("expected POST status %d, got %d: %s", http.StatusAccepted, postRec.Code, postRec.Body.String())
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/v1/visibility/devices?tenant_id=tenant-a&limit=10", nil)
+	getRec := httptest.NewRecorder()
+	server.handleVisibilityDevices(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected GET status %d, got %d: %s", http.StatusOK, getRec.Code, getRec.Body.String())
+	}
+	for _, expected := range [][]byte{
+		[]byte(`"count":2`),
+		[]byte(`"device_id":"windows-dev-agent-01"`),
+		[]byte(`"device_id":"linux-dev-agent-01"`),
+		[]byte(`"source":"aegis-linux-agent"`),
+		[]byte(`"aegis.dns.observed":1`),
+	} {
+		if !bytes.Contains(getRec.Body.Bytes(), expected) {
+			t.Fatalf("expected devices response to include %s, got %s", expected, getRec.Body.String())
+		}
+	}
+}
+
 func TestHandleVisibilityEventsRejectsValidationFailure(t *testing.T) {
 	server := &IngestServer{
 		logger:    slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
