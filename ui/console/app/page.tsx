@@ -81,6 +81,31 @@ type VisibilityData = {
   findings: FindingRecord[]
 }
 
+type InvestigationData = {
+  ok: boolean
+  device_id: string
+  filters: {
+    process_guid?: string
+    pid?: number
+  }
+  counts: {
+    processes: number
+    flows: number
+    dns: number
+    findings: number
+  }
+  processes: ProcessRecord[]
+  flows: FlowRecord[]
+  dns: DnsRecord[]
+  findings: FindingRecord[]
+}
+
+type InvestigationSelection = {
+  label: string
+  process_guid?: string
+  pid?: number
+}
+
 type DeviceRecord = {
   device_id: string
   agent_id: string
@@ -135,6 +160,9 @@ export default function VisibilityConsole() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+  const [investigation, setInvestigation] = useState<InvestigationData | null>(null)
+  const [investigationSelection, setInvestigationSelection] = useState<InvestigationSelection | null>(null)
+  const [investigationLoading, setInvestigationLoading] = useState(false)
 
   useEffect(() => {
     fetchDevices()
@@ -203,6 +231,28 @@ export default function VisibilityConsole() {
       setError(err instanceof Error ? err.message : 'Failed to load visibility data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchInvestigation(selection: InvestigationSelection) {
+    if (!selectedDevice) return
+
+    try {
+      setInvestigationLoading(true)
+      setInvestigationSelection(selection)
+      const params = new URLSearchParams({
+        device_id: selectedDevice,
+        limit: '20',
+      })
+      if (selection.process_guid) params.set('process_guid', selection.process_guid)
+      if (selection.pid !== undefined) params.set('pid', selection.pid.toString())
+
+      const response = await fetchJson<InvestigationData>(`/api/visibility/investigation?${params.toString()}`)
+      setInvestigation(response)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load investigation path')
+    } finally {
+      setInvestigationLoading(false)
     }
   }
 
@@ -345,15 +395,21 @@ export default function VisibilityConsole() {
             </div>
 
             <div className="max-h-[620px] overflow-auto">
-              {activeTab === 'processes' && <ProcessTable processes={filtered.processes} />}
+              {activeTab === 'processes' && <ProcessTable processes={filtered.processes} onInvestigate={fetchInvestigation} />}
               {activeTab === 'flows' && <FlowTable flows={filtered.flows} />}
               {activeTab === 'dns' && <DnsTable dns={filtered.dns} />}
-              {activeTab === 'findings' && <FindingTable findings={filtered.findings} />}
+              {activeTab === 'findings' && <FindingTable findings={filtered.findings} onInvestigate={fetchInvestigation} />}
               {activeTab === 'events' && <EventTable events={filtered.events} />}
             </div>
           </div>
 
           <aside className="space-y-4">
+            <InvestigationPanel
+              loading={investigationLoading}
+              selection={investigationSelection}
+              investigation={investigation}
+            />
+
             <div className="rounded-lg border border-slate-200 bg-white p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-slate-800" />
@@ -425,7 +481,13 @@ function Metric({
   )
 }
 
-function ProcessTable({ processes }: { processes: ProcessRecord[] }) {
+function ProcessTable({
+  processes,
+  onInvestigate,
+}: {
+  processes: ProcessRecord[]
+  onInvestigate: (selection: InvestigationSelection) => void
+}) {
   return (
     <Table empty="No process evidence for this filter.">
       <thead className="bg-slate-50">
@@ -440,7 +502,15 @@ function ProcessTable({ processes }: { processes: ProcessRecord[] }) {
         {processes.length === 0 ? (
           <EmptyRow colSpan={4} message="No process evidence for this filter." />
         ) : processes.slice(0, 80).map((process) => (
-          <tr key={process.process_guid || `${process.pid}-${process.name}`} className="hover:bg-slate-50">
+          <tr
+            key={process.process_guid || `${process.pid}-${process.name}`}
+            onClick={() => onInvestigate({
+              label: `${process.name} pid ${process.pid}`,
+              process_guid: process.process_guid,
+              pid: process.pid,
+            })}
+            className="cursor-pointer hover:bg-slate-50"
+          >
             <Td mono>{process.pid}</Td>
             <Td>{process.name}</Td>
             <Td muted>{process.path || 'unknown'}</Td>
@@ -508,7 +578,13 @@ function DnsTable({ dns }: { dns: DnsRecord[] }) {
   )
 }
 
-function FindingTable({ findings }: { findings: FindingRecord[] }) {
+function FindingTable({
+  findings,
+  onInvestigate,
+}: {
+  findings: FindingRecord[]
+  onInvestigate: (selection: InvestigationSelection) => void
+}) {
   return (
     <Table empty="No findings for this filter.">
       <thead className="bg-slate-50">
@@ -523,7 +599,14 @@ function FindingTable({ findings }: { findings: FindingRecord[] }) {
         {findings.length === 0 ? (
           <EmptyRow colSpan={4} message="No findings for this filter." />
         ) : findings.slice(0, 80).map((finding, index) => (
-          <tr key={finding.finding_id || finding.detection_id || index} className="hover:bg-slate-50">
+          <tr
+            key={finding.finding_id || finding.detection_id || index}
+            onClick={() => onInvestigate({
+              label: finding.title || finding.classification || finding.event_type,
+              process_guid: finding.process_guid,
+            })}
+            className="cursor-pointer hover:bg-slate-50"
+          >
             <Td>
               <div className="font-medium text-slate-900">{finding.title || finding.classification || finding.event_type}</div>
               <div className="mt-1 text-xs text-slate-500">{finding.detection_id || finding.finding_id || 'no id'}</div>
@@ -570,6 +653,99 @@ function Table({ children }: { children: React.ReactNode; empty: string }) {
     <table className="min-w-full table-fixed text-left text-sm">
       {children}
     </table>
+  )
+}
+
+function InvestigationPanel({
+  loading,
+  selection,
+  investigation,
+}: {
+  loading: boolean
+  selection: InvestigationSelection | null
+  investigation: InvestigationData | null
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Network className="h-5 w-5 text-slate-800" />
+          <h2 className="text-base font-semibold">Investigation Path</h2>
+        </div>
+        {loading && <RefreshCw className="h-4 w-4 animate-spin text-slate-500" />}
+      </div>
+
+      {!selection ? (
+        <div className="rounded-md border border-dashed border-slate-300 p-4 text-sm leading-5 text-slate-600">
+          Select a process or finding to trace linked process, flow, DNS, and finding evidence.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <div className="text-sm font-semibold text-slate-950">{selection.label}</div>
+            <div className="mt-1 text-xs text-slate-500">
+              {selection.process_guid || (selection.pid !== undefined ? `pid ${selection.pid}` : 'device scope')}
+            </div>
+          </div>
+
+          {investigation && (
+            <>
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <MiniCount label="Proc" value={investigation.counts.processes} />
+                <MiniCount label="Flow" value={investigation.counts.flows} />
+                <MiniCount label="DNS" value={investigation.counts.dns} />
+                <MiniCount label="Find" value={investigation.counts.findings} />
+              </div>
+
+              <PathSection
+                title="Processes"
+                items={investigation.processes.slice(0, 4).map((process) => `${process.name} pid ${process.pid}`)}
+              />
+              <PathSection
+                title="Flows"
+                items={investigation.flows.slice(0, 4).map((flow) => `${flow.process_name || 'unknown'} -> ${socket(flow.remote_ip, flow.remote_port)}`)}
+              />
+              <PathSection
+                title="DNS"
+                items={investigation.dns.slice(0, 4).map((record) => `${record.query} -> ${(record.answers || []).join(', ') || record.resolver || 'unknown'}`)}
+              />
+              <PathSection
+                title="Findings"
+                items={investigation.findings.slice(0, 4).map((finding) => `${finding.title || finding.classification || finding.event_type} (${finding.risk_score || 0})`)}
+              />
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MiniCount({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md bg-slate-100 px-2 py-2">
+      <div className="text-lg font-semibold text-slate-950">{value}</div>
+      <div className="text-xs text-slate-500">{label}</div>
+    </div>
+  )
+}
+
+function PathSection({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</div>
+      {items.length === 0 ? (
+        <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-500">No linked evidence</div>
+      ) : (
+        <div className="space-y-2">
+          {items.map((item, index) => (
+            <div key={`${title}-${index}`} className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700">
+              {item}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
