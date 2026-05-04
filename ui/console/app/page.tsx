@@ -434,7 +434,7 @@ const ui: Record<string, CSSProperties> = {
   loginPage: {
     minHeight: '100vh',
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1.08fr) minmax(390px, 0.92fr)',
+    gridTemplateColumns: 'minmax(0, 1fr) 440px',
     background: '#020617',
     color: '#fff',
     overflow: 'hidden',
@@ -445,9 +445,9 @@ const ui: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 56,
+    padding: 64,
     background:
-      'radial-gradient(circle at 62% 42%, rgba(14,165,233,0.22), transparent 34%), linear-gradient(135deg, #020617 0%, #07111f 52%, #020617 100%)',
+      'radial-gradient(circle at 64% 36%, rgba(14,165,233,0.18), transparent 34%), radial-gradient(circle at 18% 78%, rgba(37,99,235,0.16), transparent 30%), linear-gradient(135deg, #020617 0%, #07111f 56%, #020617 100%)',
   },
   loginGridOverlay: {
     position: 'absolute',
@@ -457,33 +457,40 @@ const ui: Record<string, CSSProperties> = {
       'linear-gradient(rgba(14,165,233,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(14,165,233,0.18) 1px, transparent 1px)',
     backgroundSize: '42px 42px',
   },
-  loginBrandBlock: { position: 'relative', zIndex: 1, width: 'min(620px, 92%)', textAlign: 'center' },
-  loginHeroIcon: {
-    width: 'min(420px, 78vw)',
-    aspectRatio: '1 / 1',
-    margin: '0 auto 26px',
-    objectFit: 'contain',
-    filter: 'drop-shadow(0 28px 48px rgba(14, 165, 233, 0.28))',
-  },
-  loginWordmark: { margin: 0, fontSize: 56, lineHeight: 1, fontWeight: 900, letterSpacing: 0.6 },
+  loginBrandBlock: { position: 'relative', zIndex: 1, width: 'min(720px, 92%)' },
+  loginWordmark: { margin: 0, fontSize: 74, lineHeight: 1, fontWeight: 900, letterSpacing: 0.2 },
   loginMotto: {
-    marginTop: 18,
+    marginTop: 30,
     display: 'flex',
-    justifyContent: 'center',
-    gap: 18,
+    gap: 22,
     color: '#e2e8f0',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 700,
-    letterSpacing: '0.32em',
+    letterSpacing: '0.34em',
     textTransform: 'uppercase',
+    flexWrap: 'wrap',
   },
   loginSubMotto: {
-    marginTop: 18,
+    marginTop: 24,
     color: '#38bdf8',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 700,
-    letterSpacing: '0.24em',
+    letterSpacing: '0.26em',
     textTransform: 'uppercase',
+  },
+  loginRule: {
+    width: 360,
+    maxWidth: '100%',
+    height: 2,
+    margin: '34px 0',
+    background: 'linear-gradient(90deg, transparent, #0ea5e9, #2563eb, transparent)',
+  },
+  loginStatement: {
+    maxWidth: 660,
+    margin: 0,
+    color: '#cbd5e1',
+    fontSize: 18,
+    lineHeight: 1.7,
   },
   loginPanelWrap: {
     minHeight: '100vh',
@@ -491,10 +498,10 @@ const ui: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
-    background: '#f8fafc',
+    background: 'linear-gradient(180deg, #f8fafc 0%, #eef6ff 100%)',
   },
   loginCard: {
-    width: 'min(430px, 100%)',
+    width: 'min(380px, 100%)',
     borderRadius: 14,
     border: '1px solid #e2e8f0',
     background: '#fff',
@@ -999,7 +1006,6 @@ function LoginScreen({
       <section style={ui.loginVisual}>
         <div style={ui.loginGridOverlay} />
         <div style={ui.loginBrandBlock}>
-          <img src="/aegisflux-icon.svg" alt="AegisFlux shield" style={ui.loginHeroIcon} />
           <h1 style={ui.loginWordmark}>
             Aegis<span style={ui.wordmarkFlux}>Flux</span>
           </h1>
@@ -1009,6 +1015,10 @@ function LoginScreen({
             <span>Enforce.</span>
           </div>
           <div style={ui.loginSubMotto}>Adaptive security. Real-time protection.</div>
+          <div style={ui.loginRule} />
+          <p style={ui.loginStatement}>
+            Endpoint evidence, dynamic AI detection, and control readiness in one operational workflow.
+          </p>
         </div>
       </section>
 
