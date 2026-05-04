@@ -51,6 +51,12 @@ Aegis should maintain an Agent Bill of Materials for every endpoint:
 
 This gives customers an inventory they do not reliably get today: which AI-capable agents exist, what they can reach, and what evidence supports that conclusion.
 
+### Dynamic AI Detection
+
+AI tooling changes too quickly for static endpoint signatures to carry the product. Aegis should support a research-to-detection loop where cloud-side research agents monitor new AI tools, protocols, model gateways, MCP servers, browser agents, coding agents, and agent-to-agent ecosystems, then generate signed observe-only detection packs for endpoint agents.
+
+See [AEGIS_DYNAMIC_AI_DETECTION_STRATEGY.md](AEGIS_DYNAMIC_AI_DETECTION_STRATEGY.md) for the detailed architecture.
+
 ### Finding to Draft Control
 
 Every finding should be able to produce a draft control:
