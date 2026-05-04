@@ -43,6 +43,7 @@ type EventRecord = {
 }
 
 type ProcessRecord = {
+  device_id?: string
   process_guid: string
   pid: number
   ppid?: number
@@ -52,6 +53,7 @@ type ProcessRecord = {
 }
 
 type FlowRecord = {
+  device_id?: string
   flow_id: string
   pid?: number
   process_name?: string
@@ -65,6 +67,7 @@ type FlowRecord = {
 }
 
 type DnsRecord = {
+  device_id?: string
   query: string
   answers?: string[]
   resolver?: string
@@ -72,6 +75,7 @@ type DnsRecord = {
 }
 
 type FindingRecord = {
+  device_id?: string
   event_type: string
   detection_id?: string
   finding_id?: string
@@ -152,6 +156,7 @@ type InvestigationData = {
 
 type InvestigationSelection = {
   label: string
+  device_id?: string
   process_guid?: string
   pid?: number
 }
@@ -226,11 +231,10 @@ export default function VisibilityConsole() {
   }, [])
 
   useEffect(() => {
-    if (!selectedDevice) return
     fetchVisibility()
     const interval = setInterval(fetchVisibility, 15000)
     return () => clearInterval(interval)
-  }, [selectedDevice])
+  }, [])
 
   async function fetchJson<T>(path: string): Promise<T> {
     const response = await fetch(path, { cache: 'no-store' })
@@ -246,9 +250,6 @@ export default function VisibilityConsole() {
       const nextDevices = response.devices || []
       setDevices(nextDevices)
       if (!selectedDevice && nextDevices.length > 0) setSelectedDevice(nextDevices[0].device_id)
-      if (selectedDevice && !nextDevices.some((device) => device.device_id === selectedDevice) && nextDevices.length > 0) {
-        setSelectedDevice(nextDevices[0].device_id)
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load devices')
     } finally {
@@ -257,20 +258,28 @@ export default function VisibilityConsole() {
   }
 
   async function fetchVisibility() {
-    if (!selectedDevice) return
     try {
       setLoading(true)
       setError(null)
-      const params = `device_id=${encodeURIComponent(selectedDevice)}&limit=160`
-      const [events, processes, flows, dns, findings] = await Promise.all([
+      const params = 'limit=300'
+      const [events, extensionEvents, saseEvents, collectorEvents, processes, flows, dns, findings] = await Promise.all([
         fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?${params}`),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.browser_extension.observed&limit=120'),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.sase_component.observed&limit=120'),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.collector.status&limit=160'),
         fetchJson<{ processes?: ProcessRecord[] }>(`/api/visibility/processes?${params}`),
         fetchJson<{ flows?: FlowRecord[] }>(`/api/visibility/flows?${params}`),
         fetchJson<{ dns?: DnsRecord[] }>(`/api/visibility/dns?${params}`),
         fetchJson<{ findings?: FindingRecord[] }>(`/api/visibility/findings?${params}`),
       ])
+      const mergedEvents = uniqueEvents([
+        ...(events.events || []),
+        ...(extensionEvents.events || []),
+        ...(saseEvents.events || []),
+        ...(collectorEvents.events || []),
+      ])
       setData({
-        events: events.events || [],
+        events: mergedEvents,
         processes: processes.processes || [],
         flows: flows.flows || [],
         dns: dns.dns || [],
@@ -285,11 +294,12 @@ export default function VisibilityConsole() {
   }
 
   async function fetchInvestigation(selection: InvestigationSelection) {
-    if (!selectedDevice) return
+    const investigationDevice = selection.device_id || selectedDevice || devices[0]?.device_id
+    if (!investigationDevice) return
     try {
       setInvestigationLoading(true)
       setInvestigationSelection(selection)
-      const params = new URLSearchParams({ device_id: selectedDevice, limit: '20' })
+      const params = new URLSearchParams({ device_id: investigationDevice, limit: '20' })
       if (selection.process_guid) params.set('process_guid', selection.process_guid)
       if (selection.pid !== undefined) params.set('pid', selection.pid.toString())
       const response = await fetchJson<InvestigationData>(`/api/visibility/investigation?${params.toString()}`)
@@ -303,8 +313,7 @@ export default function VisibilityConsole() {
 
   const derived = useMemo(() => deriveVisibility(data), [data])
   const filtered = useMemo(() => filterVisibility(data, derived.extensions, derived.saseComponents, query), [data, derived, query])
-  const selectedDeviceRecord = devices.find((device) => device.device_id === selectedDevice)
-  const stats = useMemo(() => buildStats(data, derived, selectedDeviceRecord), [data, derived, selectedDeviceRecord])
+  const stats = useMemo(() => buildStats(data, derived, devices), [data, derived, devices])
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-slate-900">
@@ -368,19 +377,10 @@ export default function VisibilityConsole() {
               <p className="mt-1 text-sm text-slate-500">{sectionSubtitle(activeSection)}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={selectedDevice}
-                onChange={(event) => setSelectedDevice(event.target.value)}
-                className="h-10 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-slate-600"
-              >
-                {devices.length === 0 ? (
-                  <option value="">No reporting devices</option>
-                ) : devices.map((device) => (
-                  <option key={device.device_id} value={device.device_id}>
-                    {platformName(device.source || device.device_id)} · {device.device_id}
-                  </option>
-                ))}
-              </select>
+              <div className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-300 bg-gray-50 px-3 text-sm font-medium text-slate-700">
+                <Server className="h-4 w-4 text-slate-500" />
+                Fleet scope · {devices.length} endpoints
+              </div>
               <button
                 onClick={fetchVisibility}
                 className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-gray-50"
@@ -401,7 +401,7 @@ export default function VisibilityConsole() {
           )}
 
           <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-            <KpiCard icon={Server} label="Device" value={stats.deviceLabel} detail={selectedDevice || 'waiting for telemetry'} />
+            <KpiCard icon={Server} label="Endpoints" value={devices.length.toString()} detail={`${stats.onlineDevices} recently active`} />
             <KpiCard icon={Activity} label="Latest" value={stats.latestAge} detail={lastRefresh ? `UI ${lastRefresh.toLocaleTimeString()}` : 'waiting'} />
             <KpiCard icon={Bot} label="AI Signals" value={stats.aiSignals.toString()} detail={`${data.findings.length} findings`} />
             <KpiCard icon={Chrome} label="Extensions" value={derived.extensions.length.toString()} detail="browser inventory" />
@@ -496,19 +496,30 @@ function filterVisibility(data: VisibilityData, extensions: BrowserExtensionReco
   }
 }
 
-function buildStats(data: VisibilityData, derived: ReturnType<typeof deriveVisibility>, device?: DeviceRecord) {
+function uniqueEvents(events: EventRecord[]) {
+  const byId = new Map<string, EventRecord>()
+  for (const event of events) byId.set(event.event_id, event)
+  return Array.from(byId.values()).sort((left, right) =>
+    (right.received_at_ms || right.timestamp_ms) - (left.received_at_ms || left.timestamp_ms)
+  )
+}
+
+function buildStats(data: VisibilityData, derived: ReturnType<typeof deriveVisibility>, devices: DeviceRecord[]) {
   const latest = data.events[0]
   const risk = data.findings.reduce((max, finding) => Math.max(max, finding.risk_score || 0), 0)
   const aiSignals = data.findings.filter((finding) =>
     `${finding.classification || ''} ${finding.title || ''} ${(finding.detected_patterns || []).join(' ')}`.toLowerCase().includes('ai')
     || `${finding.classification || ''} ${finding.title || ''}`.toLowerCase().includes('agent')
   ).length
+  const onlineDevices = devices.filter((device) => Date.now() - device.last_seen_ms < 5 * 60 * 1000).length
+  const platforms = new Set(devices.map((device) => platformName(device.source || device.device_id))).size
   return {
-    deviceLabel: platformName(device?.source || device?.device_id || ''),
     latestAge: latest ? ageFromMs(latest.received_at_ms || latest.timestamp_ms) : 'no data',
     risk,
     aiSignals,
     collectorHealthy: derived.collectorStatuses.filter((status) => status.status === 'healthy').length,
+    onlineDevices,
+    platforms,
   }
 }
 
@@ -526,11 +537,17 @@ function OverviewPanel({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <StatusCard tone="emerald" icon={CheckCircle2} title="Collector Coverage" value={`${stats.collectorHealthy}/${derived.collectorStatuses.length}`} detail="healthy collectors in latest event window" onClick={() => setSection('devices')} />
+        <StatusCard tone="emerald" icon={CheckCircle2} title="Fleet Health" value={`${stats.onlineDevices}`} detail="endpoints recently reporting" onClick={() => setSection('devices')} />
         <StatusCard tone="blue" icon={Database} title="Evidence Volume" value={`${data.events.length}`} detail={`${data.processes.length} processes, ${data.flows.length} flows, ${data.dns.length} DNS rows`} onClick={() => setSection('evidence')} />
         <StatusCard tone="amber" icon={Shield} title="Controls" value="Observe" detail="draft controls require staged approval and rollback" onClick={() => setSection('controls')} />
       </div>
-      <Panel title="Operational Summary" subtitle="Clarion-style triage view for AI endpoint governance.">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+        <MiniMetric label="Platforms" value={stats.platforms} />
+        <MiniMetric label="Healthy Collectors" value={stats.collectorHealthy} />
+        <MiniMetric label="Browser Extensions" value={derived.extensions.length} />
+        <MiniMetric label="SSE/SASE Components" value={derived.saseComponents.length} />
+      </div>
+      <Panel title="Aegis Status" subtitle="High-level posture across all reporting endpoints.">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <SummaryItem icon={Bot} title="AI activity" text="Browser AI, CLI agents, IDE tooling, local model runtimes, and tool bridges become first-class endpoint evidence." />
           <SummaryItem icon={Chrome} title="Enterprise browser evidence" text="Chromium profiles, extension manifests, policies, history, and vendor APIs fill gaps left by DNS or flow-only detection." />
@@ -813,8 +830,8 @@ function ProcessTable({ processes, onInvestigate }: { processes: ProcessRecord[]
       <thead className="bg-gray-50"><tr><Th>PID</Th><Th>Name</Th><Th>Path</Th><Th>Command</Th></tr></thead>
       <tbody className="divide-y divide-gray-100 bg-white">
         {processes.length === 0 ? <EmptyRow colSpan={4} message="No process evidence." /> : processes.slice(0, 80).map((process) => (
-          <tr key={process.process_guid || `${process.pid}-${process.name}`} onClick={() => onInvestigate({ label: `${process.name} pid ${process.pid}`, process_guid: process.process_guid, pid: process.pid })} className="cursor-pointer hover:bg-gray-50">
-            <Td mono>{process.pid}</Td><Td>{process.name}</Td><Td muted>{process.path || 'unknown'}</Td><Td muted>{process.command_line || 'not collected'}</Td>
+          <tr key={process.process_guid || `${process.pid}-${process.name}`} onClick={() => onInvestigate({ label: `${process.name} pid ${process.pid}`, device_id: process.device_id, process_guid: process.process_guid, pid: process.pid })} className="cursor-pointer hover:bg-gray-50">
+            <Td mono>{process.pid}</Td><Td><div>{process.name}</div><div className="mt-1 text-xs text-slate-500">{process.device_id || 'unknown device'}</div></Td><Td muted>{process.path || 'unknown'}</Td><Td muted>{process.command_line || 'not collected'}</Td>
           </tr>
         ))}
       </tbody>
@@ -829,7 +846,7 @@ function FlowTable({ flows }: { flows: FlowRecord[] }) {
       <tbody className="divide-y divide-gray-100 bg-white">
         {flows.length === 0 ? <EmptyRow colSpan={5} message="No flow evidence." /> : flows.slice(0, 80).map((flow) => (
           <tr key={flow.flow_id || `${flow.local_ip}-${flow.remote_ip}-${flow.remote_port}`} className="hover:bg-gray-50">
-            <Td>{flow.process_name || (flow.pid ? `pid ${flow.pid}` : 'unknown')}</Td><Td><Badge value={flow.direction} /></Td><Td mono>{socket(flow.local_ip, flow.local_port)}</Td><Td mono>{socket(flow.remote_ip, flow.remote_port)}</Td><Td muted>{flow.remote_hostname || 'unknown'}</Td>
+            <Td><div>{flow.process_name || (flow.pid ? `pid ${flow.pid}` : 'unknown')}</div><div className="mt-1 text-xs text-slate-500">{flow.device_id || 'unknown device'}</div></Td><Td><Badge value={flow.direction} /></Td><Td mono>{socket(flow.local_ip, flow.local_port)}</Td><Td mono>{socket(flow.remote_ip, flow.remote_port)}</Td><Td muted>{flow.remote_hostname || 'unknown'}</Td>
           </tr>
         ))}
       </tbody>
@@ -844,7 +861,7 @@ function DnsTable({ dns }: { dns: DnsRecord[] }) {
       <tbody className="divide-y divide-gray-100 bg-white">
         {dns.length === 0 ? <EmptyRow colSpan={4} message="No DNS evidence." /> : dns.slice(0, 80).map((record, index) => (
           <tr key={`${record.query}-${index}`} className="hover:bg-gray-50">
-            <Td>{record.query}</Td><Td muted>{(record.answers || []).join(', ') || 'none'}</Td><Td mono>{record.resolver || 'unknown'}</Td><Td muted>{record.correlation_method || 'unknown'}</Td>
+            <Td><div>{record.query}</div><div className="mt-1 text-xs text-slate-500">{record.device_id || 'unknown device'}</div></Td><Td muted>{(record.answers || []).join(', ') || 'none'}</Td><Td mono>{record.resolver || 'unknown'}</Td><Td muted>{record.correlation_method || 'unknown'}</Td>
           </tr>
         ))}
       </tbody>
@@ -858,7 +875,7 @@ function FindingTable({ findings, onInvestigate }: { findings: FindingRecord[]; 
       <thead className="bg-gray-50"><tr><Th>Finding</Th><Th>Risk</Th><Th>Pattern</Th><Th>Evidence</Th></tr></thead>
       <tbody className="divide-y divide-gray-100 bg-white">
         {findings.length === 0 ? <EmptyRow colSpan={4} message="No findings." /> : findings.slice(0, 80).map((finding, index) => (
-          <tr key={finding.finding_id || finding.detection_id || index} onClick={() => onInvestigate({ label: finding.title || finding.classification || finding.event_type, process_guid: finding.process_guid })} className="cursor-pointer hover:bg-gray-50">
+          <tr key={finding.finding_id || finding.detection_id || index} onClick={() => onInvestigate({ label: finding.title || finding.classification || finding.event_type, device_id: finding.device_id, process_guid: finding.process_guid })} className="cursor-pointer hover:bg-gray-50">
             <Td><div className="font-medium text-slate-900">{finding.title || finding.classification || finding.event_type}</div><div className="mt-1 text-xs text-slate-500">{finding.detection_id || finding.finding_id || 'no id'}</div></Td>
             <Td><Risk value={finding.risk_score || 0} severity={finding.severity} /></Td>
             <Td muted>{(finding.detected_patterns || []).join(', ') || 'none'}</Td>
