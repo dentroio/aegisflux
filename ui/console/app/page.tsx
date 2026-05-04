@@ -4,29 +4,21 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
-  ArrowDownUp,
   Bot,
-  Box,
-  Chrome,
   CheckCircle2,
+  Chrome,
   Cpu,
   Database,
-  FileText,
   Globe2,
   HardDrive,
-  LayoutDashboard,
   LockKeyhole,
   Network,
-  Plug,
   RefreshCw,
   Search,
   Server,
-  Settings,
-  Shield,
   ShieldCheck,
-  SlidersHorizontal,
+  Sparkles,
   TerminalSquare,
-  Undo2,
 } from 'lucide-react'
 
 type EventRecord = {
@@ -46,7 +38,6 @@ type ProcessRecord = {
   device_id?: string
   process_guid: string
   pid: number
-  ppid?: number
   name: string
   path?: string
   command_line?: string
@@ -59,8 +50,6 @@ type FlowRecord = {
   process_name?: string
   protocol: string
   direction: string
-  local_ip: string
-  local_port?: number
   remote_ip: string
   remote_port?: number
   remote_hostname?: string
@@ -77,15 +66,11 @@ type DnsRecord = {
 type FindingRecord = {
   device_id?: string
   event_type: string
-  detection_id?: string
-  finding_id?: string
   classification?: string
   severity?: string
   title?: string
   risk_score?: number
-  process_guid?: string
   detected_patterns?: string[]
-  evidence?: Array<{ type: string; value: string; confidence: number }>
 }
 
 type DeviceRecord = {
@@ -101,6 +86,7 @@ type DeviceRecord = {
 }
 
 type BrowserExtensionRecord = {
+  device_id?: string
   browser: string
   profile: string
   extension_id: string
@@ -108,57 +94,16 @@ type BrowserExtensionRecord = {
   version: string
   permissions?: string[]
   host_permissions?: string[]
-  collection_method?: string
 }
 
 type SaseComponentRecord = {
+  device_id?: string
   component_type: string
   vendor: string
   product: string
   name: string
-  version?: string | null
   status?: string | null
-  source: string
   evidence?: string[]
-  collection_method?: string
-}
-
-type DraftControl = {
-  control_id: string
-  title: string
-  mode: string
-  status: string
-  action: string
-  target: string
-  scope: string
-  reason: string
-  evidence: string[]
-  blast_radius: string[]
-  rollback: string[]
-}
-
-type InvestigationData = {
-  ok: boolean
-  device_id: string
-  counts: {
-    processes: number
-    flows: number
-    dns: number
-    findings: number
-    draft_controls?: number
-  }
-  processes: ProcessRecord[]
-  flows: FlowRecord[]
-  dns: DnsRecord[]
-  findings: FindingRecord[]
-  draft_controls?: DraftControl[]
-}
-
-type InvestigationSelection = {
-  label: string
-  device_id?: string
-  process_guid?: string
-  pid?: number
 }
 
 type VisibilityData = {
@@ -169,70 +114,26 @@ type VisibilityData = {
   findings: FindingRecord[]
 }
 
-const navGroups = [
-  {
-    label: 'Dashboard',
-    items: [{ id: 'overview', label: 'Overview', icon: LayoutDashboard }],
-  },
-  {
-    label: 'Analyze',
-    items: [
-      { id: 'activity', label: 'AI Activity', icon: Bot },
-      { id: 'evidence', label: 'Evidence', icon: Database },
-      { id: 'inventory', label: 'Inventory', icon: Box },
-      { id: 'findings', label: 'Findings', icon: AlertTriangle },
-    ],
-  },
-  {
-    label: 'Operate',
-    items: [
-      { id: 'controls', label: 'Controls', icon: Shield },
-      { id: 'devices', label: 'Devices', icon: Server },
-    ],
-  },
-  {
-    label: 'Configure',
-    items: [
-      { id: 'connectors', label: 'Connectors', icon: Plug },
-      { id: 'management', label: 'Management', icon: Settings },
-    ],
-  },
-] as const
+type CollectorStatus = {
+  device_id: string
+  collector: string
+  status: string
+  message: string
+  received_at_ms: number
+}
 
-const evidenceTabs = [
-  { id: 'processes', label: 'Processes', icon: TerminalSquare },
-  { id: 'flows', label: 'Flows', icon: Network },
-  { id: 'dns', label: 'DNS', icon: Globe2 },
-  { id: 'events', label: 'Events', icon: Database },
-] as const
-
-export default function VisibilityConsole() {
+export default function AegisDashboard() {
   const [devices, setDevices] = useState<DeviceRecord[]>([])
-  const [selectedDevice, setSelectedDevice] = useState('')
-  const [activeSection, setActiveSection] = useState('overview')
-  const [activeEvidenceTab, setActiveEvidenceTab] = useState<(typeof evidenceTabs)[number]['id']>('processes')
+  const [selectedDeviceId, setSelectedDeviceId] = useState('')
   const [query, setQuery] = useState('')
-  const [data, setData] = useState<VisibilityData>({
-    events: [],
-    processes: [],
-    flows: [],
-    dns: [],
-    findings: [],
-  })
+  const [data, setData] = useState<VisibilityData>({ events: [], processes: [], flows: [], dns: [], findings: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
-  const [investigation, setInvestigation] = useState<InvestigationData | null>(null)
-  const [investigationSelection, setInvestigationSelection] = useState<InvestigationSelection | null>(null)
-  const [investigationLoading, setInvestigationLoading] = useState(false)
 
   useEffect(() => {
-    fetchDevices()
-  }, [])
-
-  useEffect(() => {
-    fetchVisibility()
-    const interval = setInterval(fetchVisibility, 15000)
+    fetchDashboard()
+    const interval = setInterval(fetchDashboard, 15000)
     return () => clearInterval(interval)
   }, [])
 
@@ -242,44 +143,32 @@ export default function VisibilityConsole() {
     return response.json()
   }
 
-  async function fetchDevices() {
+  async function fetchDashboard() {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetchJson<{ devices?: DeviceRecord[] }>('/api/visibility/devices?limit=50')
-      const nextDevices = response.devices || []
-      setDevices(nextDevices)
-      if (!selectedDevice && nextDevices.length > 0) setSelectedDevice(nextDevices[0].device_id)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load devices')
-    } finally {
-      setLoading(false)
-    }
-  }
+      const [deviceResponse, events, extensionEvents, saseEvents, collectorEvents, processes, flows, dns, findings] = await Promise.all([
+        fetchJson<{ devices?: DeviceRecord[] }>('/api/visibility/devices?limit=100'),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?limit=240'),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.browser_extension.observed&limit=160'),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.sase_component.observed&limit=160'),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.collector.status&limit=220'),
+        fetchJson<{ processes?: ProcessRecord[] }>('/api/visibility/processes?limit=180'),
+        fetchJson<{ flows?: FlowRecord[] }>('/api/visibility/flows?limit=180'),
+        fetchJson<{ dns?: DnsRecord[] }>('/api/visibility/dns?limit=180'),
+        fetchJson<{ findings?: FindingRecord[] }>('/api/visibility/findings?limit=120'),
+      ])
 
-  async function fetchVisibility() {
-    try {
-      setLoading(true)
-      setError(null)
-      const params = 'limit=300'
-      const [events, extensionEvents, saseEvents, collectorEvents, processes, flows, dns, findings] = await Promise.all([
-        fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?${params}`),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.browser_extension.observed&limit=120'),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.sase_component.observed&limit=120'),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.collector.status&limit=160'),
-        fetchJson<{ processes?: ProcessRecord[] }>(`/api/visibility/processes?${params}`),
-        fetchJson<{ flows?: FlowRecord[] }>(`/api/visibility/flows?${params}`),
-        fetchJson<{ dns?: DnsRecord[] }>(`/api/visibility/dns?${params}`),
-        fetchJson<{ findings?: FindingRecord[] }>(`/api/visibility/findings?${params}`),
-      ])
-      const mergedEvents = uniqueEvents([
-        ...(events.events || []),
-        ...(extensionEvents.events || []),
-        ...(saseEvents.events || []),
-        ...(collectorEvents.events || []),
-      ])
+      const nextDevices = deviceResponse.devices || []
+      setDevices(nextDevices)
+      setSelectedDeviceId((current) => current || nextDevices[0]?.device_id || '')
       setData({
-        events: mergedEvents,
+        events: uniqueEvents([
+          ...(events.events || []),
+          ...(extensionEvents.events || []),
+          ...(saseEvents.events || []),
+          ...(collectorEvents.events || []),
+        ]),
         processes: processes.processes || [],
         flows: flows.flows || [],
         dns: dns.dns || [],
@@ -287,212 +176,205 @@ export default function VisibilityConsole() {
       })
       setLastRefresh(new Date())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load visibility data')
+      setError(err instanceof Error ? err.message : 'Failed to load Aegis dashboard')
     } finally {
       setLoading(false)
     }
   }
 
-  async function fetchInvestigation(selection: InvestigationSelection) {
-    const investigationDevice = selection.device_id || selectedDevice || devices[0]?.device_id
-    if (!investigationDevice) return
-    try {
-      setInvestigationLoading(true)
-      setInvestigationSelection(selection)
-      const params = new URLSearchParams({ device_id: investigationDevice, limit: '20' })
-      if (selection.process_guid) params.set('process_guid', selection.process_guid)
-      if (selection.pid !== undefined) params.set('pid', selection.pid.toString())
-      const response = await fetchJson<InvestigationData>(`/api/visibility/investigation?${params.toString()}`)
-      setInvestigation(response)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load investigation path')
-    } finally {
-      setInvestigationLoading(false)
-    }
-  }
+  const model = useMemo(() => buildDashboardModel(data, devices), [data, devices])
+  const selectedDevice = devices.find((device) => device.device_id === selectedDeviceId) || devices[0]
+  const selectedDetail = useMemo(
+    () => selectedDevice ? buildDeviceDetail(selectedDevice, data, model) : null,
+    [selectedDevice, data, model],
+  )
+  const filteredDevices = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    if (!needle) return devices
+    return devices.filter((device) => JSON.stringify(device).toLowerCase().includes(needle))
+  }, [devices, query])
 
-  const derived = useMemo(() => deriveVisibility(data), [data])
-  const filtered = useMemo(() => filterVisibility(data, derived.extensions, derived.saseComponents, query), [data, derived, query])
-  const stats = useMemo(() => buildStats(data, derived, devices), [data, derived, devices])
+  const health = model.offlineDevices > 0
+    ? { label: 'Attention', tone: 'amber' as const, text: `${model.offlineDevices} endpoint${model.offlineDevices === 1 ? '' : 's'} not fresh` }
+    : model.totalDevices > 0
+      ? { label: 'Healthy', tone: 'emerald' as const, text: 'All reporting endpoints are fresh' }
+      : { label: 'Waiting', tone: 'slate' as const, text: 'No endpoint telemetry yet' }
 
   return (
-    <div className="flex min-h-screen bg-gray-50 text-slate-900">
-      <aside className="hidden w-72 shrink-0 border-r border-gray-200 bg-white lg:flex lg:flex-col">
-        <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950">
-            <ShieldCheck className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <div className="text-base font-semibold text-slate-950">Aegis</div>
-            <div className="text-xs text-slate-500">AI endpoint governance</div>
-          </div>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {navGroups.map((group) => (
-            <div key={group.label} className="mb-4">
-              <div className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{group.label}</div>
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const Icon = item.icon
-                  const active = activeSection === item.id
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveSection(item.id)}
-                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                        active ? 'bg-slate-950 text-white' : 'text-slate-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
-                    </button>
-                  )
-                })}
-              </div>
+    <div className="min-h-screen bg-gray-50 text-slate-900">
+      <header className="border-b border-gray-200 bg-white shadow-sm">
+        <div className="flex h-16 items-center justify-between px-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950">
+              <ShieldCheck className="h-5 w-5 text-white" />
             </div>
-          ))}
-        </nav>
-
-        <div className="border-t border-gray-200 p-4">
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
-              <CheckCircle2 className="h-4 w-4" />
-              Observe-only
-            </div>
-            <p className="mt-1 text-xs leading-5 text-emerald-700">Controls stay staged until approval and rollback are wired.</p>
-          </div>
-        </div>
-      </aside>
-
-      <div className="min-w-0 flex-1">
-        <header className="border-b border-gray-200 bg-white">
-          <div className="flex flex-col gap-4 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <ShieldCheck className="h-4 w-4" />
-                Aegis Management Console
-              </div>
-              <h1 className="mt-1 text-2xl font-semibold text-slate-950">{sectionTitle(activeSection)}</h1>
-              <p className="mt-1 text-sm text-slate-500">{sectionSubtitle(activeSection)}</p>
+              <div className="text-lg font-semibold leading-5 text-slate-950">Aegis</div>
+              <div className="text-xs text-slate-500">AI endpoint visibility and control readiness</div>
             </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <StatusChip tone={health.tone} label={health.label} />
+            <button
+              onClick={fetchDashboard}
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-gray-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-[1500px] px-5 py-6">
+        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-300 bg-gray-50 px-3 text-sm font-medium text-slate-700">
-                <Server className="h-4 w-4 text-slate-500" />
-                Fleet scope · {devices.length} endpoints
+              <h1 className="text-2xl font-bold text-slate-950">Dashboard</h1>
+              <StatusChip tone={health.tone} label={health.text} />
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              Overall status, coverage, AI activity, and endpoint drill-in for the Aegis fleet.
+            </p>
+          </div>
+          <div className="text-sm text-slate-500">
+            {lastRefresh ? `Last updated ${lastRefresh.toLocaleTimeString()}` : 'Waiting for refresh'}
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-4 flex items-center gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <AlertTriangle className="h-4 w-4" />
+            {error}
+          </div>
+        )}
+
+        <section className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <Activity className="h-4 w-4 text-emerald-600" />
+                  Platform status
+                </div>
+                <div className="mt-3 text-4xl font-bold tracking-tight text-slate-950">{health.label}</div>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{health.text}. Aegis is running in observe-only mode while evidence, inventory, and control readiness mature.</p>
               </div>
-              <button
-                onClick={fetchVisibility}
-                className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-gray-50"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
+              <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]">
+                <MiniStat label="Endpoints" value={model.totalDevices} />
+                <MiniStat label="Fresh" value={model.onlineDevices} />
+                <MiniStat label="Collectors" value={model.healthyCollectorPairs} />
+                <MiniStat label="Max Risk" value={model.maxRisk} />
+              </div>
             </div>
           </div>
-        </header>
 
-        <main className="px-5 py-5">
-          {error && (
-            <div className="mb-4 flex items-center gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              <AlertTriangle className="h-4 w-4" />
-              {error}
+          <div className="rounded-xl border border-slate-200 bg-slate-950 p-5 text-white shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+              <Sparkles className="h-4 w-4 text-cyan-300" />
+              Signal focus
             </div>
-          )}
-
-          <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-            <KpiCard icon={Server} label="Endpoints" value={devices.length.toString()} detail={`${stats.onlineDevices} recently active`} />
-            <KpiCard icon={Activity} label="Latest" value={stats.latestAge} detail={lastRefresh ? `UI ${lastRefresh.toLocaleTimeString()}` : 'waiting'} />
-            <KpiCard icon={Bot} label="AI Signals" value={stats.aiSignals.toString()} detail={`${data.findings.length} findings`} />
-            <KpiCard icon={Chrome} label="Extensions" value={derived.extensions.length.toString()} detail="browser inventory" />
-            <KpiCard icon={LockKeyhole} label="SSE/SASE" value={derived.saseComponents.length.toString()} detail="endpoint controls" />
-            <KpiCard icon={AlertTriangle} label="Max Risk" value={stats.risk.toString()} detail="observe-only" />
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              <DarkStat icon={Bot} label="AI" value={model.aiSignals} />
+              <DarkStat icon={Chrome} label="Ext" value={model.extensionCount} />
+              <DarkStat icon={LockKeyhole} label="SASE" value={model.saseCount} />
+            </div>
+            <p className="mt-4 text-sm leading-6 text-slate-300">
+              The next product leap is turning these signals into an Agent Bill of Materials per endpoint.
+            </p>
           </div>
+        </section>
 
-          <div className="mb-5 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-            <section className="min-w-0">
-              {activeSection === 'overview' && (
-                <OverviewPanel stats={stats} derived={derived} data={data} setSection={setActiveSection} />
-              )}
-              {activeSection === 'activity' && (
-                <ActivityPanel findings={filtered.findings} dns={filtered.dns} flows={filtered.flows} onInvestigate={fetchInvestigation} />
-              )}
-              {activeSection === 'evidence' && (
-                <EvidencePanel
-                  query={query}
-                  setQuery={setQuery}
-                  activeTab={activeEvidenceTab}
-                  setActiveTab={setActiveEvidenceTab}
-                  filtered={filtered}
-                  onInvestigate={fetchInvestigation}
+        <section className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Widget icon={Database} title="Evidence" value={model.eventCount} detail={`${data.processes.length} process, ${data.flows.length} flow, ${data.dns.length} DNS records`} />
+          <Widget icon={Chrome} title="Browser Surface" value={model.extensionCount} detail="extension and profile observations" />
+          <Widget icon={LockKeyhole} title="Enterprise Controls" value={model.saseCount} detail="SSE/SASE endpoint components" />
+          <Widget icon={Cpu} title="Agent Budget" value="Low" detail="near-zero idle, bounded collectors" />
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_430px]">
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-slate-950">Agents</h2>
+                <p className="mt-1 text-sm text-slate-500">Select an endpoint to dig into coverage, evidence, and inventory.</p>
+              </div>
+              <div className="relative lg:w-80">
+                <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-slate-600"
+                  placeholder="Search agents"
                 />
-              )}
-              {activeSection === 'inventory' && (
-                <InventoryPanel extensions={filtered.extensions} saseComponents={filtered.saseComponents} />
-              )}
-              {activeSection === 'findings' && (
-                <Panel title="Findings" subtitle="Explainable detections and risk records.">
-                  <FindingTable findings={filtered.findings} onInvestigate={fetchInvestigation} />
-                </Panel>
-              )}
-              {activeSection === 'controls' && (
-                <ControlsPanel investigation={investigation} />
-              )}
-              {activeSection === 'devices' && (
-                <DevicesPanel devices={devices} selectedDevice={selectedDevice} selectDevice={setSelectedDevice} collectorStatuses={derived.collectorStatuses} />
-              )}
-              {activeSection === 'connectors' && (
-                <ConnectorsPanel saseComponents={derived.saseComponents} />
-              )}
-              {activeSection === 'management' && (
-                <ManagementPanel collectorStatuses={derived.collectorStatuses} />
-              )}
-            </section>
-
-            <aside className="space-y-4">
-              <InvestigationPanel loading={investigationLoading} selection={investigationSelection} investigation={investigation} />
-              <AgentBudgetPanel />
-              <ReadinessPanel collectorStatuses={derived.collectorStatuses} />
-            </aside>
+              </div>
+            </div>
+            <AgentList
+              devices={filteredDevices}
+              selectedDeviceId={selectedDevice?.device_id || ''}
+              model={model}
+              onSelect={setSelectedDeviceId}
+            />
           </div>
-        </main>
-      </div>
+
+          <AgentDetailPanel detail={selectedDetail} />
+        </section>
+      </main>
     </div>
   )
 }
 
-function deriveVisibility(data: VisibilityData) {
+function buildDashboardModel(data: VisibilityData, devices: DeviceRecord[]) {
   const extensions = data.events
     .filter((event) => event.event_type === 'aegis.browser_extension.observed')
-    .map((event) => event.payload as BrowserExtensionRecord)
-
-  const saseComponents = data.events
+    .map((event) => ({ ...event.payload, device_id: event.device_id }) as BrowserExtensionRecord)
+  const sase = data.events
     .filter((event) => event.event_type === 'aegis.sase_component.observed')
-    .map((event) => event.payload as SaseComponentRecord)
-
+    .map((event) => ({ ...event.payload, device_id: event.device_id }) as SaseComponentRecord)
   const collectorStatuses = data.events
     .filter((event) => event.event_type === 'aegis.collector.status')
     .map((event) => ({
+      device_id: event.device_id,
       collector: String(event.payload.collector || 'unknown'),
       status: String(event.payload.status || 'unknown'),
       message: String(event.payload.message || ''),
       received_at_ms: event.received_at_ms || event.timestamp_ms,
     }))
 
-  return { extensions, saseComponents, collectorStatuses }
+  const onlineDevices = devices.filter((device) => Date.now() - device.last_seen_ms < 5 * 60 * 1000).length
+  const maxRisk = data.findings.reduce((max, finding) => Math.max(max, finding.risk_score || 0), 0)
+  const aiSignals = data.findings.filter((finding) =>
+    `${finding.title || ''} ${finding.classification || ''} ${(finding.detected_patterns || []).join(' ')}`.toLowerCase().match(/ai|agent|browser|model/),
+  ).length
+
+  return {
+    totalDevices: devices.length,
+    onlineDevices,
+    offlineDevices: Math.max(0, devices.length - onlineDevices),
+    maxRisk,
+    aiSignals,
+    eventCount: data.events.length,
+    extensionCount: extensions.length,
+    saseCount: sase.length,
+    extensions,
+    sase,
+    collectorStatuses,
+    healthyCollectorPairs: new Set(collectorStatuses.filter((status) => status.status === 'healthy').map((status) => `${status.device_id}:${status.collector}`)).size,
+  }
 }
 
-function filterVisibility(data: VisibilityData, extensions: BrowserExtensionRecord[], saseComponents: SaseComponentRecord[], query: string) {
-  const needle = query.trim().toLowerCase()
-  const includesNeedle = (value: unknown) => !needle || JSON.stringify(value || '').toLowerCase().includes(needle)
+function buildDeviceDetail(device: DeviceRecord, data: VisibilityData, model: ReturnType<typeof buildDashboardModel>) {
+  const deviceId = device.device_id
   return {
-    events: data.events.filter(includesNeedle),
-    processes: data.processes.filter(includesNeedle),
-    flows: data.flows.filter(includesNeedle),
-    dns: data.dns.filter(includesNeedle),
-    findings: data.findings.filter(includesNeedle),
-    extensions: extensions.filter(includesNeedle),
-    saseComponents: saseComponents.filter(includesNeedle),
+    device,
+    processes: data.processes.filter((record) => record.device_id === deviceId),
+    flows: data.flows.filter((record) => record.device_id === deviceId),
+    dns: data.dns.filter((record) => record.device_id === deviceId),
+    findings: data.findings.filter((record) => record.device_id === deviceId),
+    extensions: model.extensions.filter((record) => record.device_id === deviceId),
+    sase: model.sase.filter((record) => record.device_id === deviceId),
+    collectors: model.collectorStatuses.filter((record) => record.device_id === deviceId),
   }
 }
 
@@ -500,634 +382,222 @@ function uniqueEvents(events: EventRecord[]) {
   const byId = new Map<string, EventRecord>()
   for (const event of events) byId.set(event.event_id, event)
   return Array.from(byId.values()).sort((left, right) =>
-    (right.received_at_ms || right.timestamp_ms) - (left.received_at_ms || left.timestamp_ms)
+    (right.received_at_ms || right.timestamp_ms) - (left.received_at_ms || left.timestamp_ms),
   )
 }
 
-function buildStats(data: VisibilityData, derived: ReturnType<typeof deriveVisibility>, devices: DeviceRecord[]) {
-  const latest = data.events[0]
-  const risk = data.findings.reduce((max, finding) => Math.max(max, finding.risk_score || 0), 0)
-  const aiSignals = data.findings.filter((finding) =>
-    `${finding.classification || ''} ${finding.title || ''} ${(finding.detected_patterns || []).join(' ')}`.toLowerCase().includes('ai')
-    || `${finding.classification || ''} ${finding.title || ''}`.toLowerCase().includes('agent')
-  ).length
-  const onlineDevices = devices.filter((device) => Date.now() - device.last_seen_ms < 5 * 60 * 1000).length
-  const platforms = new Set(devices.map((device) => platformName(device.source || device.device_id))).size
-  return {
-    latestAge: latest ? ageFromMs(latest.received_at_ms || latest.timestamp_ms) : 'no data',
-    risk,
-    aiSignals,
-    collectorHealthy: derived.collectorStatuses.filter((status) => status.status === 'healthy').length,
-    onlineDevices,
-    platforms,
-  }
-}
-
-function OverviewPanel({
-  stats,
-  derived,
-  data,
-  setSection,
-}: {
-  stats: ReturnType<typeof buildStats>
-  derived: ReturnType<typeof deriveVisibility>
-  data: VisibilityData
-  setSection: (section: string) => void
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <StatusCard tone="emerald" icon={CheckCircle2} title="Fleet Health" value={`${stats.onlineDevices}`} detail="endpoints recently reporting" onClick={() => setSection('devices')} />
-        <StatusCard tone="blue" icon={Database} title="Evidence Volume" value={`${data.events.length}`} detail={`${data.processes.length} processes, ${data.flows.length} flows, ${data.dns.length} DNS rows`} onClick={() => setSection('evidence')} />
-        <StatusCard tone="amber" icon={Shield} title="Controls" value="Observe" detail="draft controls require staged approval and rollback" onClick={() => setSection('controls')} />
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-        <MiniMetric label="Platforms" value={stats.platforms} />
-        <MiniMetric label="Healthy Collectors" value={stats.collectorHealthy} />
-        <MiniMetric label="Browser Extensions" value={derived.extensions.length} />
-        <MiniMetric label="SSE/SASE Components" value={derived.saseComponents.length} />
-      </div>
-      <Panel title="Aegis Status" subtitle="High-level posture across all reporting endpoints.">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <SummaryItem icon={Bot} title="AI activity" text="Browser AI, CLI agents, IDE tooling, local model runtimes, and tool bridges become first-class endpoint evidence." />
-          <SummaryItem icon={Chrome} title="Enterprise browser evidence" text="Chromium profiles, extension manifests, policies, history, and vendor APIs fill gaps left by DNS or flow-only detection." />
-          <SummaryItem icon={LockKeyhole} title="SSE/SASE awareness" text="Endpoint clients, services, adapters, proxy/PAC, and browser extensions show where traffic should also be visible in enterprise controls." />
-          <SummaryItem icon={Cpu} title="Low-resource agent" text="Collectors are budgeted, bounded, low cadence where possible, and designed to feel invisible on Windows and Linux endpoints." />
-        </div>
-      </Panel>
-    </div>
-  )
-}
-
-function ActivityPanel({
-  findings,
-  dns,
-  flows,
-  onInvestigate,
-}: {
-  findings: FindingRecord[]
-  dns: DnsRecord[]
-  flows: FlowRecord[]
-  onInvestigate: (selection: InvestigationSelection) => void
-}) {
-  const aiDns = dns.filter((record) => /chatgpt|openai|anthropic|claude|gemini|copilot|mistral|perplexity/i.test(record.query))
-  const aiFlows = flows.filter((flow) => /chatgpt|openai|anthropic|claude|gemini|copilot/i.test(flow.remote_hostname || ''))
-
-  return (
-    <div className="space-y-4">
-      <Panel title="AI Activity" subtitle="Known model destinations and agentic behavior evidence.">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-          <MiniMetric label="Findings" value={findings.length} />
-          <MiniMetric label="AI DNS" value={aiDns.length} />
-          <MiniMetric label="AI Flows" value={aiFlows.length} />
-        </div>
-      </Panel>
-      <Panel title="Recent Findings" subtitle="Click a row to open investigation context.">
-        <FindingTable findings={findings} onInvestigate={onInvestigate} />
-      </Panel>
-    </div>
-  )
-}
-
-function EvidencePanel({
-  query,
-  setQuery,
-  activeTab,
-  setActiveTab,
-  filtered,
-  onInvestigate,
-}: {
-  query: string
-  setQuery: (query: string) => void
-  activeTab: (typeof evidenceTabs)[number]['id']
-  setActiveTab: (tab: (typeof evidenceTabs)[number]['id']) => void
-  filtered: ReturnType<typeof filterVisibility>
-  onInvestigate: (selection: InvestigationSelection) => void
-}) {
-  return (
-    <Panel title="Evidence" subtitle="Process, flow, DNS, and raw event evidence for the selected endpoint.">
-      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {evidenceTabs.map((tab) => {
-            const Icon = tab.icon
-            const count = filtered[tab.id].length
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
-                  activeTab === tab.id ? 'bg-slate-950 text-white' : 'bg-gray-100 text-slate-700 hover:bg-gray-200'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-                <span className={activeTab === tab.id ? 'text-slate-300' : 'text-slate-500'}>{count}</span>
-              </button>
-            )
-          })}
-        </div>
-        <SearchBox value={query} onChange={setQuery} />
-      </div>
-      <div className="max-h-[680px] overflow-auto rounded-md border border-gray-200">
-        {activeTab === 'processes' && <ProcessTable processes={filtered.processes} onInvestigate={onInvestigate} />}
-        {activeTab === 'flows' && <FlowTable flows={filtered.flows} />}
-        {activeTab === 'dns' && <DnsTable dns={filtered.dns} />}
-        {activeTab === 'events' && <EventTable events={filtered.events} />}
-      </div>
-    </Panel>
-  )
-}
-
-function InventoryPanel({
-  extensions,
-  saseComponents,
-}: {
-  extensions: BrowserExtensionRecord[]
-  saseComponents: SaseComponentRecord[]
-}) {
-  return (
-    <div className="space-y-4">
-      <Panel title="Browser Extension Inventory" subtitle="Chromium extension manifests across discovered browser profiles.">
-        <ExtensionTable extensions={extensions} />
-      </Panel>
-      <Panel title="SSE/SASE Inventory" subtitle="Endpoint security access components, proxy/PAC state, tunnel adapters, and services.">
-        <SaseTable components={saseComponents} />
-      </Panel>
-    </div>
-  )
-}
-
-function ControlsPanel({ investigation }: { investigation: InvestigationData | null }) {
-  const draft = investigation?.draft_controls?.[0]
-  return (
-    <Panel title="Controls" subtitle="Observe-only recommendations before enforcement adapters are enabled.">
-      {draft ? <DraftControlPanel draft={draft} /> : (
-        <EmptyState icon={Shield} title="No staged control selected" text="Open an investigation from a process or finding to generate evidence-backed draft control context." />
-      )}
-    </Panel>
-  )
-}
-
-function DevicesPanel({
+function AgentList({
   devices,
-  selectedDevice,
-  selectDevice,
-  collectorStatuses,
+  selectedDeviceId,
+  model,
+  onSelect,
 }: {
   devices: DeviceRecord[]
-  selectedDevice: string
-  selectDevice: (device: string) => void
-  collectorStatuses: ReturnType<typeof deriveVisibility>['collectorStatuses']
+  selectedDeviceId: string
+  model: ReturnType<typeof buildDashboardModel>
+  onSelect: (deviceId: string) => void
 }) {
   return (
-    <div className="space-y-4">
-      <Panel title="Devices" subtitle="Agent inventory and endpoint freshness.">
-        <Table>
-          <thead className="bg-gray-50">
-            <tr>
-              <Th>Device</Th>
-              <Th>Platform</Th>
-              <Th>Version</Th>
-              <Th>Last Seen</Th>
-              <Th>Events</Th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 bg-white">
-            {devices.length === 0 ? <EmptyRow colSpan={5} message="No reporting devices." /> : devices.map((device) => (
-              <tr key={device.device_id} onClick={() => selectDevice(device.device_id)} className={`cursor-pointer hover:bg-gray-50 ${selectedDevice === device.device_id ? 'bg-slate-50' : ''}`}>
-                <Td>{device.device_id}</Td>
-                <Td>{platformName(device.source || device.device_id)}</Td>
-                <Td muted>{device.sensor_version || 'unknown'}</Td>
-                <Td muted>{ageFromMs(device.last_seen_ms)}</Td>
-                <Td mono>{device.event_count}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      </Panel>
-      <Panel title="Collector Health" subtitle="Latest collector status events for the selected endpoint.">
-        <CollectorStatusList statuses={collectorStatuses} />
-      </Panel>
+    <div className="divide-y divide-slate-100">
+      {devices.length === 0 ? (
+        <div className="px-4 py-12 text-center text-sm text-slate-500">No agents match this filter.</div>
+      ) : devices.map((device) => {
+        const active = Date.now() - device.last_seen_ms < 5 * 60 * 1000
+        const findings = Number(device.event_type_count?.['aegis.risk_finding.created'] || 0)
+        const extensions = model.extensions.filter((record) => record.device_id === device.device_id).length
+        return (
+          <button
+            key={device.device_id}
+            onClick={() => onSelect(device.device_id)}
+            className={`grid w-full grid-cols-[minmax(0,1fr)_auto] gap-4 px-4 py-3 text-left transition-colors hover:bg-slate-50 ${
+              selectedDeviceId === device.device_id ? 'bg-blue-50/60' : ''
+            }`}
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <FreshDot active={active} />
+                <div className="truncate text-sm font-semibold text-slate-950">{device.device_id}</div>
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{platformName(device.source || device.device_id)}</span>
+              </div>
+              <div className="mt-1 truncate text-xs text-slate-500">
+                {device.sensor_version} · last seen {ageFromMs(device.last_seen_ms)}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <CountPill label="Find" value={findings} tone={findings ? 'amber' : 'slate'} />
+              <CountPill label="Ext" value={extensions} tone="blue" />
+            </div>
+          </button>
+        )
+      })}
     </div>
   )
 }
 
-function ConnectorsPanel({ saseComponents }: { saseComponents: SaseComponentRecord[] }) {
-  const vendors = Array.from(new Set(saseComponents.map((component) => component.vendor))).filter(Boolean)
-  return (
-    <Panel title="Connectors" subtitle="Future Clarion, SASE/SSE, identity, firewall, proxy, and model-gateway integrations.">
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <ConnectorCard icon={ShieldCheck} title="Clarion" status="Planned" text="Share Aegis endpoint truth with Clarion enterprise context and policy orchestration." />
-        <ConnectorCard icon={LockKeyhole} title="SSE/SASE" status={vendors.length ? vendors.join(', ') : 'No endpoint client detected'} text="Use endpoint inventory to choose Zscaler, Palo Alto, Cisco, Netskope, Cloudflare, or other enrichment paths." />
-        <ConnectorCard icon={Globe2} title="Proxy and DNS" status="Planned" text="Enrich direct endpoint evidence with resolver, proxy, SNI, and gateway labels." />
-        <ConnectorCard icon={Bot} title="Model Gateways" status="Planned" text="Separate approved model access from unsanctioned local or direct AI usage." />
+function AgentDetailPanel({ detail }: { detail: ReturnType<typeof buildDeviceDetail> | null }) {
+  if (!detail) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+        Select an agent to view detail.
       </div>
-    </Panel>
-  )
-}
-
-function ManagementPanel({ collectorStatuses }: { collectorStatuses: ReturnType<typeof deriveVisibility>['collectorStatuses'] }) {
-  return (
-    <Panel title="Management" subtitle="Agent budget, collector cadence, detection packs, and platform settings.">
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <ManagementCard icon={Cpu} title="Agent Resource Budget" text="CPU, memory, disk, and network budgets must be explicit per collector." />
-        <ManagementCard icon={SlidersHorizontal} title="Collector Cadence" text="Fast snapshots, inventory collectors, and heavy enrichment need separate schedules." />
-        <ManagementCard icon={Database} title="Detection Packs" text="Dynamic AI indicators should update independently of agent binaries." />
-        <ManagementCard icon={HardDrive} title="Spool and Backpressure" text="Bounded local JSONL spool today; later compression, batch sizing, and queue-depth health." />
-      </div>
-      <div className="mt-4">
-        <CollectorStatusList statuses={collectorStatuses} />
-      </div>
-    </Panel>
-  )
-}
-
-function KpiCard({ icon: Icon, label, value, detail }: { icon: typeof Activity; label: string; value: string; detail: string }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-          <div className="mt-2 truncate text-2xl font-semibold text-slate-950">{value || 'Unknown'}</div>
-          <div className="mt-1 truncate text-xs text-slate-500">{detail}</div>
-        </div>
-        <Icon className="h-5 w-5 shrink-0 text-slate-500" />
-      </div>
-    </div>
-  )
-}
-
-function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-200 px-4 py-3">
-        <h2 className="text-base font-semibold text-slate-950">{title}</h2>
-        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
-      </div>
-      <div className="p-4">{children}</div>
-    </div>
-  )
-}
-
-function StatusCard({ icon: Icon, title, value, detail, tone, onClick }: { icon: typeof Activity; title: string; value: string; detail: string; tone: 'emerald' | 'blue' | 'amber'; onClick: () => void }) {
-  const styles = {
-    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-    blue: 'border-blue-200 bg-blue-50 text-blue-800',
-    amber: 'border-amber-200 bg-amber-50 text-amber-800',
+    )
   }
+  const { device } = detail
+  const active = Date.now() - device.last_seen_ms < 5 * 60 * 1000
+
   return (
-    <button onClick={onClick} className={`rounded-lg border p-4 text-left ${styles[tone]}`}>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold">{title}</div>
-          <div className="mt-2 text-3xl font-semibold">{value}</div>
-          <div className="mt-1 text-sm opacity-80">{detail}</div>
+    <aside className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <FreshDot active={active} />
+              <h2 className="truncate text-base font-semibold text-slate-950">{device.device_id}</h2>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">{platformName(device.source)} · {device.sensor_version}</p>
+          </div>
+          <StatusChip tone={active ? 'emerald' : 'amber'} label={active ? 'Fresh' : 'Stale'} />
         </div>
-        <Icon className="h-6 w-6" />
       </div>
-    </button>
+
+      <div className="space-y-4 p-4">
+        <div className="grid grid-cols-2 gap-3">
+          <MiniStat label="Processes" value={detail.processes.length} />
+          <MiniStat label="Flows" value={detail.flows.length} />
+          <MiniStat label="DNS" value={detail.dns.length} />
+          <MiniStat label="Findings" value={detail.findings.length} />
+        </div>
+
+        <DetailSection icon={Activity} title="Collector health">
+          {detail.collectors.length === 0 ? (
+            <EmptyLine text="No collector status in current window." />
+          ) : detail.collectors.slice(0, 6).map((collector) => (
+            <div key={`${collector.collector}-${collector.received_at_ms}`} className="rounded-md border border-slate-200 px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-slate-800">{collector.collector}</span>
+                <StatusChip tone={collector.status === 'healthy' ? 'emerald' : 'amber'} label={collector.status} />
+              </div>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{collector.message}</p>
+            </div>
+          ))}
+        </DetailSection>
+
+        <DetailSection icon={Chrome} title="Browser inventory">
+          {detail.extensions.length === 0 ? (
+            <EmptyLine text="No extensions observed in current window." />
+          ) : detail.extensions.slice(0, 5).map((extension) => (
+            <CompactRow key={`${extension.extension_id}-${extension.profile}`} title={extension.name} subtitle={`${extension.browser} · ${extension.profile}`} />
+          ))}
+        </DetailSection>
+
+        <DetailSection icon={LockKeyhole} title="SSE/SASE">
+          {detail.sase.length === 0 ? (
+            <EmptyLine text="No SSE/SASE component detected." />
+          ) : detail.sase.slice(0, 5).map((component) => (
+            <CompactRow key={`${component.component_type}-${component.name}`} title={`${component.vendor} · ${component.name}`} subtitle={component.product} />
+          ))}
+        </DetailSection>
+
+        <DetailSection icon={Globe2} title="Recent AI destinations">
+          {detail.dns.filter((record) => /chatgpt|openai|anthropic|claude|gemini|copilot|mistral/i.test(record.query)).slice(0, 5).map((record) => (
+            <CompactRow key={record.query} title={record.query} subtitle={record.correlation_method || 'DNS/browser evidence'} />
+          ))}
+          {detail.dns.filter((record) => /chatgpt|openai|anthropic|claude|gemini|copilot|mistral/i.test(record.query)).length === 0 && (
+            <EmptyLine text="No AI destination in current DNS window." />
+          )}
+        </DetailSection>
+      </div>
+    </aside>
   )
 }
 
-function SummaryItem({ icon: Icon, title, text }: { icon: typeof Activity; title: string; text: string }) {
+function Widget({ icon: Icon, title, value, detail }: { icon: typeof Activity; title: string; value: string | number; detail: string }) {
   return (
-    <div className="rounded-lg border border-gray-200 p-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-        <Icon className="h-4 w-4 text-slate-500" />
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{title}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
+          <p className="mt-2 text-sm leading-5 text-slate-500">{detail}</p>
+        </div>
+        <Icon className="h-5 w-5 text-slate-400" />
+      </div>
+    </div>
+  )
+}
+
+function MiniStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-1 text-xl font-semibold text-slate-950">{value}</div>
+    </div>
+  )
+}
+
+function DarkStat({ icon: Icon, label, value }: { icon: typeof Activity; label: string; value: number }) {
+  return (
+    <div className="rounded-lg bg-white/10 p-3">
+      <Icon className="h-4 w-4 text-cyan-200" />
+      <div className="mt-2 text-xl font-semibold">{value}</div>
+      <div className="text-xs uppercase tracking-wide text-slate-300">{label}</div>
+    </div>
+  )
+}
+
+function DetailSection({ icon: Icon, title, children }: { icon: typeof Activity; title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <Icon className="h-4 w-4" />
         {title}
       </div>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{text}</p>
+      <div className="space-y-2">{children}</div>
+    </section>
+  )
+}
+
+function CompactRow({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="rounded-md border border-slate-200 px-3 py-2">
+      <div className="truncate text-sm font-medium text-slate-800">{title}</div>
+      <div className="mt-1 truncate text-xs text-slate-500">{subtitle}</div>
     </div>
   )
 }
 
-function MiniMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-2 text-2xl font-semibold text-slate-950">{value}</div>
-    </div>
-  )
+function EmptyLine({ text }: { text: string }) {
+  return <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-500">{text}</div>
 }
 
-function SearchBox({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return (
-    <div className="relative min-w-0 lg:w-80">
-      <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-slate-600"
-        placeholder="Filter evidence"
-      />
-    </div>
-  )
-}
-
-function ProcessTable({ processes, onInvestigate }: { processes: ProcessRecord[]; onInvestigate: (selection: InvestigationSelection) => void }) {
-  return (
-    <Table>
-      <thead className="bg-gray-50"><tr><Th>PID</Th><Th>Name</Th><Th>Path</Th><Th>Command</Th></tr></thead>
-      <tbody className="divide-y divide-gray-100 bg-white">
-        {processes.length === 0 ? <EmptyRow colSpan={4} message="No process evidence." /> : processes.slice(0, 80).map((process) => (
-          <tr key={process.process_guid || `${process.pid}-${process.name}`} onClick={() => onInvestigate({ label: `${process.name} pid ${process.pid}`, device_id: process.device_id, process_guid: process.process_guid, pid: process.pid })} className="cursor-pointer hover:bg-gray-50">
-            <Td mono>{process.pid}</Td><Td><div>{process.name}</div><div className="mt-1 text-xs text-slate-500">{process.device_id || 'unknown device'}</div></Td><Td muted>{process.path || 'unknown'}</Td><Td muted>{process.command_line || 'not collected'}</Td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
-  )
-}
-
-function FlowTable({ flows }: { flows: FlowRecord[] }) {
-  return (
-    <Table>
-      <thead className="bg-gray-50"><tr><Th>Process</Th><Th>Direction</Th><Th>Local</Th><Th>Remote</Th><Th>Host</Th></tr></thead>
-      <tbody className="divide-y divide-gray-100 bg-white">
-        {flows.length === 0 ? <EmptyRow colSpan={5} message="No flow evidence." /> : flows.slice(0, 80).map((flow) => (
-          <tr key={flow.flow_id || `${flow.local_ip}-${flow.remote_ip}-${flow.remote_port}`} className="hover:bg-gray-50">
-            <Td><div>{flow.process_name || (flow.pid ? `pid ${flow.pid}` : 'unknown')}</div><div className="mt-1 text-xs text-slate-500">{flow.device_id || 'unknown device'}</div></Td><Td><Badge value={flow.direction} /></Td><Td mono>{socket(flow.local_ip, flow.local_port)}</Td><Td mono>{socket(flow.remote_ip, flow.remote_port)}</Td><Td muted>{flow.remote_hostname || 'unknown'}</Td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
-  )
-}
-
-function DnsTable({ dns }: { dns: DnsRecord[] }) {
-  return (
-    <Table>
-      <thead className="bg-gray-50"><tr><Th>Query</Th><Th>Answers</Th><Th>Resolver</Th><Th>Method</Th></tr></thead>
-      <tbody className="divide-y divide-gray-100 bg-white">
-        {dns.length === 0 ? <EmptyRow colSpan={4} message="No DNS evidence." /> : dns.slice(0, 80).map((record, index) => (
-          <tr key={`${record.query}-${index}`} className="hover:bg-gray-50">
-            <Td><div>{record.query}</div><div className="mt-1 text-xs text-slate-500">{record.device_id || 'unknown device'}</div></Td><Td muted>{(record.answers || []).join(', ') || 'none'}</Td><Td mono>{record.resolver || 'unknown'}</Td><Td muted>{record.correlation_method || 'unknown'}</Td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
-  )
-}
-
-function FindingTable({ findings, onInvestigate }: { findings: FindingRecord[]; onInvestigate: (selection: InvestigationSelection) => void }) {
-  return (
-    <Table>
-      <thead className="bg-gray-50"><tr><Th>Finding</Th><Th>Risk</Th><Th>Pattern</Th><Th>Evidence</Th></tr></thead>
-      <tbody className="divide-y divide-gray-100 bg-white">
-        {findings.length === 0 ? <EmptyRow colSpan={4} message="No findings." /> : findings.slice(0, 80).map((finding, index) => (
-          <tr key={finding.finding_id || finding.detection_id || index} onClick={() => onInvestigate({ label: finding.title || finding.classification || finding.event_type, device_id: finding.device_id, process_guid: finding.process_guid })} className="cursor-pointer hover:bg-gray-50">
-            <Td><div className="font-medium text-slate-900">{finding.title || finding.classification || finding.event_type}</div><div className="mt-1 text-xs text-slate-500">{finding.detection_id || finding.finding_id || 'no id'}</div></Td>
-            <Td><Risk value={finding.risk_score || 0} severity={finding.severity} /></Td>
-            <Td muted>{(finding.detected_patterns || []).join(', ') || 'none'}</Td>
-            <Td muted>{(finding.evidence || []).slice(0, 2).map((item) => `${item.type}: ${item.value}`).join(' | ') || 'none'}</Td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
-  )
-}
-
-function EventTable({ events }: { events: EventRecord[] }) {
-  return (
-    <Table>
-      <thead className="bg-gray-50"><tr><Th>Sequence</Th><Th>Type</Th><Th>Source</Th><Th>Received</Th></tr></thead>
-      <tbody className="divide-y divide-gray-100 bg-white">
-        {events.length === 0 ? <EmptyRow colSpan={4} message="No events." /> : events.slice(0, 100).map((event) => (
-          <tr key={event.event_id} className="hover:bg-gray-50">
-            <Td mono>{event.sequence}</Td><Td>{event.event_type}</Td><Td muted>{event.source || 'unknown'}</Td><Td muted>{formatDate(event.received_at_ms || event.timestamp_ms)}</Td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
-  )
-}
-
-function ExtensionTable({ extensions }: { extensions: BrowserExtensionRecord[] }) {
-  return (
-    <Table>
-      <thead className="bg-gray-50"><tr><Th>Extension</Th><Th>Browser/Profile</Th><Th>Version</Th><Th>Permissions</Th><Th>Host Permissions</Th></tr></thead>
-      <tbody className="divide-y divide-gray-100 bg-white">
-        {extensions.length === 0 ? <EmptyRow colSpan={5} message="No browser extensions observed." /> : extensions.slice(0, 100).map((extension) => (
-          <tr key={`${extension.browser}-${extension.profile}-${extension.extension_id}-${extension.version}`} className="hover:bg-gray-50">
-            <Td><div className="font-medium text-slate-900">{extension.name}</div><div className="mt-1 font-mono text-xs text-slate-500">{extension.extension_id}</div></Td>
-            <Td muted>{extension.browser}<br />{extension.profile}</Td>
-            <Td mono>{extension.version}</Td>
-            <Td muted>{(extension.permissions || []).join(', ') || 'none'}</Td>
-            <Td muted>{(extension.host_permissions || []).join(', ') || 'none'}</Td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
-  )
-}
-
-function SaseTable({ components }: { components: SaseComponentRecord[] }) {
-  return (
-    <Table>
-      <thead className="bg-gray-50"><tr><Th>Component</Th><Th>Vendor</Th><Th>Product</Th><Th>Status</Th><Th>Evidence</Th></tr></thead>
-      <tbody className="divide-y divide-gray-100 bg-white">
-        {components.length === 0 ? <EmptyRow colSpan={5} message="No SSE/SASE components observed on this endpoint." /> : components.slice(0, 100).map((component, index) => (
-          <tr key={`${component.component_type}-${component.name}-${index}`} className="hover:bg-gray-50">
-            <Td><div className="font-medium text-slate-900">{component.name}</div><div className="mt-1 text-xs text-slate-500">{component.component_type}</div></Td>
-            <Td>{component.vendor}</Td><Td muted>{component.product}</Td><Td><Badge value={component.status || 'observed'} /></Td><Td muted>{(component.evidence || []).join(' | ') || component.source}</Td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
-  )
-}
-
-function InvestigationPanel({ loading, selection, investigation }: { loading: boolean; selection: InvestigationSelection | null; investigation: InvestigationData | null }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2"><Network className="h-5 w-5 text-slate-700" /><h2 className="text-base font-semibold">Investigation Path</h2></div>
-        {loading && <RefreshCw className="h-4 w-4 animate-spin text-slate-500" />}
-      </div>
-      {!selection ? (
-        <div className="rounded-md border border-dashed border-gray-300 p-4 text-sm leading-5 text-slate-600">Select a process or finding to trace linked process, flow, DNS, and finding evidence.</div>
-      ) : (
-        <div className="space-y-4">
-          <div><div className="text-sm font-semibold text-slate-950">{selection.label}</div><div className="mt-1 text-xs text-slate-500">{selection.process_guid || (selection.pid !== undefined ? `pid ${selection.pid}` : 'device scope')}</div></div>
-          {investigation && (
-            <>
-              <div className="grid grid-cols-4 gap-2 text-center">
-                <MiniCount label="Proc" value={investigation.counts.processes} /><MiniCount label="Flow" value={investigation.counts.flows} /><MiniCount label="DNS" value={investigation.counts.dns} /><MiniCount label="Find" value={investigation.counts.findings} />
-              </div>
-              <PathSection title="Flows" items={investigation.flows.slice(0, 4).map((flow) => `${flow.process_name || 'unknown'} to ${socket(flow.remote_ip, flow.remote_port)}`)} />
-              <PathSection title="DNS" items={investigation.dns.slice(0, 4).map((record) => `${record.query} to ${(record.answers || []).join(', ') || record.resolver || 'unknown'}`)} />
-              {investigation.draft_controls?.[0] && <DraftControlPanel draft={investigation.draft_controls[0]} />}
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function DraftControlPanel({ draft }: { draft: DraftControl }) {
-  return (
-    <div className="space-y-3">
-      <div className="rounded-md border border-gray-200 px-3 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-sm font-semibold text-slate-950">{draft.title}</div>
-          <Badge value={displayMode(draft.mode)} />
-        </div>
-        <p className="mt-2 text-sm leading-5 text-slate-600">{draft.reason}</p>
-      </div>
-      <DraftList icon={FileText} title="Evidence Used" items={draft.evidence} />
-      <DraftList icon={Undo2} title="Rollback Plan" items={draft.rollback} />
-      <button disabled className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-sm font-medium text-slate-500">
-        <FileText className="h-4 w-4" /> Policy staging API pending
-      </button>
-    </div>
-  )
-}
-
-function AgentBudgetPanel() {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2"><Cpu className="h-5 w-5 text-slate-700" /><h2 className="text-base font-semibold">Agent Budget</h2></div>
-      <div className="space-y-2 text-sm text-slate-700">
-        <BudgetRow label="CPU" value="near 0% idle" />
-        <BudgetRow label="Memory" value="target < 50 MB" />
-        <BudgetRow label="Disk" value="bounded spool" />
-        <BudgetRow label="Network" value="outbound only" />
-      </div>
-    </div>
-  )
-}
-
-function ReadinessPanel({ collectorStatuses }: { collectorStatuses: ReturnType<typeof deriveVisibility>['collectorStatuses'] }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2"><Activity className="h-5 w-5 text-slate-700" /><h2 className="text-base font-semibold">Readiness</h2></div>
-      <CollectorStatusList statuses={collectorStatuses.slice(0, 6)} />
-    </div>
-  )
-}
-
-function CollectorStatusList({ statuses }: { statuses: ReturnType<typeof deriveVisibility>['collectorStatuses'] }) {
-  if (statuses.length === 0) return <div className="rounded-md bg-gray-50 px-3 py-3 text-sm text-slate-500">No collector status in the current event window.</div>
-  return (
-    <div className="space-y-2">
-      {statuses.slice(0, 12).map((status, index) => (
-        <div key={`${status.collector}-${index}`} className="rounded-md border border-gray-200 px-3 py-2">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-medium text-slate-900">{status.collector}</div>
-            <Risk value={status.status === 'healthy' ? 0 : 50} severity={status.status} />
-          </div>
-          <div className="mt-1 text-xs leading-5 text-slate-500">{status.message}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ConnectorCard({ icon: Icon, title, status, text }: { icon: typeof Activity; title: string; status: string; text: string }) {
-  return <SummaryItem icon={Icon} title={`${title}: ${status}`} text={text} />
-}
-
-function ManagementCard({ icon: Icon, title, text }: { icon: typeof Activity; title: string; text: string }) {
-  return <SummaryItem icon={Icon} title={title} text={text} />
-}
-
-function EmptyState({ icon: Icon, title, text }: { icon: typeof Activity; title: string; text: string }) {
-  return (
-    <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center">
-      <Icon className="mx-auto h-8 w-8 text-slate-400" />
-      <div className="mt-3 text-sm font-semibold text-slate-900">{title}</div>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{text}</p>
-    </div>
-  )
-}
-
-function DraftList({ icon: Icon, title, items }: { icon: typeof Activity; title: string; items: string[] }) {
-  return (
-    <div>
-      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><Icon className="h-4 w-4" />{title}</div>
-      <div className="space-y-2">{items.map((item, index) => <div key={`${title}-${index}`} className="rounded-md border border-gray-200 px-3 py-2 text-sm leading-5 text-slate-700">{item}</div>)}</div>
-    </div>
-  )
-}
-
-function MiniCount({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-md bg-gray-100 px-2 py-2"><div className="text-lg font-semibold text-slate-950">{value}</div><div className="text-xs text-slate-500">{label}</div></div>
-}
-
-function PathSection({ title, items }: { title: string; items: string[] }) {
-  return <div><div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</div>{items.length === 0 ? <div className="rounded-md bg-gray-50 px-3 py-2 text-sm text-slate-500">No linked evidence</div> : <div className="space-y-2">{items.map((item, index) => <div key={`${title}-${index}`} className="rounded-md border border-gray-200 px-3 py-2 text-sm text-slate-700">{item}</div>)}</div>}</div>
-}
-
-function BudgetRow({ label, value }: { label: string; value: string }) {
-  return <div className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2"><span className="font-medium">{label}</span><span className="text-slate-500">{value}</span></div>
-}
-
-function Table({ children }: { children: React.ReactNode }) {
-  return <table className="min-w-full table-fixed text-left text-sm">{children}</table>
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{children}</th>
-}
-
-function Td({ children, muted, mono }: { children: React.ReactNode; muted?: boolean; mono?: boolean }) {
-  return <td className={`max-w-[360px] truncate px-4 py-3 align-top ${muted ? 'text-slate-500' : 'text-slate-800'} ${mono ? 'font-mono text-xs' : ''}`}>{children}</td>
-}
-
-function EmptyRow({ colSpan, message }: { colSpan: number; message: string }) {
-  return <tr><td colSpan={colSpan} className="px-4 py-10 text-center text-sm text-slate-500">{message}</td></tr>
-}
-
-function Badge({ value }: { value: string }) {
-  return <span className="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-slate-700">{value}</span>
-}
-
-function Risk({ value, severity }: { value: number; severity?: string }) {
-  const tone = value >= 70 ? 'bg-red-100 text-red-800' : value >= 40 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-50 text-emerald-700'
-  return <span className={`rounded-md px-2 py-1 text-xs font-semibold ${tone}`}>{severity || 'info'} {value}</span>
-}
-
-function sectionTitle(section: string) {
-  const titles: Record<string, string> = {
-    overview: 'Operational Overview',
-    activity: 'AI Activity',
-    evidence: 'Endpoint Evidence',
-    inventory: 'Inventory',
-    findings: 'Findings',
-    controls: 'Controls',
-    devices: 'Devices',
-    connectors: 'Connectors',
-    management: 'Management',
+function CountPill({ label, value, tone }: { label: string; value: number; tone: 'slate' | 'blue' | 'amber' }) {
+  const tones = {
+    slate: 'bg-slate-100 text-slate-600',
+    blue: 'bg-blue-50 text-blue-700',
+    amber: 'bg-amber-50 text-amber-800',
   }
-  return titles[section] || 'Aegis'
+  return <span className={`rounded-md px-2 py-1 font-medium ${tones[tone]}`}>{label} {value}</span>
 }
 
-function sectionSubtitle(section: string) {
-  const subtitles: Record<string, string> = {
-    overview: 'Current endpoint posture, AI evidence, collector coverage, and readiness.',
-    activity: 'Known AI destinations, agentic behavior, and user/application context.',
-    evidence: 'Raw process, flow, DNS, and event records from the selected endpoint.',
-    inventory: 'Browser extensions, enterprise browsers, and SSE/SASE endpoint components.',
-    findings: 'Explainable detections with evidence and risk scoring.',
-    controls: 'Observe-only draft controls, blast-radius notes, and rollback plans.',
-    devices: 'Agent freshness, platform visibility, and collector health.',
-    connectors: 'Clarion, SASE/SSE, proxy, firewall, identity, and model gateway integration paths.',
-    management: 'Agent budgets, collector cadence, detection packs, and platform settings.',
+function StatusChip({ tone, label }: { tone: 'emerald' | 'amber' | 'slate'; label: string }) {
+  const tones = {
+    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    amber: 'border-amber-200 bg-amber-50 text-amber-800',
+    slate: 'border-slate-200 bg-slate-50 text-slate-700',
   }
-  return subtitles[section] || ''
+  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>{label}</span>
 }
 
-function displayMode(value: string) {
-  return value === 'observe-only' ? 'Observe-only' : value || 'Draft'
+function FreshDot({ active }: { active: boolean }) {
+  return <span className={`h-2.5 w-2.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-amber-500'}`} />
 }
 
-function socket(ip?: string, port?: number) {
-  return `${ip || 'unknown'}${port ? `:${port}` : ''}`
-}
-
-function formatDate(ms?: number) {
-  return ms ? new Date(ms).toLocaleString() : 'unknown'
+function platformName(value: string) {
+  const normalized = value.toLowerCase()
+  if (normalized.includes('windows')) return 'Windows'
+  if (normalized.includes('linux')) return 'Linux'
+  if (normalized.includes('macos') || normalized.includes('darwin')) return 'macOS'
+  return value || 'Unknown'
 }
 
 function ageFromMs(ms?: number) {
@@ -1137,12 +607,4 @@ function ageFromMs(ms?: number) {
   const minutes = Math.round(seconds / 60)
   if (minutes < 60) return `${minutes}m ago`
   return `${Math.round(minutes / 60)}h ago`
-}
-
-function platformName(value: string) {
-  const normalized = value.toLowerCase()
-  if (normalized.includes('windows')) return 'Windows'
-  if (normalized.includes('linux')) return 'Linux'
-  if (normalized.includes('macos') || normalized.includes('darwin')) return 'macOS'
-  return value || 'Unknown'
 }
