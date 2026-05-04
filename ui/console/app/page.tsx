@@ -166,18 +166,6 @@ const ui: Record<string, CSSProperties> = {
   },
   brandTitle: { fontSize: 18, fontWeight: 700, lineHeight: '20px' },
   mutedSmall: { fontSize: 12, color: '#64748b' },
-  brandTagline: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 7,
-    color: '#0ea5e9',
-    fontSize: 10,
-    fontWeight: 800,
-    lineHeight: '12px',
-    letterSpacing: '0.22em',
-    textTransform: 'uppercase',
-  },
-  brandDot: { color: '#0284c7', fontWeight: 900 },
   headerActions: { display: 'flex', alignItems: 'center', gap: 12 },
   button: {
     height: 36,
@@ -374,7 +362,7 @@ const ui: Record<string, CSSProperties> = {
     color: '#475569',
     background: '#f8fafc',
   },
-  headerLogo: { display: 'flex', alignItems: 'center', gap: 12, minWidth: 260 },
+  headerLogo: { display: 'flex', alignItems: 'center', gap: 12, minWidth: 230 },
   headerLogoMark: {
     width: 38,
     height: 38,
@@ -600,17 +588,9 @@ export default function AegisDashboard() {
               <div style={ui.headerLogoMark}>
                 <img src="/aegisflux-icon.svg" alt="AegisFlux" style={ui.logoImage} />
               </div>
-              <div style={{ display: 'grid', gap: 1 }}>
+              <div>
                 <div style={ui.wordmarkText}>
                   Aegis<span style={ui.wordmarkFlux}>Flux</span>
-                </div>
-                <div style={ui.brandTagline}>
-                  <span>Observe</span>
-                  <span style={ui.brandDot}>.</span>
-                  <span>Adapt</span>
-                  <span style={ui.brandDot}>.</span>
-                  <span>Enforce</span>
-                  <span style={ui.brandDot}>.</span>
                 </div>
               </div>
             </div>
