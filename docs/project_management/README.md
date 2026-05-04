@@ -10,6 +10,7 @@ This directory is the active project-management home for AegisFlux planning and 
 ## Active Work Orders
 
 - [Visibility and Observability Work Orders](work_orders/visibility_observability/README.md)
+- [Product Platform Work Orders](work_orders/product_platform/README.md)
 
 ## Archive Boundary
 
