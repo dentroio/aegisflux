@@ -5,9 +5,9 @@ export const metadata: Metadata = {
   title: 'AegisFlux Console',
   description: 'Agent Management and Network Security Policy Builder',
   icons: {
-    icon: '/aegisflux-icon.svg',
-    shortcut: '/aegisflux-icon.svg',
-    apple: '/aegisflux-icon.svg',
+    icon: '/aegisflux-shield.png',
+    shortcut: '/aegisflux-shield.png',
+    apple: '/aegisflux-shield.png',
   },
 }
 

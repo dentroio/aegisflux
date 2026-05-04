@@ -445,7 +445,7 @@ const ui: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 64,
+    padding: 56,
     background:
       'radial-gradient(circle at 64% 36%, rgba(14,165,233,0.18), transparent 34%), radial-gradient(circle at 18% 78%, rgba(37,99,235,0.16), transparent 30%), linear-gradient(135deg, #020617 0%, #07111f 56%, #020617 100%)',
   },
@@ -458,6 +458,15 @@ const ui: Record<string, CSSProperties> = {
     backgroundSize: '42px 42px',
   },
   loginBrandBlock: { position: 'relative', zIndex: 1, width: 'min(720px, 92%)' },
+  loginHeroArtwork: {
+    position: 'relative',
+    zIndex: 1,
+    width: 'min(780px, 94%)',
+    maxHeight: '88vh',
+    objectFit: 'contain',
+    display: 'block',
+    filter: 'drop-shadow(0 30px 70px rgba(14, 165, 233, 0.28))',
+  },
   loginWordmark: { margin: 0, fontSize: 74, lineHeight: 1, fontWeight: 900, letterSpacing: 0.2 },
   loginMotto: {
     marginTop: 30,
@@ -510,7 +519,7 @@ const ui: Record<string, CSSProperties> = {
     padding: 30,
   },
   loginCardHeader: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26 },
-  loginMiniIcon: { width: 42, height: 42, borderRadius: 10, background: '#020617', overflow: 'hidden' },
+  loginMiniIcon: { width: 42, height: 42, borderRadius: 10, background: '#020617', overflow: 'hidden', flexShrink: 0 },
   loginTitle: { margin: 0, fontSize: 24, fontWeight: 850, letterSpacing: 0 },
   loginCopy: { margin: '8px 0 0', color: '#64748b', fontSize: 14, lineHeight: 1.6 },
   loginForm: { display: 'grid', gap: 14 },
@@ -752,7 +761,7 @@ export default function AegisDashboard() {
           <div className="flex h-16 items-center justify-between px-5" style={ui.headerInner}>
             <div style={ui.headerLogo}>
               <div style={ui.headerLogoMark}>
-                <img src="/aegisflux-icon.svg" alt="AegisFlux" style={ui.logoImage} />
+                <img src="/aegisflux-shield.png" alt="AegisFlux" style={ui.logoImage} />
               </div>
               <div>
                 <div style={ui.wordmarkText}>
@@ -1005,28 +1014,14 @@ function LoginScreen({
     <div style={ui.loginPage}>
       <section style={ui.loginVisual}>
         <div style={ui.loginGridOverlay} />
-        <div style={ui.loginBrandBlock}>
-          <h1 style={ui.loginWordmark}>
-            Aegis<span style={ui.wordmarkFlux}>Flux</span>
-          </h1>
-          <div style={ui.loginMotto}>
-            <span>Observe.</span>
-            <span>Adapt.</span>
-            <span>Enforce.</span>
-          </div>
-          <div style={ui.loginSubMotto}>Adaptive security. Real-time protection.</div>
-          <div style={ui.loginRule} />
-          <p style={ui.loginStatement}>
-            Endpoint evidence, dynamic AI detection, and control readiness in one operational workflow.
-          </p>
-        </div>
+        <img src="/aegisflux-login-hero.png" alt="AegisFlux Observe Adapt Enforce" style={ui.loginHeroArtwork} />
       </section>
 
       <section style={ui.loginPanelWrap}>
         <div style={ui.loginCard}>
           <div style={ui.loginCardHeader}>
             <div style={ui.loginMiniIcon}>
-              <img src="/aegisflux-icon.svg" alt="" style={ui.logoImage} />
+              <img src="/aegisflux-shield.png" alt="" style={ui.logoImage} />
             </div>
             <div>
               <h2 style={ui.loginTitle}>Sign in</h2>
