@@ -8,7 +8,9 @@ import {
   Bot,
   Cpu,
   Database,
+  FileText,
   FlaskConical,
+  GitBranch,
   Globe2,
   Network,
   RefreshCw,
@@ -17,6 +19,7 @@ import {
   ShieldCheck,
   Sparkles,
   TerminalSquare,
+  Undo2,
 } from 'lucide-react'
 
 type EventRecord = {
@@ -116,6 +119,18 @@ type DeviceRecord = {
   last_event_type: string
   event_count: number
   event_type_count: Record<string, number>
+}
+
+type DraftControl = {
+  title: string
+  mode: string
+  action: string
+  target: string
+  scope: string
+  reason: string
+  evidence: string[]
+  blastRadius: string[]
+  rollback: string[]
 }
 
 const tabs = [
@@ -444,9 +459,9 @@ export default function VisibilityConsole() {
                 <h2 className="text-base font-semibold">Next Build Slice</h2>
               </div>
               <ol className="space-y-2 text-sm text-slate-700">
-                <li>1. Add investigation drill-in: process to flows to DNS to finding.</li>
-                <li>2. Add draft control actions from a finding, still observe-only.</li>
-                <li>3. Add device health scoring from event freshness and collector status.</li>
+                <li>1. Persist draft controls from investigation evidence.</li>
+                <li>2. Add device health scoring from event freshness and collector status.</li>
+                <li>3. Add policy simulation before any enforcement adapter is enabled.</li>
               </ol>
             </div>
           </aside>
@@ -665,6 +680,8 @@ function InvestigationPanel({
   selection: InvestigationSelection | null
   investigation: InvestigationData | null
 }) {
+  const draftControl = selection && investigation ? buildDraftControl(selection, investigation) : null
+
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -703,22 +720,169 @@ function InvestigationPanel({
               />
               <PathSection
                 title="Flows"
-                items={investigation.flows.slice(0, 4).map((flow) => `${flow.process_name || 'unknown'} -> ${socket(flow.remote_ip, flow.remote_port)}`)}
+                items={investigation.flows.slice(0, 4).map((flow) => `${flow.process_name || 'unknown'} to ${socket(flow.remote_ip, flow.remote_port)}`)}
               />
               <PathSection
                 title="DNS"
-                items={investigation.dns.slice(0, 4).map((record) => `${record.query} -> ${(record.answers || []).join(', ') || record.resolver || 'unknown'}`)}
+                items={investigation.dns.slice(0, 4).map((record) => `${record.query} to ${(record.answers || []).join(', ') || record.resolver || 'unknown'}`)}
               />
               <PathSection
                 title="Findings"
                 items={investigation.findings.slice(0, 4).map((finding) => `${finding.title || finding.classification || finding.event_type} (${finding.risk_score || 0})`)}
               />
+              {draftControl && <DraftControlPanel draft={draftControl} />}
             </>
           )}
         </div>
       )}
     </div>
   )
+}
+
+function DraftControlPanel({ draft }: { draft: DraftControl }) {
+  return (
+    <div className="border-t border-slate-200 pt-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-5 w-5 text-slate-800" />
+          <h3 className="text-sm font-semibold text-slate-950">Draft Control</h3>
+        </div>
+        <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+          {draft.mode}
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        <div className="rounded-md border border-slate-200 px-3 py-3">
+          <div className="text-sm font-semibold text-slate-950">{draft.title}</div>
+          <p className="mt-1 text-sm leading-5 text-slate-600">{draft.reason}</p>
+        </div>
+
+        <DraftField label="Action" value={draft.action} />
+        <DraftField label="Target" value={draft.target} mono />
+        <DraftField label="Scope" value={draft.scope} />
+
+        <DraftList icon={FileText} title="Evidence Used" items={draft.evidence} />
+        <DraftList icon={GitBranch} title="Blast Radius Checks" items={draft.blastRadius} />
+        <DraftList icon={Undo2} title="Rollback Plan" items={draft.rollback} />
+
+        <button
+          disabled
+          className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-500"
+        >
+          <FileText className="h-4 w-4" />
+          Policy staging API pending
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function DraftField({
+  label,
+  value,
+  mono,
+}: {
+  label: string
+  value: string
+  mono?: boolean
+}) {
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className={`mt-1 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700 ${mono ? 'font-mono text-xs' : ''}`}>
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function DraftList({
+  icon: Icon,
+  title,
+  items,
+}: {
+  icon: typeof Activity
+  title: string
+  items: string[]
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <Icon className="h-4 w-4" />
+        {title}
+      </div>
+      <div className="space-y-2">
+        {items.map((item, index) => (
+          <div key={`${title}-${index}`} className="rounded-md border border-slate-200 px-3 py-2 text-sm leading-5 text-slate-700">
+            {item}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function buildDraftControl(selection: InvestigationSelection, investigation: InvestigationData): DraftControl {
+  const process = investigation.processes[0]
+  const flow = investigation.flows[0]
+  const finding = investigation.findings[0]
+  const dns = investigation.dns[0]
+  const processName = process?.name || flow?.process_name || selection.label || 'selected activity'
+  const processScope = process
+    ? `${process.name} pid ${process.pid}${process.path ? ` at ${process.path}` : ''}`
+    : selection.process_guid || (selection.pid !== undefined ? `pid ${selection.pid}` : 'device activity')
+  const remoteTarget = flow ? socket(flow.remote_ip, flow.remote_port) : 'remote destination not yet linked'
+  const findingTitle = finding?.title || finding?.classification || finding?.event_type || 'linked endpoint evidence'
+  const evidence = [
+    process ? `Process: ${process.name} pid ${process.pid}` : `Selection: ${selection.label}`,
+    process?.command_line ? `Command line: ${process.command_line}` : '',
+    flow ? `Flow: ${flow.direction || 'unknown'} ${flow.protocol || 'tcp'} to ${remoteTarget}` : '',
+    dns ? `DNS: ${dns.query} resolved to ${(dns.answers || []).join(', ') || dns.resolver || 'unknown'}` : '',
+    finding ? `Finding: ${findingTitle} risk ${finding.risk_score || 0}` : '',
+  ].filter(Boolean)
+
+  if (flow) {
+    return {
+      title: `Observe outbound access for ${processName}`,
+      mode: 'Observe-only',
+      action: 'Stage a monitor rule that records matches before deny or restrict is considered.',
+      target: remoteTarget,
+      scope: `${processScope}; ${flow.protocol || 'tcp'} ${flow.direction || 'outbound'} traffic to ${remoteTarget}`,
+      reason: `Aegis linked ${findingTitle} to a concrete process and network destination. The next safe step is to measure repeat matches and affected activity before enforcement.`,
+      evidence,
+      blastRadius: [
+        'Count historical matches for the same process, destination, port, and protocol.',
+        'Check whether other processes on the device use the same destination.',
+        'Require DNS and process evidence before expanding beyond this endpoint.',
+      ],
+      rollback: [
+        'Disable the staged monitor rule.',
+        'Clear any pending enforcement candidate for this process and destination.',
+        'Keep collected evidence for audit and future simulation.',
+      ],
+    }
+  }
+
+  return {
+    title: `Observe process behavior for ${processName}`,
+    mode: 'Observe-only',
+    action: 'Stage a process watch that records future flows, DNS, and findings before control design.',
+    target: process?.path || selection.process_guid || selection.label,
+    scope: processScope,
+    reason: `Aegis has process or finding evidence but not enough linked network evidence for a network control. The next safe step is richer observation.`,
+    evidence,
+    blastRadius: [
+      'Wait for at least one linked flow or DNS record before proposing a restrict or deny rule.',
+      'Compare command-line markers to avoid matching unrelated processes.',
+      'Keep scope limited to this device until cross-device evidence exists.',
+    ],
+    rollback: [
+      'Remove the process watch candidate.',
+      'Keep the investigation record available for review.',
+      'Return the device to passive collection only.',
+    ],
+  }
 }
 
 function MiniCount({ label, value }: { label: string; value: number }) {
