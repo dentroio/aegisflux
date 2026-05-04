@@ -8,6 +8,8 @@ The practical wedge is simple: observe first, explain clearly, draft safely, enf
 
 The larger platform vision is captured in [AEGIS_PLATFORM_VISION.md](AEGIS_PLATFORM_VISION.md): Aegis should mature as a first-of-kind standalone innovation platform, then integrate into Clarion through explicit events and APIs as Clarion's host/workload evidence and local-control subsystem.
 
+Clarion's AI-agent patterns should also carry into Aegis. Aegis should support governed AI providers, registered AI platform agents, privacy controls, audit records, endpoint-specific AI assistance, and research-to-detection workflows. See [AEGIS_AI_AGENT_PLATFORM_ARCHITECTURE.md](AEGIS_AI_AGENT_PLATFORM_ARCHITECTURE.md).
+
 ## Current Lab State
 
 The lab now has a working visibility foundation:
@@ -58,6 +60,8 @@ This gives customers an inventory they do not reliably get today: which AI-capab
 AI tooling changes too quickly for static endpoint signatures to carry the product. Aegis should support a research-to-detection loop where cloud-side research agents monitor new AI tools, protocols, model gateways, MCP servers, browser agents, coding agents, and agent-to-agent ecosystems, then generate signed observe-only detection packs for endpoint agents.
 
 See [AEGIS_DYNAMIC_AI_DETECTION_STRATEGY.md](AEGIS_DYNAMIC_AI_DETECTION_STRATEGY.md) for the detailed architecture.
+
+The AI platform itself should be managed like a first-class enterprise connector, following the Clarion model: provider configuration, registered agents, health status, privacy redaction, and auditable runs.
 
 ### Finding to Draft Control
 
