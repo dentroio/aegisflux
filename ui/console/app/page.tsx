@@ -5,7 +5,9 @@ import type { CSSProperties } from 'react'
 import {
   Activity,
   AlertTriangle,
+  Bell,
   Bot,
+  BookText,
   CheckCircle2,
   Chrome,
   Cpu,
@@ -14,6 +16,8 @@ import {
   HardDrive,
   LayoutDashboard,
   LockKeyhole,
+  LogOut,
+  Moon,
   Network,
   Plug,
   RefreshCw,
@@ -24,6 +28,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   TerminalSquare,
+  UserCircle,
 } from 'lucide-react'
 
 type EventRecord = {
@@ -144,7 +149,7 @@ const ui: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '0 20px',
+    padding: '0 16px',
     gap: 16,
   },
   brandRow: { display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 },
@@ -285,7 +290,8 @@ const ui: Record<string, CSSProperties> = {
   countPill: { borderRadius: 6, padding: '4px 8px', fontSize: 12, fontWeight: 700 },
   statusChip: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, border: '1px solid', padding: '4px 10px', fontSize: 12, fontWeight: 700 },
   freshDot: { display: 'inline-block', width: 10, height: 10, borderRadius: 999, flexShrink: 0 },
-  appShell: { display: 'flex', minHeight: '100vh' },
+  appShell: { display: 'flex', minHeight: '100vh', flexDirection: 'column' },
+  bodyShell: { display: 'flex', minHeight: 0, flex: 1 },
   sidebar: {
     width: 264,
     flexShrink: 0,
@@ -293,6 +299,7 @@ const ui: Record<string, CSSProperties> = {
     borderRight: '1px solid #e5e7eb',
     display: 'flex',
     flexDirection: 'column',
+    overflowY: 'auto',
   },
   sidebarBrand: {
     height: 64,
@@ -302,9 +309,9 @@ const ui: Record<string, CSSProperties> = {
     padding: '0 18px',
     borderBottom: '1px solid #e5e7eb',
   },
-  sideNav: { padding: 12, display: 'grid', gap: 18 },
+  sideNav: { padding: 16, display: 'grid', gap: 4 },
   sideGroupLabel: {
-    padding: '0 10px 6px',
+    padding: '20px 12px 6px',
     fontSize: 11,
     fontWeight: 800,
     color: '#94a3b8',
@@ -317,20 +324,21 @@ const ui: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: 10,
     border: 0,
-    borderRadius: 9,
+    borderRadius: 8,
     background: 'transparent',
     color: '#475569',
-    padding: '10px 11px',
+    padding: '10px 12px',
     fontSize: 14,
-    fontWeight: 650,
+    fontWeight: 600,
     textAlign: 'left',
     cursor: 'pointer',
   },
-  sideButtonActive: { background: '#0f172a', color: '#fff' },
-  sideButtonMuted: { color: '#94a3b8', cursor: 'default' },
+  sideButtonActive: { background: '#2563eb', color: '#fff' },
+  sideButtonMuted: { color: '#475569', cursor: 'default' },
   sideFooter: { marginTop: 'auto', padding: 14, borderTop: '1px solid #e5e7eb' },
   sideFooterCard: { borderRadius: 10, border: '1px solid #bae6fd', background: '#f0f9ff', padding: 12 },
-  contentArea: { minWidth: 0, flex: 1 },
+  contentArea: { minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  scrollArea: { flex: 1, minHeight: 0, overflow: 'auto' },
   widgetHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 },
   widgetTitle: { margin: 0, fontSize: 16, fontWeight: 750, color: '#0f172a' },
   customizePanel: {
@@ -354,6 +362,63 @@ const ui: Record<string, CSSProperties> = {
     color: '#475569',
     background: '#f8fafc',
   },
+  headerLogo: { display: 'flex', alignItems: 'center', gap: 12, minWidth: 220 },
+  headerLogoMark: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    background: '#020617',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerSearch: {
+    height: 34,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    border: 0,
+    borderRadius: 8,
+    background: '#f1f5f9',
+    color: '#64748b',
+    padding: '0 10px',
+    fontSize: 14,
+  },
+  keycap: {
+    border: '1px solid #cbd5e1',
+    borderRadius: 5,
+    background: '#fff',
+    color: '#94a3b8',
+    padding: '1px 5px',
+    fontSize: 11,
+    fontWeight: 700,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    border: 0,
+    borderRadius: 8,
+    background: 'transparent',
+    color: '#64748b',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerStatus: { display: 'inline-flex', alignItems: 'center', gap: 8, paddingLeft: 12, borderLeft: '1px solid #e5e7eb' },
+  userBadge: { display: 'inline-flex', alignItems: 'center', gap: 8, paddingLeft: 12, borderLeft: '1px solid #e5e7eb' },
+  rolePill: { border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', borderRadius: 5, padding: '2px 6px', fontSize: 11, fontWeight: 700 },
+  breadcrumb: {
+    height: 38,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '0 20px',
+    borderBottom: '1px solid #f1f5f9',
+    background: '#fff',
+    color: '#64748b',
+    fontSize: 13,
+  },
 }
 
 const pillStyles: Record<'slate' | 'blue' | 'amber', CSSProperties> = {
@@ -370,18 +435,44 @@ const statusStyles: Record<'emerald' | 'amber' | 'slate', CSSProperties> = {
 
 const navGroups = [
   {
-    label: 'Workspace',
+    label: 'Overview',
     items: [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, active: true },
-      { id: 'agents', label: 'Agents', icon: Server },
-      { id: 'activity', label: 'AI Activity', icon: Bot },
-      { id: 'inventory', label: 'Inventory', icon: Database },
     ],
   },
   {
-    label: 'Platform',
+    label: 'Discover',
+    items: [
+      { id: 'agents', label: 'Agents', icon: Server },
+      { id: 'inventory', label: 'Inventory', icon: Database },
+      { id: 'activity', label: 'AI Activity', icon: Bot },
+    ],
+  },
+  {
+    label: 'Analyze',
+    items: [
+      { id: 'evidence', label: 'Evidence Graph', icon: Network },
+      { id: 'detections', label: 'Detection Packs', icon: Sparkles },
+      { id: 'activity-log', label: 'Findings', icon: Activity },
+    ],
+  },
+  {
+    label: 'Control',
     items: [
       { id: 'controls', label: 'Controls', icon: ShieldCheck },
+      { id: 'simulation', label: 'Policy Simulation', icon: TerminalSquare },
+    ],
+  },
+  {
+    label: 'Operate',
+    items: [
+      { id: 'monitoring', label: 'Monitoring', icon: Cpu },
+      { id: 'reports', label: 'Reports', icon: BookText },
+    ],
+  },
+  {
+    label: 'Configure',
+    items: [
       { id: 'connectors', label: 'Connectors', icon: Plug },
       { id: 'settings', label: 'Settings', icon: Settings },
     ],
@@ -479,96 +570,127 @@ export default function AegisDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 text-slate-900" style={ui.page}>
       <div style={ui.appShell}>
-        <aside style={ui.sidebar}>
-          <div style={ui.sidebarBrand}>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950" style={ui.logoBox}>
-              <ShieldCheck className="h-5 w-5 text-white" />
+        <header className="border-b border-gray-200 bg-white shadow-sm" style={ui.header}>
+          <div className="flex h-16 items-center justify-between px-5" style={ui.headerInner}>
+            <div style={ui.headerLogo}>
+              <div style={ui.headerLogoMark}>
+                <ShieldCheck className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <div style={ui.brandTitle}>Aegis</div>
+                <div style={ui.mutedSmall}>AI endpoint governance</div>
+              </div>
             </div>
-            <div>
-              <div style={ui.brandTitle}>Aegis</div>
-              <div style={ui.mutedSmall}>AI endpoint governance</div>
+
+            <div className="flex items-center gap-3" style={ui.headerActions}>
+              <button style={ui.headerSearch} title="Search">
+                <Search className="h-4 w-4" />
+                <span>Search</span>
+                <span style={ui.keycap}>Cmd K</span>
+              </button>
+              <button style={ui.iconButton} title="Notifications">
+                <Bell className="h-5 w-5" />
+              </button>
+              <button style={ui.iconButton} title="Theme">
+                <Moon className="h-5 w-5" />
+              </button>
+              <button style={ui.iconButton} title="Documentation">
+                <BookText className="h-5 w-5" />
+              </button>
+              <button style={ui.iconButton} title="AI Assistant">
+                <Bot className="h-5 w-5" />
+              </button>
+              <div style={ui.headerStatus}>
+                <FreshDot active={health.tone === 'emerald'} />
+                <span style={{ fontSize: 14, fontWeight: 650, color: health.tone === 'emerald' ? '#334155' : '#92400e' }}>
+                  {health.label}
+                </span>
+              </div>
+              <div style={ui.userBadge}>
+                <UserCircle className="h-5 w-5 text-slate-500" />
+                <span style={{ fontSize: 14, fontWeight: 650, color: '#334155' }}>operator</span>
+                <span style={ui.rolePill}>Admin</span>
+                <LogOut className="h-4 w-4 text-slate-400" />
+              </div>
             </div>
           </div>
-          <nav style={ui.sideNav}>
-            {navGroups.map((group) => (
-              <div key={group.label}>
-                <div style={ui.sideGroupLabel}>{group.label}</div>
-                {group.items.map((item) => {
-                  const Icon = item.icon
-                  const active = 'active' in item && item.active
-                  return (
+        </header>
+
+        <div style={ui.bodyShell}>
+          <aside style={ui.sidebar}>
+            <nav style={ui.sideNav}>
+              {navGroups.map((group) => (
+                <div key={group.label}>
+                  <div style={ui.sideGroupLabel}>{group.label}</div>
+                  {group.items.map((item) => {
+                    const Icon = item.icon
+                    const active = 'active' in item && item.active
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        style={{
+                          ...ui.sideButton,
+                          ...(active ? ui.sideButtonActive : ui.sideButtonMuted),
+                        }}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {item.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
+            </nav>
+            <div style={ui.sideFooter}>
+              <div style={ui.sideFooterCard}>
+                <div style={{ fontSize: 13, fontWeight: 750, color: '#075985' }}>Observe-only</div>
+                <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.45, color: '#0369a1' }}>
+                  Controls remain staged until approval and rollback are ready.
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <div style={ui.contentArea}>
+            <div style={ui.breadcrumb}>
+              <span>Aegis</span>
+              <span>/</span>
+              <span style={{ color: '#0f172a', fontWeight: 650 }}>Dashboard</span>
+            </div>
+            <div style={ui.scrollArea}>
+              <main className="mx-auto max-w-[1500px] px-5 py-6" style={ui.main}>
+                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between" style={ui.titleRow}>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2" style={ui.titleLine}>
+                      <h1 className="text-2xl font-bold text-slate-950" style={ui.pageTitle}>Dashboard</h1>
+                      <StatusChip tone={health.tone} label={health.text} />
+                    </div>
+                    <p className="mt-2 text-sm text-slate-500" style={ui.subtitle}>
+                      Overall status, coverage, AI activity, and endpoint drill-in for the Aegis fleet.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <div className="text-sm text-slate-500" style={ui.mutedText}>
+                      {lastRefresh ? `Last updated ${lastRefresh.toLocaleTimeString()}` : 'Waiting for refresh'}
+                    </div>
                     <button
-                      key={item.id}
-                      type="button"
-                      style={{
-                        ...ui.sideButton,
-                        ...(active ? ui.sideButtonActive : ui.sideButtonMuted),
-                      }}
+                      onClick={fetchDashboard}
+                      className="inline-flex h-9 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-gray-50"
+                      style={ui.button}
                     >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
+                      <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                      Refresh
                     </button>
-                  )
-                })}
-              </div>
-            ))}
-          </nav>
-          <div style={ui.sideFooter}>
-            <div style={ui.sideFooterCard}>
-              <div style={{ fontSize: 13, fontWeight: 750, color: '#075985' }}>Observe-only</div>
-              <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.45, color: '#0369a1' }}>
-                Controls remain staged until approval and rollback are ready.
-              </div>
-            </div>
-          </div>
-        </aside>
+                  </div>
+                </div>
 
-        <div style={ui.contentArea}>
-          <header className="border-b border-gray-200 bg-white shadow-sm" style={ui.header}>
-        <div className="flex h-16 items-center justify-between px-5" style={ui.headerInner}>
-          <div className="flex items-center gap-3" style={ui.brandRow}>
-            <div>
-              <div className="text-lg font-semibold leading-5 text-slate-950" style={ui.brandTitle}>Dashboard</div>
-              <div className="text-xs text-slate-500" style={ui.mutedSmall}>Overall Aegis status and endpoint drill-in</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3" style={ui.headerActions}>
-            <StatusChip tone={health.tone} label={health.label} />
-            <button
-              onClick={fetchDashboard}
-              className="inline-flex h-9 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-gray-50"
-              style={ui.button}
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
-        </div>
-          </header>
-
-      <main className="mx-auto max-w-[1500px] px-5 py-6" style={ui.main}>
-        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between" style={ui.titleRow}>
-          <div>
-            <div className="flex flex-wrap items-center gap-2" style={ui.titleLine}>
-              <h1 className="text-2xl font-bold text-slate-950" style={ui.pageTitle}>Dashboard</h1>
-              <StatusChip tone={health.tone} label={health.text} />
-            </div>
-            <p className="mt-2 text-sm text-slate-500" style={ui.subtitle}>
-              Overall status, coverage, AI activity, and endpoint drill-in for the Aegis fleet.
-            </p>
-          </div>
-          <div className="text-sm text-slate-500" style={ui.mutedText}>
-            {lastRefresh ? `Last updated ${lastRefresh.toLocaleTimeString()}` : 'Waiting for refresh'}
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-4 flex items-center gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            <AlertTriangle className="h-4 w-4" />
-            {error}
-          </div>
-        )}
+                {error && (
+                  <div className="mb-4 flex items-center gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    <AlertTriangle className="h-4 w-4" />
+                    {error}
+                  </div>
+                )}
 
         <section className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]" style={ui.heroGrid}>
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" style={ui.card}>
@@ -675,6 +797,8 @@ export default function AegisDashboard() {
           <AgentDetailPanel detail={selectedDetail} />
         </section>
       </main>
+        </div>
+      </div>
         </div>
       </div>
     </div>
