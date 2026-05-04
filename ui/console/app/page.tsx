@@ -368,11 +368,12 @@ const ui: Record<string, CSSProperties> = {
     height: 42,
     borderRadius: 10,
     background: '#020617',
-    color: '#fff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  logoImage: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
   headerSearch: {
     height: 34,
     display: 'inline-flex',
@@ -574,7 +575,7 @@ export default function AegisDashboard() {
           <div className="flex h-16 items-center justify-between px-5" style={ui.headerInner}>
             <div style={ui.headerLogo}>
               <div style={ui.headerLogoMark}>
-                <ShieldCheck className="h-5 w-5 text-white" />
+                <img src="/aegisflux-icon.svg" alt="AegisFlux" style={ui.logoImage} />
               </div>
               <div>
                 <div style={ui.brandTitle}>AegisFlux</div>

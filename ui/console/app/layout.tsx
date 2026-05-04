@@ -4,6 +4,11 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'AegisFlux Console',
   description: 'Agent Management and Network Security Policy Builder',
+  icons: {
+    icon: '/aegisflux-icon.svg',
+    shortcut: '/aegisflux-icon.svg',
+    apple: '/aegisflux-icon.svg',
+  },
 }
 
 export default function RootLayout({

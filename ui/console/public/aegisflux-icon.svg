@@ -1,0 +1,37 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="96" fill="#020617"/>
+  <path d="M256 45C205 79 151 96 91 101C77 239 113 351 256 467C399 351 435 239 421 101C361 96 307 79 256 45Z" fill="#06101f" stroke="url(#steel)" stroke-width="18"/>
+  <path d="M256 68C211 96 164 111 113 117C103 236 138 333 256 433C374 333 409 236 399 117C348 111 301 96 256 68Z" stroke="#0ea5ff" stroke-width="5" opacity="0.75"/>
+  <path d="M256 78V431" stroke="#1d9bff" stroke-width="4" opacity="0.9"/>
+  <path d="M104 334C160 282 186 224 210 144" stroke="#0ea5ff" stroke-width="5" opacity="0.65"/>
+  <path d="M88 271H123L154 302" stroke="#0ea5ff" stroke-width="5" opacity="0.8"/>
+  <path d="M127 208L164 245V293" stroke="#0ea5ff" stroke-width="5" opacity="0.75"/>
+  <path d="M166 159L188 181V229" stroke="#0ea5ff" stroke-width="5" opacity="0.75"/>
+  <circle cx="88" cy="271" r="8" fill="#020617" stroke="#0ea5ff" stroke-width="5"/>
+  <circle cx="127" cy="208" r="8" fill="#020617" stroke="#0ea5ff" stroke-width="5"/>
+  <circle cx="166" cy="159" r="8" fill="#020617" stroke="#0ea5ff" stroke-width="5"/>
+  <path d="M292 132H344L370 177L344 222H292L266 177L292 132Z" stroke="#0b68d8" stroke-width="4" opacity="0.7"/>
+  <path d="M344 222H396L422 267L396 312H344L318 267L344 222Z" stroke="#0b68d8" stroke-width="4" opacity="0.55"/>
+  <path d="M292 312H344L370 357L344 402H292L266 357L292 312Z" stroke="#0b68d8" stroke-width="4" opacity="0.45"/>
+  <path d="M181 389L255 112L333 389H283L269 339H217L204 389H181Z" fill="url(#letter)" stroke="#e8f4ff" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M228 298H258L243 240L228 298Z" fill="#06101f" stroke="#e8f4ff" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M69 360C130 409 229 421 329 392C395 373 443 333 471 293" stroke="url(#orbit)" stroke-width="9" stroke-linecap="round" opacity="0.9"/>
+  <path d="M51 395C130 447 273 446 381 378" stroke="#0ea5ff" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
+  <defs>
+    <linearGradient id="steel" x1="102" y1="77" x2="390" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8fafc"/>
+      <stop offset="0.44" stop-color="#94a3b8"/>
+      <stop offset="1" stop-color="#334155"/>
+    </linearGradient>
+    <linearGradient id="letter" x1="197" y1="126" x2="322" y2="393" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8fafc"/>
+      <stop offset="0.48" stop-color="#cbd5e1"/>
+      <stop offset="1" stop-color="#475569"/>
+    </linearGradient>
+    <linearGradient id="orbit" x1="57" y1="353" x2="471" y2="308" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0284c7"/>
+      <stop offset="0.5" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+</svg>
