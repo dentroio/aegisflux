@@ -1,0 +1,25 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "windows-dev-agent-01-1777895900000-301",
+  "event_type": "aegis.sase_component.observed",
+  "timestamp_ms": 1777895900000,
+  "source": "aegis-windows-agent",
+  "device_id": "windows-dev-agent-01",
+  "agent_id": "windows-dev-agent-01",
+  "sensor_version": "0.1.0",
+  "sequence": 301,
+  "payload": {
+    "component_type": "service",
+    "vendor": "Zscaler",
+    "product": "Zscaler Client Connector",
+    "name": "Zscaler Client Connector",
+    "version": null,
+    "status": "Running",
+    "source": "ZSAService",
+    "evidence": [
+      "ZSAService",
+      "Zscaler Client Connector"
+    ],
+    "collection_method": "windows.service_control_manager"
+  }
+}

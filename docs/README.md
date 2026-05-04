@@ -22,6 +22,10 @@ Welcome to the AegisFlux documentation. This directory contains comprehensive gu
 - **[Backend Overview](backend/README.md)** - Overview of all backend services
 - **[Agent Integration](agents/README.md)** - Agent architecture and integration
 - **[Capabilities](capabilities/README.md)** - System capabilities and features
+- **[Aegis Platform Vision](AEGIS_PLATFORM_VISION.md)** - Product direction for AI visibility, governance, and Clarion integration
+- **[Sensor Fusion Architecture](AEGIS_SENSOR_FUSION_ARCHITECTURE.md)** - Endpoint, browser, network, SASE, and Clarion evidence model
+- **[Agent Performance Architecture](AEGIS_AGENT_PERFORMANCE_ARCHITECTURE.md)** - Low-resource Windows/Linux agent design constraints and budgets
+- **[UI Clarion Alignment](AEGIS_UI_CLARION_ALIGNMENT.md)** - Aegis management UI direction aligned to Clarion frontend patterns
 
 ### Development
 - **[Backend Safety Shim](BACKEND_SAFETY_SHIM.md)** - Safety mechanisms and safeguards

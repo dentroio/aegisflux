@@ -7,6 +7,8 @@ The Aegis Windows Agent is the planned Windows visibility and local-control comp
 - Process inventory and process lineage
 - Process-to-flow attribution
 - DNS/domain observations
+- Browser history and browser extension inventory
+- SSE/SASE endpoint component inventory
 - Non-blocking AI-agent and automation detection evidence
 - Signed/outbound telemetry path preparation
 
@@ -17,6 +19,8 @@ Current Windows lab collection uses:
 - `sysinfo` process snapshots for process inventory and lineage
 - `netstat -ano` snapshots for TCP/UDP socket to PID attribution
 - `ipconfig /displaydns` snapshots for DNS cache observations
+- Chromium profile artifacts for Edge/Chrome/Brave browser history and extension inventory
+- Windows uninstall registry, services, process snapshots, network adapters, and proxy settings for SSE/SASE inventory
 
 The network and DNS collectors are intended for Phase 1 evidence capture. ETW/IP Helper and DNS Client ETW collectors should replace these snapshot methods before production use.
 
@@ -28,7 +32,20 @@ The Windows agent emits Phase 1 visibility events that must conform to:
 ../../schemas/visibility/
 ```
 
-Start with [../../schemas/visibility/agent-heartbeat.schema.json](../../schemas/visibility/agent-heartbeat.schema.json), [../../schemas/visibility/process-started.schema.json](../../schemas/visibility/process-started.schema.json), [../../schemas/visibility/flow-started.schema.json](../../schemas/visibility/flow-started.schema.json), and [../../schemas/visibility/dns-observed.schema.json](../../schemas/visibility/dns-observed.schema.json).
+Start with [../../schemas/visibility/agent-heartbeat.schema.json](../../schemas/visibility/agent-heartbeat.schema.json), [../../schemas/visibility/process-started.schema.json](../../schemas/visibility/process-started.schema.json), [../../schemas/visibility/flow-started.schema.json](../../schemas/visibility/flow-started.schema.json), [../../schemas/visibility/dns-observed.schema.json](../../schemas/visibility/dns-observed.schema.json), [../../schemas/visibility/browser-extension-observed.schema.json](../../schemas/visibility/browser-extension-observed.schema.json), and [../../schemas/visibility/sase-component-observed.schema.json](../../schemas/visibility/sase-component-observed.schema.json).
+
+## Current Collectors
+
+| Collector | Event Types | Evidence Source | Production Direction |
+|-----------|-------------|-----------------|----------------------|
+| `windows.process` | `aegis.process.started` | `sysinfo` process snapshot | ETW/process lifecycle plus signer/hash enrichment |
+| `windows.network` | `aegis.flow.started` | `netstat -ano` | ETW/WFP/IP Helper with stronger process attribution |
+| `windows.dns` | `aegis.dns.observed` | `ipconfig /displaydns` | DNS Client ETW and resolver integrations |
+| `windows.browser_history` | `aegis.dns.observed` | Copied Chromium SQLite history | Browser-specific collectors and policy-aware access |
+| `windows.browser_extensions` | `aegis.browser_extension.observed` | Chromium extension manifests | Extension reputation, enterprise policy, and store metadata |
+| `windows.sase_inventory` | `aegis.sase_component.observed` | Installed products, services, processes, adapters, and proxy settings | Vendor APIs, posture exports, and Clarion enrichment |
+
+The SSE/SASE inventory collector currently matches known enterprise access and security clients by vendor/product signatures. The initial catalog includes Zscaler, Palo Alto Networks GlobalProtect/Prisma Access, Cisco Secure Client/Umbrella, Netskope, Cloudflare WARP, iboss, Fortinet, Check Point, Cato Networks, and Tailscale. Unknown proxy/PAC configuration is still emitted as `vendor: "unknown"` because it tells Aegis that endpoint traffic may be visible or controlled through another enterprise plane.
 
 ## Security Baseline
 

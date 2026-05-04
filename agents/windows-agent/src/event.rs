@@ -160,6 +160,28 @@ pub enum EventPayload {
         /// Collection method.
         collection_method: String,
     },
+    /// SSE/SASE endpoint component inventory payload.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    SaseComponentObserved {
+        /// Component category, such as installed_product, service, process, network_adapter, or proxy_config.
+        component_type: String,
+        /// Matched vendor or unknown when the control plane cannot be identified locally.
+        vendor: String,
+        /// Product family or service name when available.
+        product: String,
+        /// Component display name.
+        name: String,
+        /// Component version when available.
+        version: Option<String>,
+        /// Component state when available.
+        status: Option<String>,
+        /// Local evidence source that produced the observation.
+        source: String,
+        /// Evidence strings that explain why the component matched.
+        evidence: Vec<String>,
+        /// Collection method.
+        collection_method: String,
+    },
     /// Non-blocking AI-agent or automation detection payload.
     AgentDetected {
         /// Stable detection identifier.
@@ -377,6 +399,28 @@ impl AegisEvent {
                 string_array_json(permissions),
                 string_array_json(host_permissions),
                 escape_json(path),
+                escape_json(collection_method)
+            ),
+            EventPayload::SaseComponentObserved {
+                component_type,
+                vendor,
+                product,
+                name,
+                version,
+                status,
+                source,
+                evidence,
+                collection_method,
+            } => format!(
+                r#"{{"component_type":"{}","vendor":"{}","product":"{}","name":"{}","version":{},"status":{},"source":"{}","evidence":{},"collection_method":"{}"}}"#,
+                escape_json(component_type),
+                escape_json(vendor),
+                escape_json(product),
+                escape_json(name),
+                option_json(version.as_deref()),
+                option_json(status.as_deref()),
+                escape_json(source),
+                string_array_json(evidence),
                 escape_json(collection_method)
             ),
             EventPayload::AgentDetected {

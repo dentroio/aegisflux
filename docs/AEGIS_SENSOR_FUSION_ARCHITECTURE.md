@@ -123,6 +123,8 @@ This may come from endpoint, proxy, SASE, firewall, or Clarion integrations rath
 
 Aegis should inventory SSE/SASE endpoint presence, including agents, services, browser extensions, tunnel adapters, PAC/proxy settings, certificates, and active flows. Examples include Zscaler Client Connector, Palo Alto GlobalProtect/Prisma Access components, Cisco Secure Client/Umbrella modules, Netskope Client, Cloudflare WARP, iboss, and similar enterprise access/security clients. This inventory tells Aegis whether an endpoint has a network security control plane available, whether traffic should be visible elsewhere, and which integration path Clarion can use for enrichment.
 
+The normalized SSE/SASE event is `aegis.sase_component.observed`. Each event should identify the component type, vendor, product, display name, version when available, status when available, evidence source, and collection method. The first Windows collector observes installed products, services, running processes, network adapters, and proxy/PAC configuration. Later collectors should add certificates, browser policy, SASE client posture, and vendor API state.
+
 ### Layer 6: Local AI Runtime and Tool Bridges
 
 Collect:
@@ -185,9 +187,10 @@ Example confidence levels:
 3. Add detection-pack schema so indicators can update without rebuilding agents.
 4. Add DNS-to-flow correlation by recent answer IP.
 5. Add browser extension inventory.
-6. Add local AI runtime and MCP config discovery.
-7. Add ETW DNS Client collection.
-8. Add proxy/SNI enrichment through Clarion or gateway integrations.
+6. Add SSE/SASE endpoint component inventory.
+7. Add local AI runtime and MCP config discovery.
+8. Add ETW DNS Client collection.
+9. Add proxy/SNI enrichment through Clarion or gateway integrations.
 
 ## Clarion Role
 

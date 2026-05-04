@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aegisflux.local/schemas/visibility/sase-component-observed.schema.json",
+  "title": "Aegis SSE/SASE Component Observed",
+  "allOf": [
+    {
+      "$ref": "common-envelope.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "aegis.sase_component.observed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "component_type": {
+              "type": "string",
+              "enum": [
+                "installed_product",
+                "service",
+                "process",
+                "network_adapter",
+                "proxy_config"
+              ]
+            },
+            "vendor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "product": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": ["string", "null"]
+            },
+            "status": {
+              "type": ["string", "null"]
+            },
+            "source": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "collection_method": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "component_type",
+            "vendor",
+            "product",
+            "name",
+            "source",
+            "evidence",
+            "collection_method"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

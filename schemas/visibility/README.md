@@ -41,6 +41,8 @@ visibility.v1
 | `aegis.flow.started` | [flow-started.schema.json](flow-started.schema.json) |
 | `aegis.flow.ended` | [flow-ended.schema.json](flow-ended.schema.json) |
 | `aegis.dns.observed` | [dns-observed.schema.json](dns-observed.schema.json) |
+| `aegis.browser_extension.observed` | [browser-extension-observed.schema.json](browser-extension-observed.schema.json) |
+| `aegis.sase_component.observed` | [sase-component-observed.schema.json](sase-component-observed.schema.json) |
 | `aegis.agent.detected` | [agent-detected.schema.json](agent-detected.schema.json) |
 | `aegis.risk_finding.created` | [risk-finding-created.schema.json](risk-finding-created.schema.json) |
 

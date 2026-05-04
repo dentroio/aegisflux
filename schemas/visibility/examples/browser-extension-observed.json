@@ -1,0 +1,29 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "windows-dev-agent-01-1777895900000-300",
+  "event_type": "aegis.browser_extension.observed",
+  "timestamp_ms": 1777895900000,
+  "source": "aegis-windows-agent",
+  "device_id": "windows-dev-agent-01",
+  "agent_id": "windows-dev-agent-01",
+  "sensor_version": "0.1.0",
+  "sequence": 300,
+  "payload": {
+    "browser": "edge:rachel.martinez:Default",
+    "profile": "rachel.martinez/Default",
+    "extension_id": "ghbmnnjooekpmoecnnnilnnbdlolhkhi",
+    "name": "Google Docs Offline",
+    "version": "1.104.1",
+    "manifest_version": 3,
+    "permissions": [
+      "alarms",
+      "storage"
+    ],
+    "host_permissions": [
+      "https://docs.google.com/*",
+      "https://drive.google.com/*"
+    ],
+    "path": "C:\\Users\\rachel.martinez\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Extensions\\ghbmnnjooekpmoecnnnilnnbdlolhkhi\\1.104.1_0\\manifest.json",
+    "collection_method": "windows.chromium_extension_manifest"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aegisflux.local/schemas/visibility/browser-extension-observed.schema.json",
+  "title": "Aegis Browser Extension Observed",
+  "allOf": [
+    {
+      "$ref": "common-envelope.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "aegis.browser_extension.observed"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "browser": {
+              "type": "string",
+              "minLength": 1
+            },
+            "profile": {
+              "type": "string",
+              "minLength": 1
+            },
+            "extension_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "manifest_version": {
+              "type": ["integer", "null"],
+              "minimum": 1
+            },
+            "permissions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "host_permissions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "collection_method": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "browser",
+            "profile",
+            "extension_id",
+            "name",
+            "version",
+            "permissions",
+            "host_permissions",
+            "path",
+            "collection_method"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}
