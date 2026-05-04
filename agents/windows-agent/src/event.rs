@@ -136,6 +136,30 @@ pub enum EventPayload {
         /// Correlation confidence.
         correlation_confidence: f32,
     },
+    /// Browser extension inventory payload.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    BrowserExtensionObserved {
+        /// Browser family or embedded browser host.
+        browser: String,
+        /// Browser profile name.
+        profile: String,
+        /// Extension identifier.
+        extension_id: String,
+        /// Extension display name from manifest.
+        name: String,
+        /// Extension version from manifest.
+        version: String,
+        /// Manifest version.
+        manifest_version: Option<u32>,
+        /// Requested browser extension permissions.
+        permissions: Vec<String>,
+        /// Requested host permissions or URL patterns.
+        host_permissions: Vec<String>,
+        /// Manifest path.
+        path: String,
+        /// Collection method.
+        collection_method: String,
+    },
     /// Non-blocking AI-agent or automation detection payload.
     AgentDetected {
         /// Stable detection identifier.
@@ -330,6 +354,30 @@ impl AegisEvent {
                 option_u32_json(*pid),
                 escape_json(correlation_method),
                 finite_f32_json(*correlation_confidence)
+            ),
+            EventPayload::BrowserExtensionObserved {
+                browser,
+                profile,
+                extension_id,
+                name,
+                version,
+                manifest_version,
+                permissions,
+                host_permissions,
+                path,
+                collection_method,
+            } => format!(
+                r#"{{"browser":"{}","profile":"{}","extension_id":"{}","name":"{}","version":"{}","manifest_version":{},"permissions":{},"host_permissions":{},"path":"{}","collection_method":"{}"}}"#,
+                escape_json(browser),
+                escape_json(profile),
+                escape_json(extension_id),
+                escape_json(name),
+                escape_json(version),
+                option_u32_json(*manifest_version),
+                string_array_json(permissions),
+                string_array_json(host_permissions),
+                escape_json(path),
+                escape_json(collection_method)
             ),
             EventPayload::AgentDetected {
                 detection_id,

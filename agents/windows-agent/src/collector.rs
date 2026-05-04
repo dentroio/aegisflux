@@ -22,6 +22,7 @@ pub struct CollectorSet {
     network: NetworkCollector,
     dns: DnsCollector,
     browser_history: BrowserHistoryCollector,
+    browser_extensions: BrowserExtensionCollector,
 }
 
 impl CollectorSet {
@@ -32,6 +33,7 @@ impl CollectorSet {
             &self.network,
             &self.dns,
             &self.browser_history,
+            &self.browser_extensions,
         ]
     }
 }
@@ -47,6 +49,9 @@ struct DnsCollector;
 
 #[derive(Debug, Default)]
 struct BrowserHistoryCollector;
+
+#[derive(Debug, Default)]
+struct BrowserExtensionCollector;
 
 impl Collector for ProcessCollector {
     fn name(&self) -> &'static str {
@@ -176,6 +181,27 @@ impl Collector for BrowserHistoryCollector {
             self.name(),
             "pending",
             windows_only_message("browser history collector requires Windows browser profiles"),
+        )])
+    }
+}
+
+impl Collector for BrowserExtensionCollector {
+    fn name(&self) -> &'static str {
+        "windows.browser_extensions"
+    }
+
+    fn collect_once(&self, config: &AgentConfig) -> Result<Vec<AegisEvent>, String> {
+        #[cfg(windows)]
+        {
+            return collect_windows_browser_extensions(config, self.name());
+        }
+
+        #[cfg(not(windows))]
+        Ok(vec![collector_status(
+            config,
+            self.name(),
+            "pending",
+            windows_only_message("browser extension collector requires Windows browser profiles"),
         )])
     }
 }
@@ -444,6 +470,70 @@ fn collect_windows_browser_history(
 }
 
 #[cfg(windows)]
+fn collect_windows_browser_extensions(
+    config: &AgentConfig,
+    collector_name: &str,
+) -> Result<Vec<AegisEvent>, String> {
+    let profiles = browser_profile_roots();
+    let mut observations = Vec::new();
+
+    for profile in profiles {
+        observations.extend(read_browser_extension_observations(&profile));
+    }
+
+    observations.sort_by(|left, right| {
+        left.browser
+            .cmp(&right.browser)
+            .then(left.profile.cmp(&right.profile))
+            .then(left.extension_id.cmp(&right.extension_id))
+            .then(left.version.cmp(&right.version))
+    });
+    observations.dedup_by(|left, right| {
+        left.browser == right.browser
+            && left.profile == right.profile
+            && left.extension_id == right.extension_id
+            && left.version == right.version
+    });
+
+    let mut events = vec![collector_status(
+        config,
+        collector_name,
+        "healthy",
+        format!(
+            "browser extension collector observed {} extensions across {} profiles",
+            observations.len(),
+            observations
+                .iter()
+                .map(|observation| (&observation.browser, &observation.profile))
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+        ),
+    )];
+
+    for observation in observations.into_iter().take(300) {
+        events.push(AegisEvent::new(
+            config,
+            "aegis.browser_extension.observed",
+            SystemTime::now(),
+            EventPayload::BrowserExtensionObserved {
+                browser: observation.browser,
+                profile: observation.profile,
+                extension_id: observation.extension_id,
+                name: observation.name,
+                version: observation.version,
+                manifest_version: observation.manifest_version,
+                permissions: observation.permissions,
+                host_permissions: observation.host_permissions,
+                path: observation.path,
+                collection_method: "windows.chromium_extension_manifest".to_string(),
+            },
+        ));
+    }
+
+    Ok(events)
+}
+
+#[cfg(windows)]
 #[derive(Debug, Clone)]
 struct BrowserHistoryProfile {
     browser: String,
@@ -452,8 +542,28 @@ struct BrowserHistoryProfile {
 
 #[cfg(windows)]
 fn browser_history_paths() -> Vec<BrowserHistoryProfile> {
+    browser_profile_roots()
+        .into_iter()
+        .map(|profile| BrowserHistoryProfile {
+            browser: profile.browser,
+            history_path: profile.root.join("History"),
+        })
+        .collect()
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone)]
+struct BrowserProfileRoot {
+    browser: String,
+    profile: String,
+    root: std::path::PathBuf,
+}
+
+#[cfg(windows)]
+fn browser_profile_roots() -> Vec<BrowserProfileRoot> {
     let mut profiles = Vec::new();
     for local_app_data in browser_local_app_data_roots() {
+        let account = windows_account_from_local_app_data(&local_app_data);
         let browser_roots = [
             ("edge", local_app_data.join(r"Microsoft\Edge\User Data")),
             ("chrome", local_app_data.join(r"Google\Chrome\User Data")),
@@ -464,11 +574,22 @@ fn browser_history_paths() -> Vec<BrowserHistoryProfile> {
         ];
 
         for (browser, root) in browser_roots {
-            collect_browser_profiles(browser, &root, &mut profiles);
+            collect_browser_profiles(browser, &account, &root, &mut profiles);
         }
     }
 
     profiles
+}
+
+#[cfg(windows)]
+fn windows_account_from_local_app_data(local_app_data: &std::path::Path) -> String {
+    local_app_data
+        .parent()
+        .and_then(|path| path.parent())
+        .and_then(|path| path.file_name())
+        .map(|value| value.to_string_lossy().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "current-user".to_string())
 }
 
 #[cfg(windows)]
@@ -494,18 +615,20 @@ fn browser_local_app_data_roots() -> Vec<std::path::PathBuf> {
 #[cfg(windows)]
 fn collect_browser_profiles(
     browser: &str,
+    account: &str,
     root: &std::path::Path,
-    profiles: &mut Vec<BrowserHistoryProfile>,
+    profiles: &mut Vec<BrowserProfileRoot>,
 ) {
     if !root.exists() {
         return;
     }
 
     for profile_name in ["Default", "Profile 1", "Profile 2", "Profile 3"] {
-        let history_path = root.join(profile_name).join("History");
-        profiles.push(BrowserHistoryProfile {
-            browser: format!("{browser}:{profile_name}"),
-            history_path,
+        let profile_root = root.join(profile_name);
+        profiles.push(BrowserProfileRoot {
+            browser: format!("{browser}:{account}:{profile_name}"),
+            profile: format!("{account}/{profile_name}"),
+            root: profile_root,
         });
     }
 
@@ -515,13 +638,145 @@ fn collect_browser_profiles(
             if !file_name.starts_with("Profile ") {
                 continue;
             }
-            let history_path = entry.path().join("History");
-            profiles.push(BrowserHistoryProfile {
-                browser: format!("{browser}:{file_name}"),
-                history_path,
+            profiles.push(BrowserProfileRoot {
+                browser: format!("{browser}:{account}:{file_name}"),
+                profile: format!("{account}/{file_name}"),
+                root: entry.path(),
             });
         }
     }
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BrowserExtensionObservation {
+    browser: String,
+    profile: String,
+    extension_id: String,
+    name: String,
+    version: String,
+    manifest_version: Option<u32>,
+    permissions: Vec<String>,
+    host_permissions: Vec<String>,
+    path: String,
+}
+
+#[cfg(windows)]
+fn read_browser_extension_observations(
+    profile: &BrowserProfileRoot,
+) -> Vec<BrowserExtensionObservation> {
+    let extensions_root = profile.root.join("Extensions");
+    let mut observations = Vec::new();
+    let entries = match std::fs::read_dir(extensions_root) {
+        Ok(entries) => entries,
+        Err(_) => return observations,
+    };
+
+    for extension_entry in entries.flatten() {
+        let extension_id = extension_entry.file_name().to_string_lossy().to_string();
+        if !is_chromium_extension_id(&extension_id) {
+            continue;
+        }
+        if let Ok(version_entries) = std::fs::read_dir(extension_entry.path()) {
+            for version_entry in version_entries.flatten() {
+                let manifest_path = version_entry.path().join("manifest.json");
+                if let Some(manifest) = parse_extension_manifest(&manifest_path) {
+                    observations.push(BrowserExtensionObservation {
+                        browser: profile.browser.clone(),
+                        profile: profile.profile.clone(),
+                        extension_id: extension_id.clone(),
+                        name: manifest.name,
+                        version: manifest.version,
+                        manifest_version: manifest.manifest_version,
+                        permissions: manifest.permissions,
+                        host_permissions: manifest.host_permissions,
+                        path: manifest_path.display().to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    observations
+}
+
+#[cfg(any(windows, test))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ExtensionManifestSummary {
+    name: String,
+    version: String,
+    manifest_version: Option<u32>,
+    permissions: Vec<String>,
+    host_permissions: Vec<String>,
+}
+
+#[cfg(windows)]
+fn parse_extension_manifest(path: &std::path::Path) -> Option<ExtensionManifestSummary> {
+    let raw = std::fs::read_to_string(path).ok()?;
+    parse_extension_manifest_json(&raw)
+}
+
+#[cfg(any(windows, test))]
+fn parse_extension_manifest_json(raw: &str) -> Option<ExtensionManifestSummary> {
+    let value: serde_json::Value = serde_json::from_str(raw).ok()?;
+    let object = value.as_object()?;
+    let name = object
+        .get("name")
+        .and_then(|value| value.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let version = object
+        .get("version")
+        .and_then(|value| value.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let manifest_version = object
+        .get("manifest_version")
+        .and_then(|value| value.as_u64())
+        .and_then(|value| u32::try_from(value).ok());
+    let permissions = string_array_field(object, "permissions");
+    let mut host_permissions = string_array_field(object, "host_permissions");
+    for permission in &permissions {
+        if looks_like_host_permission(permission) && !host_permissions.contains(permission) {
+            host_permissions.push(permission.clone());
+        }
+    }
+
+    Some(ExtensionManifestSummary {
+        name,
+        version,
+        manifest_version,
+        permissions,
+        host_permissions,
+    })
+}
+
+#[cfg(any(windows, test))]
+fn string_array_field(
+    object: &serde_json::Map<String, serde_json::Value>,
+    field: &str,
+) -> Vec<String> {
+    object
+        .get(field)
+        .and_then(|value| value.as_array())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_str())
+                .map(|value| value.to_string())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[cfg(any(windows, test))]
+fn looks_like_host_permission(value: &str) -> bool {
+    value.contains("://") || value == "<all_urls>"
+}
+
+#[cfg(windows)]
+fn is_chromium_extension_id(value: &str) -> bool {
+    value.len() == 32 && value.chars().all(|ch| matches!(ch, 'a'..='p'))
 }
 
 #[cfg(windows)]
@@ -856,8 +1111,8 @@ mod tests {
     use crate::event::{AegisEvent, EventPayload};
 
     use super::{
-        enrich_flow_hostnames, host_from_url, parse_ipconfig_displaydns, parse_netstat_ano,
-        parse_socket_addr,
+        enrich_flow_hostnames, host_from_url, parse_extension_manifest_json,
+        parse_ipconfig_displaydns, parse_netstat_ano, parse_socket_addr,
     };
 
     #[test]
@@ -984,6 +1239,30 @@ Windows IP Configuration
             } => assert_eq!(remote_hostname.as_deref(), Some("chatgpt.com")),
             _ => panic!("expected flow event"),
         }
+    }
+
+    #[test]
+    fn parses_extension_manifest_inventory_fields() {
+        let manifest = r#"{
+            "manifest_version": 3,
+            "name": "AI Security Extension",
+            "version": "1.2.3",
+            "permissions": ["storage", "tabs", "https://chatgpt.com/*"],
+            "host_permissions": ["https://*.openai.com/*", "<all_urls>"]
+        }"#;
+
+        let parsed = parse_extension_manifest_json(manifest).unwrap();
+
+        assert_eq!(parsed.name, "AI Security Extension");
+        assert_eq!(parsed.version, "1.2.3");
+        assert_eq!(parsed.manifest_version, Some(3));
+        assert!(parsed.permissions.contains(&"tabs".to_string()));
+        assert!(parsed.host_permissions.contains(&"<all_urls>".to_string()));
+        assert!(
+            parsed
+                .host_permissions
+                .contains(&"https://chatgpt.com/*".to_string())
+        );
     }
 
     fn test_config() -> AgentConfig {

@@ -101,6 +101,8 @@ Detect:
 
 The first Windows implementation should read recent Edge/Chrome/Brave history from copied SQLite snapshots and emit low-confidence domain observations.
 
+Enterprise browsers should be treated as first-class browser evidence sources. Chromium-based enterprise browsers can often be inventoried through the same profile, extension, policy, history, and local-state artifacts used by Edge/Chrome/Brave. Heavily managed browsers may restrict local access; in those cases Aegis should use vendor APIs, policy export, proxy/SSE logs, or Clarion integrations to fill the evidence gap.
+
 ### Layer 5: TLS, SNI, Proxy, and Gateway Evidence
 
 Collect where allowed:
@@ -109,6 +111,7 @@ Collect where allowed:
 - HTTP CONNECT destination from proxy logs.
 - Enterprise gateway labels.
 - Model gateway request metadata.
+- SSE/SASE client and connector inventory.
 
 Detect:
 
@@ -117,6 +120,8 @@ Detect:
 - Approved vs unapproved model providers.
 
 This may come from endpoint, proxy, SASE, firewall, or Clarion integrations rather than only the endpoint agent.
+
+Aegis should inventory SSE/SASE endpoint presence, including agents, services, browser extensions, tunnel adapters, PAC/proxy settings, certificates, and active flows. Examples include Zscaler Client Connector, Palo Alto GlobalProtect/Prisma Access components, Cisco Secure Client/Umbrella modules, Netskope Client, Cloudflare WARP, iboss, and similar enterprise access/security clients. This inventory tells Aegis whether an endpoint has a network security control plane available, whether traffic should be visible elsewhere, and which integration path Clarion can use for enrichment.
 
 ### Layer 6: Local AI Runtime and Tool Bridges
 
@@ -196,4 +201,3 @@ Clarion should eventually enrich Aegis endpoint evidence with network and enterp
 - Approved model gateway policy.
 
 Aegis owns endpoint truth. Clarion owns enterprise context and orchestration. Together they can detect activity that neither side can reliably prove alone.
-
