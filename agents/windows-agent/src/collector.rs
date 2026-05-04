@@ -21,12 +21,18 @@ pub struct CollectorSet {
     process: ProcessCollector,
     network: NetworkCollector,
     dns: DnsCollector,
+    browser_history: BrowserHistoryCollector,
 }
 
 impl CollectorSet {
     /// Return collectors in deterministic order.
     pub fn collectors(&self) -> Vec<&dyn Collector> {
-        vec![&self.process, &self.network, &self.dns]
+        vec![
+            &self.process,
+            &self.network,
+            &self.dns,
+            &self.browser_history,
+        ]
     }
 }
 
@@ -38,6 +44,9 @@ struct NetworkCollector;
 
 #[derive(Debug, Default)]
 struct DnsCollector;
+
+#[derive(Debug, Default)]
+struct BrowserHistoryCollector;
 
 impl Collector for ProcessCollector {
     fn name(&self) -> &'static str {
@@ -146,6 +155,27 @@ impl Collector for DnsCollector {
             windows_only_message(
                 "DNS observation collector requires Windows DNS Client ETW implementation",
             ),
+        )])
+    }
+}
+
+impl Collector for BrowserHistoryCollector {
+    fn name(&self) -> &'static str {
+        "windows.browser_history"
+    }
+
+    fn collect_once(&self, config: &AgentConfig) -> Result<Vec<AegisEvent>, String> {
+        #[cfg(windows)]
+        {
+            return collect_windows_browser_history(config, self.name());
+        }
+
+        #[cfg(not(windows))]
+        Ok(vec![collector_status(
+            config,
+            self.name(),
+            "pending",
+            windows_only_message("browser history collector requires Windows browser profiles"),
         )])
     }
 }
@@ -311,6 +341,171 @@ fn collect_windows_dns(
     }
 
     Ok(events)
+}
+
+#[cfg(windows)]
+fn collect_windows_browser_history(
+    config: &AgentConfig,
+    collector_name: &str,
+) -> Result<Vec<AegisEvent>, String> {
+    let profiles = browser_history_paths();
+    let mut observed = std::collections::BTreeSet::new();
+    let mut profile_count = 0usize;
+
+    for profile in profiles {
+        if !profile.history_path.exists() {
+            continue;
+        }
+        profile_count += 1;
+        match read_browser_history_hosts(&profile.history_path) {
+            Ok(hosts) => {
+                for host in hosts {
+                    observed.insert((profile.browser.clone(), host));
+                }
+            }
+            Err(_err) => {
+                continue;
+            }
+        }
+    }
+
+    let mut events = vec![collector_status(
+        config,
+        collector_name,
+        "healthy",
+        format!(
+            "browser history collector observed {} domains across {} profiles",
+            observed.len(),
+            profile_count
+        ),
+    )];
+
+    for (browser, host) in observed.into_iter().take(200) {
+        events.push(AegisEvent::new(
+            config,
+            "aegis.dns.observed",
+            SystemTime::now(),
+            EventPayload::DnsObserved {
+                query: host,
+                query_type: Some("BROWSER_HISTORY".to_string()),
+                answers: Vec::new(),
+                resolver: Some(browser),
+                process_guid: None,
+                pid: None,
+                correlation_method: "windows.browser_history.recent_url".to_string(),
+                correlation_confidence: 0.58,
+            },
+        ));
+    }
+
+    Ok(events)
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone)]
+struct BrowserHistoryProfile {
+    browser: String,
+    history_path: std::path::PathBuf,
+}
+
+#[cfg(windows)]
+fn browser_history_paths() -> Vec<BrowserHistoryProfile> {
+    let mut profiles = Vec::new();
+    let local_app_data = match std::env::var("LOCALAPPDATA") {
+        Ok(value) => std::path::PathBuf::from(value),
+        Err(_) => return profiles,
+    };
+
+    let browser_roots = [
+        ("edge", local_app_data.join(r"Microsoft\Edge\User Data")),
+        ("chrome", local_app_data.join(r"Google\Chrome\User Data")),
+        (
+            "brave",
+            local_app_data.join(r"BraveSoftware\Brave-Browser\User Data"),
+        ),
+    ];
+
+    for (browser, root) in browser_roots {
+        collect_browser_profiles(browser, &root, &mut profiles);
+    }
+
+    profiles
+}
+
+#[cfg(windows)]
+fn collect_browser_profiles(
+    browser: &str,
+    root: &std::path::Path,
+    profiles: &mut Vec<BrowserHistoryProfile>,
+) {
+    if !root.exists() {
+        return;
+    }
+
+    for profile_name in ["Default", "Profile 1", "Profile 2", "Profile 3"] {
+        let history_path = root.join(profile_name).join("History");
+        profiles.push(BrowserHistoryProfile {
+            browser: format!("{browser}:{profile_name}"),
+            history_path,
+        });
+    }
+
+    if let Ok(entries) = std::fs::read_dir(root) {
+        for entry in entries.flatten() {
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            if !file_name.starts_with("Profile ") {
+                continue;
+            }
+            let history_path = entry.path().join("History");
+            profiles.push(BrowserHistoryProfile {
+                browser: format!("{browser}:{file_name}"),
+                history_path,
+            });
+        }
+    }
+}
+
+#[cfg(windows)]
+fn read_browser_history_hosts(
+    path: &std::path::Path,
+) -> Result<std::collections::BTreeSet<String>, String> {
+    let temp_path = std::env::temp_dir().join(format!(
+        "aegis-browser-history-{}-{}.sqlite",
+        std::process::id(),
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("history")
+    ));
+    std::fs::copy(path, &temp_path)
+        .map_err(|err| format!("failed to copy browser history {}: {err}", path.display()))?;
+
+    let result = query_browser_history_hosts(&temp_path);
+    let _ = std::fs::remove_file(&temp_path);
+    result
+}
+
+#[cfg(windows)]
+fn query_browser_history_hosts(
+    path: &std::path::Path,
+) -> Result<std::collections::BTreeSet<String>, String> {
+    let connection = rusqlite::Connection::open(path)
+        .map_err(|err| format!("failed to open browser history {}: {err}", path.display()))?;
+    let mut statement = connection
+        .prepare("SELECT url FROM urls ORDER BY last_visit_time DESC LIMIT 500")
+        .map_err(|err| format!("failed to query browser history {}: {err}", path.display()))?;
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|err| format!("failed to read browser history {}: {err}", path.display()))?;
+
+    let mut hosts = std::collections::BTreeSet::new();
+    for row in rows {
+        if let Ok(url) = row {
+            if let Some(host) = host_from_url(&url) {
+                hosts.insert(host);
+            }
+        }
+    }
+    Ok(hosts)
 }
 
 #[cfg(windows)]
@@ -559,9 +754,43 @@ fn record_type_name(value: &str) -> String {
     }
 }
 
+#[cfg(any(windows, test))]
+fn host_from_url(url: &str) -> Option<String> {
+    let (_, rest) = url.split_once("://")?;
+    let authority = rest
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or("")
+        .rsplit('@')
+        .next()
+        .unwrap_or("")
+        .trim();
+    if authority.is_empty() {
+        return None;
+    }
+
+    if let Some(ipv6) = authority.strip_prefix('[') {
+        let host = ipv6.split(']').next()?.to_ascii_lowercase();
+        return (!host.is_empty()).then_some(host);
+    }
+
+    let host = authority
+        .split(':')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    if host.is_empty() || host == "localhost" {
+        None
+    } else {
+        Some(host)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_ipconfig_displaydns, parse_netstat_ano, parse_socket_addr};
+    use super::{host_from_url, parse_ipconfig_displaydns, parse_netstat_ano, parse_socket_addr};
 
     #[test]
     fn parses_netstat_tcp_and_udp_observations() {
@@ -622,6 +851,19 @@ Windows IP Configuration
         assert_eq!(observations[1].query, "model-cname.lab");
         assert_eq!(observations[1].query_type.as_deref(), Some("CNAME"));
         assert_eq!(observations[1].answers, vec!["api.model-gateway.lab"]);
+    }
+
+    #[test]
+    fn extracts_hosts_from_browser_urls() {
+        assert_eq!(
+            host_from_url("https://chatgpt.com/c/abc"),
+            Some("chatgpt.com".to_string())
+        );
+        assert_eq!(
+            host_from_url("https://user@example.openai.com:443/path"),
+            Some("example.openai.com".to_string())
+        );
+        assert_eq!(host_from_url("file:///C:/tmp/report.txt"), None);
     }
 }
 

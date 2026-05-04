@@ -470,6 +470,10 @@ fn is_ai_destination(query: &str) -> bool {
         &[
             "openai.com",
             "chatgpt.com",
+            "chat.openai.com",
+            "oaistatic.com",
+            "oaiusercontent.com",
+            "openaiapi-site.azureedge.net",
             "anthropic.com",
             "claude.ai",
             "gemini.google.com",

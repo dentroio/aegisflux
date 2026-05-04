@@ -50,6 +50,8 @@ The UI and API should make it easy to move from:
 
 finding to process to flow to DNS to draft control to simulation to approval.
 
+The collection strategy should follow [AEGIS_SENSOR_FUSION_ARCHITECTURE.md](AEGIS_SENSOR_FUSION_ARCHITECTURE.md): Aegis must combine process, network, DNS, browser, TLS/proxy, local runtime, config, and baseline signals so modern transports like DoH, HTTP/3, gateways, and agent-to-agent protocols do not create blind spots.
+
 ### 4. Observe-First Control Design
 
 Aegis should never rush to blocking. The platform should draft observe-only controls first, simulate historical impact, stage policy with approval, then enforce only when the evidence and rollback path are strong.
@@ -130,4 +132,3 @@ For Aegis to be first-of-kind, each feature should pass at least one of these te
 - Build management UI early enough that operations do not become invisible.
 - Keep Clarion integration explicit, versioned, and contract-based.
 - Preserve Aegis as an innovation platform while designing for eventual Clarion integration.
-
