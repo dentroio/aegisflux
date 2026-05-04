@@ -96,11 +96,13 @@ type InvestigationData = {
     flows: number
     dns: number
     findings: number
+    draft_controls?: number
   }
   processes: ProcessRecord[]
   flows: FlowRecord[]
   dns: DnsRecord[]
   findings: FindingRecord[]
+  draft_controls?: DraftControl[]
 }
 
 type InvestigationSelection = {
@@ -122,14 +124,16 @@ type DeviceRecord = {
 }
 
 type DraftControl = {
+  control_id: string
   title: string
   mode: string
+  status: string
   action: string
   target: string
   scope: string
   reason: string
   evidence: string[]
-  blastRadius: string[]
+  blast_radius: string[]
   rollback: string[]
 }
 
@@ -680,7 +684,7 @@ function InvestigationPanel({
   selection: InvestigationSelection | null
   investigation: InvestigationData | null
 }) {
-  const draftControl = selection && investigation ? buildDraftControl(selection, investigation) : null
+  const draftControl = investigation?.draft_controls?.[0] || null
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -748,7 +752,7 @@ function DraftControlPanel({ draft }: { draft: DraftControl }) {
           <h3 className="text-sm font-semibold text-slate-950">Draft Control</h3>
         </div>
         <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-          {draft.mode}
+          {displayMode(draft.mode)}
         </span>
       </div>
 
@@ -763,7 +767,7 @@ function DraftControlPanel({ draft }: { draft: DraftControl }) {
         <DraftField label="Scope" value={draft.scope} />
 
         <DraftList icon={FileText} title="Evidence Used" items={draft.evidence} />
-        <DraftList icon={GitBranch} title="Blast Radius Checks" items={draft.blastRadius} />
+        <DraftList icon={GitBranch} title="Blast Radius Checks" items={draft.blast_radius} />
         <DraftList icon={Undo2} title="Rollback Plan" items={draft.rollback} />
 
         <button
@@ -823,68 +827,6 @@ function DraftList({
   )
 }
 
-function buildDraftControl(selection: InvestigationSelection, investigation: InvestigationData): DraftControl {
-  const process = investigation.processes[0]
-  const flow = investigation.flows[0]
-  const finding = investigation.findings[0]
-  const dns = investigation.dns[0]
-  const processName = process?.name || flow?.process_name || selection.label || 'selected activity'
-  const processScope = process
-    ? `${process.name} pid ${process.pid}${process.path ? ` at ${process.path}` : ''}`
-    : selection.process_guid || (selection.pid !== undefined ? `pid ${selection.pid}` : 'device activity')
-  const remoteTarget = flow ? socket(flow.remote_ip, flow.remote_port) : 'remote destination not yet linked'
-  const findingTitle = finding?.title || finding?.classification || finding?.event_type || 'linked endpoint evidence'
-  const evidence = [
-    process ? `Process: ${process.name} pid ${process.pid}` : `Selection: ${selection.label}`,
-    process?.command_line ? `Command line: ${process.command_line}` : '',
-    flow ? `Flow: ${flow.direction || 'unknown'} ${flow.protocol || 'tcp'} to ${remoteTarget}` : '',
-    dns ? `DNS: ${dns.query} resolved to ${(dns.answers || []).join(', ') || dns.resolver || 'unknown'}` : '',
-    finding ? `Finding: ${findingTitle} risk ${finding.risk_score || 0}` : '',
-  ].filter(Boolean)
-
-  if (flow) {
-    return {
-      title: `Observe outbound access for ${processName}`,
-      mode: 'Observe-only',
-      action: 'Stage a monitor rule that records matches before deny or restrict is considered.',
-      target: remoteTarget,
-      scope: `${processScope}; ${flow.protocol || 'tcp'} ${flow.direction || 'outbound'} traffic to ${remoteTarget}`,
-      reason: `Aegis linked ${findingTitle} to a concrete process and network destination. The next safe step is to measure repeat matches and affected activity before enforcement.`,
-      evidence,
-      blastRadius: [
-        'Count historical matches for the same process, destination, port, and protocol.',
-        'Check whether other processes on the device use the same destination.',
-        'Require DNS and process evidence before expanding beyond this endpoint.',
-      ],
-      rollback: [
-        'Disable the staged monitor rule.',
-        'Clear any pending enforcement candidate for this process and destination.',
-        'Keep collected evidence for audit and future simulation.',
-      ],
-    }
-  }
-
-  return {
-    title: `Observe process behavior for ${processName}`,
-    mode: 'Observe-only',
-    action: 'Stage a process watch that records future flows, DNS, and findings before control design.',
-    target: process?.path || selection.process_guid || selection.label,
-    scope: processScope,
-    reason: `Aegis has process or finding evidence but not enough linked network evidence for a network control. The next safe step is richer observation.`,
-    evidence,
-    blastRadius: [
-      'Wait for at least one linked flow or DNS record before proposing a restrict or deny rule.',
-      'Compare command-line markers to avoid matching unrelated processes.',
-      'Keep scope limited to this device until cross-device evidence exists.',
-    ],
-    rollback: [
-      'Remove the process watch candidate.',
-      'Keep the investigation record available for review.',
-      'Return the device to passive collection only.',
-    ],
-  }
-}
-
 function MiniCount({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-md bg-slate-100 px-2 py-2">
@@ -942,6 +884,11 @@ function Badge({ value }: { value: string }) {
 function Risk({ value, severity }: { value: number; severity?: string }) {
   const tone = value >= 70 ? 'bg-red-100 text-red-800' : value >= 40 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
   return <span className={`rounded-md px-2 py-1 text-xs font-semibold ${tone}`}>{severity || 'info'} {value}</span>
+}
+
+function displayMode(value: string) {
+  if (value === 'observe-only') return 'Observe-only'
+  return value || 'Draft'
 }
 
 function socket(ip?: string, port?: number) {

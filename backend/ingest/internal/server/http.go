@@ -61,6 +61,7 @@ func (s *IngestServer) RegisterHTTPRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/visibility/dns", s.handleVisibilityDNS)
 	mux.HandleFunc("/v1/visibility/findings", s.handleVisibilityFindings)
 	mux.HandleFunc("/v1/visibility/investigation", s.handleVisibilityInvestigation)
+	mux.HandleFunc("/v1/visibility/draft-controls", s.handleVisibilityDraftControls)
 	mux.HandleFunc("/v1/clarion/events", s.handleClarionEventExport)
 }
 

@@ -447,6 +447,57 @@ func TestHandleVisibilityInvestigationIncludesFindings(t *testing.T) {
 	}
 }
 
+func TestHandleVisibilityDraftControlsReturnsObserveOnlyControl(t *testing.T) {
+	store, err := newFileVisibilityStore(t.TempDir() + "/visibility-events.jsonl")
+	if err != nil {
+		t.Fatalf("newFileVisibilityStore returned error: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	server := &IngestServer{
+		logger:    slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
+		validator: mockValidator{},
+		publisher: &mockPublisher{},
+		dedupe:    newDuplicateTracker(100),
+		store:     store,
+		metrics:   sharedTestMetrics,
+		checker:   health.NewServiceChecker(slog.Default()),
+	}
+
+	body := `{"schema_version":"visibility.v1","event_id":"evt-process-1","event_type":"aegis.process.started","timestamp_ms":1777075005616,"source":"aegis-windows-agent","device_id":"RMARTINEZ-WS","agent_id":"windows-agent-dev","sensor_version":"0.1.0","sequence":3,"payload":{"process_guid":"proc-abc","pid":3084,"name":"python.exe","path":"C:\\AegisLab\\scripts\\agent_runner.py","command_line":"python.exe agent_runner.py"}}
+` +
+		`{"schema_version":"visibility.v1","event_id":"evt-flow-1","event_type":"aegis.flow.started","timestamp_ms":1777075005617,"source":"aegis-windows-agent","device_id":"RMARTINEZ-WS","agent_id":"windows-agent-dev","sensor_version":"0.1.0","sequence":4,"payload":{"flow_id":"flow-abc","process_guid":"proc-abc","pid":3084,"process_name":"python.exe","protocol":"tcp","direction":"outbound","remote_ip":"203.0.113.10","remote_port":443}}
+` +
+		`{"schema_version":"visibility.v1","event_id":"evt-dns-1","event_type":"aegis.dns.observed","timestamp_ms":1777075005618,"source":"aegis-windows-agent","device_id":"RMARTINEZ-WS","agent_id":"windows-agent-dev","sensor_version":"0.1.0","sequence":5,"payload":{"query":"api.model-gateway.lab","answers":["203.0.113.10"],"process_guid":"proc-abc","pid":3084}}
+` +
+		`{"schema_version":"visibility.v1","event_id":"evt-finding-1","event_type":"aegis.risk_finding.created","timestamp_ms":1777075005619,"source":"aegis-windows-agent","device_id":"RMARTINEZ-WS","agent_id":"windows-agent-dev","sensor_version":"0.1.0","sequence":6,"payload":{"finding_id":"finding-abc","severity":"medium","risk_score":42,"title":"Likely local AI agent script observed","process_guid":"proc-abc","flow_id":"flow-abc","recommended_action":"review"}}`
+	postReq := httptest.NewRequest(http.MethodPost, "/v1/visibility/events", bytes.NewBufferString(body))
+	postRec := httptest.NewRecorder()
+	server.handleVisibilityEvents(postRec, postReq)
+	if postRec.Code != http.StatusAccepted {
+		t.Fatalf("expected POST status %d, got %d: %s", http.StatusAccepted, postRec.Code, postRec.Body.String())
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/v1/visibility/draft-controls?device_id=RMARTINEZ-WS&process_guid=proc-abc&limit=10", nil)
+	getRec := httptest.NewRecorder()
+	server.handleVisibilityDraftControls(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected GET status %d, got %d: %s", http.StatusOK, getRec.Code, getRec.Body.String())
+	}
+	for _, expected := range [][]byte{
+		[]byte(`"count":1`),
+		[]byte(`"mode":"observe-only"`),
+		[]byte(`"status":"draft"`),
+		[]byte(`"target":"203.0.113.10:443"`),
+		[]byte(`"blast_radius"`),
+		[]byte(`Likely local AI agent script observed`),
+	} {
+		if !bytes.Contains(getRec.Body.Bytes(), expected) {
+			t.Fatalf("expected draft controls response to include %s, got %s", expected, getRec.Body.String())
+		}
+	}
+}
+
 func TestHandleClarionEventExportReturnsContractEvents(t *testing.T) {
 	store, err := newFileVisibilityStore(t.TempDir() + "/visibility-events.jsonl")
 	if err != nil {
