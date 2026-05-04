@@ -180,6 +180,44 @@ impl Collector for BrowserHistoryCollector {
     }
 }
 
+/// Enrich flow observations with hostnames from DNS answers in the same batch.
+pub fn enrich_flow_hostnames(events: &mut [AegisEvent]) {
+    let mut host_by_ip = std::collections::HashMap::new();
+    for event in events.iter() {
+        if let EventPayload::DnsObserved { query, answers, .. } = &event.payload {
+            if query.trim().is_empty() {
+                continue;
+            }
+            for answer in answers {
+                if is_ip_address(answer) {
+                    host_by_ip
+                        .entry(answer.clone())
+                        .or_insert_with(|| query.clone());
+                }
+            }
+        }
+    }
+
+    if host_by_ip.is_empty() {
+        return;
+    }
+
+    for event in events.iter_mut() {
+        if let EventPayload::FlowStarted {
+            remote_ip,
+            remote_hostname,
+            ..
+        } = &mut event.payload
+        {
+            if remote_hostname.is_none() {
+                if let Some(hostname) = host_by_ip.get(remote_ip) {
+                    *remote_hostname = Some(hostname.clone());
+                }
+            }
+        }
+    }
+}
+
 fn collector_status(
     config: &AgentConfig,
     collector: &str,
@@ -196,6 +234,10 @@ fn collector_status(
             message,
         },
     )
+}
+
+fn is_ip_address(value: &str) -> bool {
+    value.parse::<std::net::IpAddr>().is_ok()
 }
 
 #[cfg(not(windows))]
@@ -807,7 +849,16 @@ fn host_from_url(url: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{host_from_url, parse_ipconfig_displaydns, parse_netstat_ano, parse_socket_addr};
+    use std::path::PathBuf;
+    use std::time::SystemTime;
+
+    use crate::config::AgentConfig;
+    use crate::event::{AegisEvent, EventPayload};
+
+    use super::{
+        enrich_flow_hostnames, host_from_url, parse_ipconfig_displaydns, parse_netstat_ano,
+        parse_socket_addr,
+    };
 
     #[test]
     fn parses_netstat_tcp_and_udp_observations() {
@@ -881,6 +932,69 @@ Windows IP Configuration
             Some("example.openai.com".to_string())
         );
         assert_eq!(host_from_url("file:///C:/tmp/report.txt"), None);
+    }
+
+    #[test]
+    fn enriches_flow_remote_hostname_from_dns_answer() {
+        let config = test_config();
+        let mut events = vec![
+            AegisEvent::new(
+                &config,
+                "aegis.flow.started",
+                SystemTime::now(),
+                EventPayload::FlowStarted {
+                    flow_id: "flow-1".to_string(),
+                    process_guid: None,
+                    pid: Some(1000),
+                    process_name: Some("msedge.exe".to_string()),
+                    user: None,
+                    protocol: "tcp".to_string(),
+                    direction: "outbound".to_string(),
+                    local_ip: "192.168.12.101".to_string(),
+                    local_port: Some(50000),
+                    remote_ip: "203.0.113.10".to_string(),
+                    remote_port: Some(443),
+                    remote_hostname: None,
+                    attribution_method: "test".to_string(),
+                    attribution_confidence: 0.7,
+                },
+            ),
+            AegisEvent::new(
+                &config,
+                "aegis.dns.observed",
+                SystemTime::now(),
+                EventPayload::DnsObserved {
+                    query: "chatgpt.com".to_string(),
+                    query_type: Some("A".to_string()),
+                    answers: vec!["203.0.113.10".to_string()],
+                    resolver: None,
+                    process_guid: None,
+                    pid: None,
+                    correlation_method: "test".to_string(),
+                    correlation_confidence: 0.5,
+                },
+            ),
+        ];
+
+        enrich_flow_hostnames(&mut events);
+
+        match &events[0].payload {
+            EventPayload::FlowStarted {
+                remote_hostname, ..
+            } => assert_eq!(remote_hostname.as_deref(), Some("chatgpt.com")),
+            _ => panic!("expected flow event"),
+        }
+    }
+
+    fn test_config() -> AgentConfig {
+        AgentConfig {
+            agent_id: "test-agent".to_string(),
+            device_id: "test-device".to_string(),
+            sensor_version: "test".to_string(),
+            backend_url: None,
+            event_spool: PathBuf::from("/tmp/aegis-test.jsonl"),
+            collect_command_line: false,
+        }
     }
 }
 

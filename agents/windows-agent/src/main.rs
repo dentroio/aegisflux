@@ -51,6 +51,7 @@ fn run() -> Result<(), String> {
     for collector in collectors.collectors() {
         events.extend(collector.collect_once(&config)?);
     }
+    collector::enrich_flow_hostnames(&mut events);
     events.extend(detection::detect_ai_agent_activity(&config, &events));
 
     let spool = JsonlSpool::new(config.event_spool.clone());
