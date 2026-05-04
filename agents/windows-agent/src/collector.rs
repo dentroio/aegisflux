@@ -411,25 +411,42 @@ struct BrowserHistoryProfile {
 #[cfg(windows)]
 fn browser_history_paths() -> Vec<BrowserHistoryProfile> {
     let mut profiles = Vec::new();
-    let local_app_data = match std::env::var("LOCALAPPDATA") {
-        Ok(value) => std::path::PathBuf::from(value),
-        Err(_) => return profiles,
-    };
+    for local_app_data in browser_local_app_data_roots() {
+        let browser_roots = [
+            ("edge", local_app_data.join(r"Microsoft\Edge\User Data")),
+            ("chrome", local_app_data.join(r"Google\Chrome\User Data")),
+            (
+                "brave",
+                local_app_data.join(r"BraveSoftware\Brave-Browser\User Data"),
+            ),
+        ];
 
-    let browser_roots = [
-        ("edge", local_app_data.join(r"Microsoft\Edge\User Data")),
-        ("chrome", local_app_data.join(r"Google\Chrome\User Data")),
-        (
-            "brave",
-            local_app_data.join(r"BraveSoftware\Brave-Browser\User Data"),
-        ),
-    ];
-
-    for (browser, root) in browser_roots {
-        collect_browser_profiles(browser, &root, &mut profiles);
+        for (browser, root) in browser_roots {
+            collect_browser_profiles(browser, &root, &mut profiles);
+        }
     }
 
     profiles
+}
+
+#[cfg(windows)]
+fn browser_local_app_data_roots() -> Vec<std::path::PathBuf> {
+    let mut roots = Vec::new();
+    if let Ok(value) = std::env::var("LOCALAPPDATA") {
+        roots.push(std::path::PathBuf::from(value));
+    }
+
+    let users_root = std::path::Path::new(r"C:\Users");
+    if let Ok(entries) = std::fs::read_dir(users_root) {
+        for entry in entries.flatten() {
+            let local_app_data = entry.path().join(r"AppData\Local");
+            if local_app_data.exists() && !roots.iter().any(|root| root == &local_app_data) {
+                roots.push(local_app_data);
+            }
+        }
+    }
+
+    roots
 }
 
 #[cfg(windows)]
