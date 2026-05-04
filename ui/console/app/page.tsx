@@ -12,12 +12,16 @@ import {
   Database,
   Globe2,
   HardDrive,
+  LayoutDashboard,
   LockKeyhole,
   Network,
+  Plug,
   RefreshCw,
   Search,
   Server,
+  Settings,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   TerminalSquare,
 } from 'lucide-react'
@@ -281,6 +285,75 @@ const ui: Record<string, CSSProperties> = {
   countPill: { borderRadius: 6, padding: '4px 8px', fontSize: 12, fontWeight: 700 },
   statusChip: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, border: '1px solid', padding: '4px 10px', fontSize: 12, fontWeight: 700 },
   freshDot: { display: 'inline-block', width: 10, height: 10, borderRadius: 999, flexShrink: 0 },
+  appShell: { display: 'flex', minHeight: '100vh' },
+  sidebar: {
+    width: 264,
+    flexShrink: 0,
+    background: '#fff',
+    borderRight: '1px solid #e5e7eb',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  sidebarBrand: {
+    height: 64,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '0 18px',
+    borderBottom: '1px solid #e5e7eb',
+  },
+  sideNav: { padding: 12, display: 'grid', gap: 18 },
+  sideGroupLabel: {
+    padding: '0 10px 6px',
+    fontSize: 11,
+    fontWeight: 800,
+    color: '#94a3b8',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  sideButton: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    border: 0,
+    borderRadius: 9,
+    background: 'transparent',
+    color: '#475569',
+    padding: '10px 11px',
+    fontSize: 14,
+    fontWeight: 650,
+    textAlign: 'left',
+    cursor: 'pointer',
+  },
+  sideButtonActive: { background: '#0f172a', color: '#fff' },
+  sideButtonMuted: { color: '#94a3b8', cursor: 'default' },
+  sideFooter: { marginTop: 'auto', padding: 14, borderTop: '1px solid #e5e7eb' },
+  sideFooterCard: { borderRadius: 10, border: '1px solid #bae6fd', background: '#f0f9ff', padding: 12 },
+  contentArea: { minWidth: 0, flex: 1 },
+  widgetHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 },
+  widgetTitle: { margin: 0, fontSize: 16, fontWeight: 750, color: '#0f172a' },
+  customizePanel: {
+    marginBottom: 12,
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 8,
+    border: '1px solid #e2e8f0',
+    background: '#fff',
+    borderRadius: 10,
+    padding: 10,
+  },
+  widgetToggle: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 7,
+    border: '1px solid #e2e8f0',
+    borderRadius: 999,
+    padding: '6px 10px',
+    fontSize: 13,
+    color: '#475569',
+    background: '#f8fafc',
+  },
 }
 
 const pillStyles: Record<'slate' | 'blue' | 'amber', CSSProperties> = {
@@ -295,6 +368,33 @@ const statusStyles: Record<'emerald' | 'amber' | 'slate', CSSProperties> = {
   slate: { borderColor: '#e2e8f0', background: '#f8fafc', color: '#334155' },
 }
 
+const navGroups = [
+  {
+    label: 'Workspace',
+    items: [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, active: true },
+      { id: 'agents', label: 'Agents', icon: Server },
+      { id: 'activity', label: 'AI Activity', icon: Bot },
+      { id: 'inventory', label: 'Inventory', icon: Database },
+    ],
+  },
+  {
+    label: 'Platform',
+    items: [
+      { id: 'controls', label: 'Controls', icon: ShieldCheck },
+      { id: 'connectors', label: 'Connectors', icon: Plug },
+      { id: 'settings', label: 'Settings', icon: Settings },
+    ],
+  },
+] as const
+
+const widgetCatalog = [
+  { id: 'evidence', icon: Database, title: 'Evidence', detail: 'process, flow, and DNS records' },
+  { id: 'browser', icon: Chrome, title: 'Browser Surface', detail: 'extension and profile observations' },
+  { id: 'sase', icon: LockKeyhole, title: 'Enterprise Controls', detail: 'SSE/SASE endpoint components' },
+  { id: 'budget', icon: Cpu, title: 'Agent Budget', detail: 'near-zero idle, bounded collectors' },
+] as const
+
 export default function AegisDashboard() {
   const [devices, setDevices] = useState<DeviceRecord[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState('')
@@ -303,6 +403,8 @@ export default function AegisDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+  const [customizeOpen, setCustomizeOpen] = useState(false)
+  const [hiddenWidgets, setHiddenWidgets] = useState<string[]>([])
 
   useEffect(() => {
     fetchDashboard()
@@ -372,18 +474,62 @@ export default function AegisDashboard() {
     : model.totalDevices > 0
       ? { label: 'Healthy', tone: 'emerald' as const, text: 'All reporting endpoints are fresh' }
       : { label: 'Waiting', tone: 'slate' as const, text: 'No endpoint telemetry yet' }
+  const visibleWidgets = widgetCatalog.filter((widget) => !hiddenWidgets.includes(widget.id))
 
   return (
     <div className="min-h-screen bg-gray-50 text-slate-900" style={ui.page}>
-      <header className="border-b border-gray-200 bg-white shadow-sm" style={ui.header}>
-        <div className="flex h-16 items-center justify-between px-5" style={ui.headerInner}>
-          <div className="flex items-center gap-3" style={ui.brandRow}>
+      <div style={ui.appShell}>
+        <aside style={ui.sidebar}>
+          <div style={ui.sidebarBrand}>
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950" style={ui.logoBox}>
               <ShieldCheck className="h-5 w-5 text-white" />
             </div>
             <div>
-              <div className="text-lg font-semibold leading-5 text-slate-950" style={ui.brandTitle}>Aegis</div>
-              <div className="text-xs text-slate-500" style={ui.mutedSmall}>AI endpoint visibility and control readiness</div>
+              <div style={ui.brandTitle}>Aegis</div>
+              <div style={ui.mutedSmall}>AI endpoint governance</div>
+            </div>
+          </div>
+          <nav style={ui.sideNav}>
+            {navGroups.map((group) => (
+              <div key={group.label}>
+                <div style={ui.sideGroupLabel}>{group.label}</div>
+                {group.items.map((item) => {
+                  const Icon = item.icon
+                  const active = 'active' in item && item.active
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      style={{
+                        ...ui.sideButton,
+                        ...(active ? ui.sideButtonActive : ui.sideButtonMuted),
+                      }}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </nav>
+          <div style={ui.sideFooter}>
+            <div style={ui.sideFooterCard}>
+              <div style={{ fontSize: 13, fontWeight: 750, color: '#075985' }}>Observe-only</div>
+              <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.45, color: '#0369a1' }}>
+                Controls remain staged until approval and rollback are ready.
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <div style={ui.contentArea}>
+          <header className="border-b border-gray-200 bg-white shadow-sm" style={ui.header}>
+        <div className="flex h-16 items-center justify-between px-5" style={ui.headerInner}>
+          <div className="flex items-center gap-3" style={ui.brandRow}>
+            <div>
+              <div className="text-lg font-semibold leading-5 text-slate-950" style={ui.brandTitle}>Dashboard</div>
+              <div className="text-xs text-slate-500" style={ui.mutedSmall}>Overall Aegis status and endpoint drill-in</div>
             </div>
           </div>
 
@@ -399,7 +545,7 @@ export default function AegisDashboard() {
             </button>
           </div>
         </div>
-      </header>
+          </header>
 
       <main className="mx-auto max-w-[1500px] px-5 py-6" style={ui.main}>
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between" style={ui.titleRow}>
@@ -460,11 +606,44 @@ export default function AegisDashboard() {
           </div>
         </section>
 
+        <section>
+          <div style={ui.widgetHeader}>
+            <h2 style={ui.widgetTitle}>Dashboard widgets</h2>
+            <button style={ui.button} onClick={() => setCustomizeOpen((value) => !value)}>
+              <SlidersHorizontal className="h-4 w-4" />
+              Customize
+            </button>
+          </div>
+          {customizeOpen && (
+            <div style={ui.customizePanel}>
+              {widgetCatalog.map((widget) => (
+                <label key={widget.id} style={ui.widgetToggle}>
+                  <input
+                    type="checkbox"
+                    checked={!hiddenWidgets.includes(widget.id)}
+                    onChange={() => setHiddenWidgets((current) =>
+                      current.includes(widget.id)
+                        ? current.filter((id) => id !== widget.id)
+                        : [...current, widget.id],
+                    )}
+                  />
+                  {widget.title}
+                </label>
+              ))}
+            </div>
+          )}
+        </section>
+
         <section className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" style={ui.widgetGrid}>
-          <Widget icon={Database} title="Evidence" value={model.eventCount} detail={`${data.processes.length} process, ${data.flows.length} flow, ${data.dns.length} DNS records`} />
-          <Widget icon={Chrome} title="Browser Surface" value={model.extensionCount} detail="extension and profile observations" />
-          <Widget icon={LockKeyhole} title="Enterprise Controls" value={model.saseCount} detail="SSE/SASE endpoint components" />
-          <Widget icon={Cpu} title="Agent Budget" value="Low" detail="near-zero idle, bounded collectors" />
+          {visibleWidgets.map((widget) => (
+            <Widget
+              key={widget.id}
+              icon={widget.icon}
+              title={widget.title}
+              value={widgetValue(widget.id, model, data)}
+              detail={widget.id === 'evidence' ? `${data.processes.length} process, ${data.flows.length} flow, ${data.dns.length} DNS records` : widget.detail}
+            />
+          ))}
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_430px]" style={ui.contentGrid}>
@@ -496,6 +675,8 @@ export default function AegisDashboard() {
           <AgentDetailPanel detail={selectedDetail} />
         </section>
       </main>
+        </div>
+      </div>
     </div>
   )
 }
@@ -559,6 +740,14 @@ function uniqueEvents(events: EventRecord[]) {
   return Array.from(byId.values()).sort((left, right) =>
     (right.received_at_ms || right.timestamp_ms) - (left.received_at_ms || left.timestamp_ms),
   )
+}
+
+function widgetValue(id: string, model: ReturnType<typeof buildDashboardModel>, data: VisibilityData) {
+  if (id === 'evidence') return model.eventCount
+  if (id === 'browser') return model.extensionCount
+  if (id === 'sase') return model.saseCount
+  if (id === 'budget') return 'Low'
+  return data.events.length
 }
 
 function AgentList({
