@@ -374,6 +374,7 @@ const ui: Record<string, CSSProperties> = {
     overflow: 'hidden',
   },
   logoImage: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
+  wordmarkImage: { width: 190, height: 'auto', display: 'block' },
   headerSearch: {
     height: 34,
     display: 'inline-flex',
@@ -577,8 +578,8 @@ export default function AegisDashboard() {
               <div style={ui.headerLogoMark}>
                 <img src="/aegisflux-icon.svg" alt="AegisFlux" style={ui.logoImage} />
               </div>
-              <div>
-                <div style={ui.brandTitle}>AegisFlux</div>
+              <div style={{ display: 'grid', gap: 2 }}>
+                <img src="/aegisflux-wordmark.svg" alt="AegisFlux" style={ui.wordmarkImage} />
                 <div style={ui.mutedSmall}>AI endpoint governance</div>
               </div>
             </div>
