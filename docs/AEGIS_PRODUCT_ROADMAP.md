@@ -2,9 +2,12 @@
 
 ## Product Thesis
 
+**Observe. Adapt. Enforce.**  
+**Adaptive security. Real-time protection.**
+
 AegisFlux should become the evidence-to-control platform for the AI-era endpoint. The market already has tools that detect, alert, block, and aggregate. AegisFlux can be different by making every control recommendation traceable to live evidence: process, command line, network flow, DNS, identity, policy, blast radius, and rollback plan.
 
-The practical wedge is simple: observe first, explain clearly, draft safely, enforce only when the operator trusts the evidence.
+The practical wedge is simple: observe first, adapt continuously, explain clearly, draft safely, and enforce only when the operator trusts the evidence.
 
 The larger platform vision is captured in [AEGIS_PLATFORM_VISION.md](AEGIS_PLATFORM_VISION.md): AegisFlux should mature as a first-of-kind standalone innovation platform, then integrate into Clarion through explicit events and APIs as Clarion's host/workload evidence and local-control subsystem.
 

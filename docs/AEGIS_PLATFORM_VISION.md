@@ -2,9 +2,12 @@
 
 ## North Star
 
+**Observe. Adapt. Enforce.**  
+**Adaptive security. Real-time protection.**
+
 AegisFlux should become a first-of-kind, feature-rich AI-era endpoint and workload intelligence platform. The near-term lab is important, but the larger goal is bigger: build the system that understands AI-capable activity on devices, proves it with evidence, drafts safe controls, and eventually feeds that intelligence into Clarion.
 
-AegisFlux should be innovative enough to stand alone, and disciplined enough to integrate cleanly.
+AegisFlux should be innovative enough to stand alone, and disciplined enough to integrate cleanly. The product loop is explicit: observe endpoint truth, adapt detections and policy recommendations as behavior changes, and enforce only when the control is proven, approved, and rollbackable.
 
 ## What AegisFlux Should Become
 

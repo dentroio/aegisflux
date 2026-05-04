@@ -7,6 +7,9 @@
 
 ## Objective
 
+**Product promise:** Observe. Adapt. Enforce.  
+**Positioning:** Adaptive security. Real-time protection.
+
 Turn the current AegisFlux lab visibility foundation into a product-shaped platform that can be worked on safely by multiple agents.
 
 The product direction is solid:
@@ -15,6 +18,8 @@ The product direction is solid:
 - AegisFlux endpoint agents stay lightweight, optimized, and observe-first.
 - AegisFlux backend and UI turn endpoint evidence into investigation, inventory, detection packs, and draft controls.
 - AegisFlux AI platform agents research, explain, validate, and draft, but do not bypass governance.
+- AegisFlux adapts through signed detection packs, validated candidates, and continuous research-to-detection workflows.
+- AegisFlux enforces only after evidence, simulation, approval, and rollback readiness are in place.
 - Clarion remains the broader enterprise context and policy intelligence platform; AegisFlux eventually integrates as the host/workload evidence and endpoint-control subsystem.
 
 ## Architecture Baseline
@@ -93,4 +98,3 @@ These can run in parallel with low conflict:
 - No arbitrary code in detection packs.
 - No broad UI rewrite outside the active AegisFlux console unless explicitly scoped.
 - No Clarion database coupling.
-

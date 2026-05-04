@@ -166,6 +166,18 @@ const ui: Record<string, CSSProperties> = {
   },
   brandTitle: { fontSize: 18, fontWeight: 700, lineHeight: '20px' },
   mutedSmall: { fontSize: 12, color: '#64748b' },
+  brandTagline: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 7,
+    color: '#0ea5e9',
+    fontSize: 10,
+    fontWeight: 800,
+    lineHeight: '12px',
+    letterSpacing: '0.22em',
+    textTransform: 'uppercase',
+  },
+  brandDot: { color: '#0284c7', fontWeight: 900 },
   headerActions: { display: 'flex', alignItems: 'center', gap: 12 },
   button: {
     height: 36,
@@ -592,7 +604,14 @@ export default function AegisDashboard() {
                 <div style={ui.wordmarkText}>
                   Aegis<span style={ui.wordmarkFlux}>Flux</span>
                 </div>
-                <div style={ui.mutedSmall}>AI endpoint governance</div>
+                <div style={ui.brandTagline}>
+                  <span>Observe</span>
+                  <span style={ui.brandDot}>.</span>
+                  <span>Adapt</span>
+                  <span style={ui.brandDot}>.</span>
+                  <span>Enforce</span>
+                  <span style={ui.brandDot}>.</span>
+                </div>
               </div>
             </div>
 
@@ -681,7 +700,7 @@ export default function AegisDashboard() {
                       <StatusChip tone={health.tone} label={health.text} />
                     </div>
                     <p className="mt-2 text-sm text-slate-500" style={ui.subtitle}>
-                      Overall status, coverage, AI activity, and endpoint drill-in for the AegisFlux fleet.
+                      Adaptive security and real-time protection across the AegisFlux fleet.
                     </p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -715,7 +734,7 @@ export default function AegisDashboard() {
                   Platform status
                 </div>
                 <div className="mt-3 text-4xl font-bold tracking-tight text-slate-950" style={ui.heroStatus}>{health.label}</div>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600" style={ui.heroText}>{health.text}. AegisFlux is running in observe-only mode while evidence, inventory, and control readiness mature.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600" style={ui.heroText}>{health.text}. Observe endpoint evidence, adapt detections continuously, and enforce only when controls are proven.</p>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]" style={ui.miniGrid}>
                 <MiniStat label="Endpoints" value={model.totalDevices} />
