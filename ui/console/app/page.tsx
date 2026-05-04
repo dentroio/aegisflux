@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, FormEvent } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -431,6 +431,113 @@ const ui: Record<string, CSSProperties> = {
     color: '#64748b',
     fontSize: 13,
   },
+  loginPage: {
+    minHeight: '100vh',
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1.08fr) minmax(390px, 0.92fr)',
+    background: '#020617',
+    color: '#fff',
+    overflow: 'hidden',
+  },
+  loginVisual: {
+    position: 'relative',
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 56,
+    background:
+      'radial-gradient(circle at 62% 42%, rgba(14,165,233,0.22), transparent 34%), linear-gradient(135deg, #020617 0%, #07111f 52%, #020617 100%)',
+  },
+  loginGridOverlay: {
+    position: 'absolute',
+    inset: 0,
+    opacity: 0.22,
+    backgroundImage:
+      'linear-gradient(rgba(14,165,233,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(14,165,233,0.18) 1px, transparent 1px)',
+    backgroundSize: '42px 42px',
+  },
+  loginBrandBlock: { position: 'relative', zIndex: 1, width: 'min(620px, 92%)', textAlign: 'center' },
+  loginHeroIcon: {
+    width: 'min(420px, 78vw)',
+    aspectRatio: '1 / 1',
+    margin: '0 auto 26px',
+    objectFit: 'contain',
+    filter: 'drop-shadow(0 28px 48px rgba(14, 165, 233, 0.28))',
+  },
+  loginWordmark: { margin: 0, fontSize: 56, lineHeight: 1, fontWeight: 900, letterSpacing: 0.6 },
+  loginMotto: {
+    marginTop: 18,
+    display: 'flex',
+    justifyContent: 'center',
+    gap: 18,
+    color: '#e2e8f0',
+    fontSize: 18,
+    fontWeight: 700,
+    letterSpacing: '0.32em',
+    textTransform: 'uppercase',
+  },
+  loginSubMotto: {
+    marginTop: 18,
+    color: '#38bdf8',
+    fontSize: 14,
+    fontWeight: 700,
+    letterSpacing: '0.24em',
+    textTransform: 'uppercase',
+  },
+  loginPanelWrap: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    background: '#f8fafc',
+  },
+  loginCard: {
+    width: 'min(430px, 100%)',
+    borderRadius: 14,
+    border: '1px solid #e2e8f0',
+    background: '#fff',
+    color: '#0f172a',
+    boxShadow: '0 24px 70px rgba(15, 23, 42, 0.16)',
+    padding: 30,
+  },
+  loginCardHeader: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26 },
+  loginMiniIcon: { width: 42, height: 42, borderRadius: 10, background: '#020617', overflow: 'hidden' },
+  loginTitle: { margin: 0, fontSize: 24, fontWeight: 850, letterSpacing: 0 },
+  loginCopy: { margin: '8px 0 0', color: '#64748b', fontSize: 14, lineHeight: 1.6 },
+  loginForm: { display: 'grid', gap: 14 },
+  loginLabel: { display: 'grid', gap: 7, color: '#334155', fontSize: 13, fontWeight: 700 },
+  loginInput: {
+    width: '100%',
+    height: 42,
+    borderRadius: 8,
+    border: '1px solid #cbd5e1',
+    padding: '0 12px',
+    color: '#0f172a',
+    fontSize: 14,
+    outline: 'none',
+  },
+  loginSubmit: {
+    height: 42,
+    border: 0,
+    borderRadius: 8,
+    background: '#2563eb',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 800,
+    cursor: 'pointer',
+  },
+  loginError: {
+    borderRadius: 8,
+    border: '1px solid #fecaca',
+    background: '#fef2f2',
+    color: '#991b1b',
+    padding: '10px 12px',
+    fontSize: 13,
+    fontWeight: 600,
+  },
+  loginHint: { marginTop: 16, color: '#64748b', fontSize: 12, lineHeight: 1.55 },
 }
 
 const pillStyles: Record<'slate' | 'blue' | 'amber', CSSProperties> = {
@@ -499,6 +606,11 @@ const widgetCatalog = [
 ] as const
 
 export default function AegisDashboard() {
+  const [authChecked, setAuthChecked] = useState(false)
+  const [authenticated, setAuthenticated] = useState(false)
+  const [loginUser, setLoginUser] = useState('admin')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
   const [devices, setDevices] = useState<DeviceRecord[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState('')
   const [query, setQuery] = useState('')
@@ -510,10 +622,16 @@ export default function AegisDashboard() {
   const [hiddenWidgets, setHiddenWidgets] = useState<string[]>([])
 
   useEffect(() => {
+    setAuthenticated(window.localStorage.getItem('aegisflux.labAuth') === 'admin')
+    setAuthChecked(true)
+  }, [])
+
+  useEffect(() => {
+    if (!authenticated) return undefined
     fetchDashboard()
     const interval = setInterval(fetchDashboard, 15000)
     return () => clearInterval(interval)
-  }, [])
+  }, [authenticated])
 
   async function fetchJson<T>(path: string): Promise<T> {
     const response = await fetch(path, { cache: 'no-store' })
@@ -560,6 +678,26 @@ export default function AegisDashboard() {
     }
   }
 
+  function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (loginUser.trim() === 'admin' && loginPassword === 'admin') {
+      window.localStorage.setItem('aegisflux.labAuth', 'admin')
+      setAuthenticated(true)
+      setLoginError('')
+      setLoginPassword('')
+      return
+    }
+    setLoginError('Invalid lab credentials. Use admin/admin.')
+  }
+
+  function handleLogout() {
+    window.localStorage.removeItem('aegisflux.labAuth')
+    setAuthenticated(false)
+    setDevices([])
+    setSelectedDeviceId('')
+    setData({ events: [], processes: [], flows: [], dns: [], findings: [] })
+  }
+
   const model = useMemo(() => buildDashboardModel(data, devices), [data, devices])
   const selectedDevice = devices.find((device) => device.device_id === selectedDeviceId) || devices[0]
   const selectedDetail = useMemo(
@@ -578,6 +716,27 @@ export default function AegisDashboard() {
       ? { label: 'Healthy', tone: 'emerald' as const, text: 'All reporting endpoints are fresh' }
       : { label: 'Waiting', tone: 'slate' as const, text: 'No endpoint telemetry yet' }
   const visibleWidgets = widgetCatalog.filter((widget) => !hiddenWidgets.includes(widget.id))
+
+  if (!authChecked) {
+    return (
+      <div style={{ ...ui.loginPage, gridTemplateColumns: '1fr', placeItems: 'center' }}>
+        <div style={{ color: '#cbd5e1', fontSize: 14, fontWeight: 700 }}>Loading AegisFlux</div>
+      </div>
+    )
+  }
+
+  if (!authenticated) {
+    return (
+      <LoginScreen
+        username={loginUser}
+        password={loginPassword}
+        error={loginError}
+        onUsernameChange={setLoginUser}
+        onPasswordChange={setLoginPassword}
+        onSubmit={handleLogin}
+      />
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-slate-900" style={ui.page}>
@@ -623,7 +782,9 @@ export default function AegisDashboard() {
                 <UserCircle className="h-5 w-5 text-slate-500" />
                 <span style={{ fontSize: 14, fontWeight: 650, color: '#334155' }}>operator</span>
                 <span style={ui.rolePill}>Admin</span>
-                <LogOut className="h-4 w-4 text-slate-400" />
+                <button onClick={handleLogout} style={{ ...ui.iconButton, width: 28, height: 28 }} title="Sign out">
+                  <LogOut className="h-4 w-4 text-slate-400" />
+                </button>
               </div>
             </div>
           </div>
@@ -814,6 +975,81 @@ export default function AegisDashboard() {
       </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function LoginScreen({
+  username,
+  password,
+  error,
+  onUsernameChange,
+  onPasswordChange,
+  onSubmit,
+}: {
+  username: string
+  password: string
+  error: string
+  onUsernameChange: (value: string) => void
+  onPasswordChange: (value: string) => void
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void
+}) {
+  return (
+    <div style={ui.loginPage}>
+      <section style={ui.loginVisual}>
+        <div style={ui.loginGridOverlay} />
+        <div style={ui.loginBrandBlock}>
+          <img src="/aegisflux-icon.svg" alt="AegisFlux shield" style={ui.loginHeroIcon} />
+          <h1 style={ui.loginWordmark}>
+            Aegis<span style={ui.wordmarkFlux}>Flux</span>
+          </h1>
+          <div style={ui.loginMotto}>
+            <span>Observe.</span>
+            <span>Adapt.</span>
+            <span>Enforce.</span>
+          </div>
+          <div style={ui.loginSubMotto}>Adaptive security. Real-time protection.</div>
+        </div>
+      </section>
+
+      <section style={ui.loginPanelWrap}>
+        <div style={ui.loginCard}>
+          <div style={ui.loginCardHeader}>
+            <div style={ui.loginMiniIcon}>
+              <img src="/aegisflux-icon.svg" alt="" style={ui.logoImage} />
+            </div>
+            <div>
+              <h2 style={ui.loginTitle}>Sign in</h2>
+              <p style={ui.loginCopy}>Access the AegisFlux lab console.</p>
+            </div>
+          </div>
+
+          <form style={ui.loginForm} onSubmit={onSubmit}>
+            <label style={ui.loginLabel}>
+              Username
+              <input
+                value={username}
+                onChange={(event) => onUsernameChange(event.target.value)}
+                autoComplete="username"
+                style={ui.loginInput}
+              />
+            </label>
+            <label style={ui.loginLabel}>
+              Password
+              <input
+                value={password}
+                onChange={(event) => onPasswordChange(event.target.value)}
+                autoComplete="current-password"
+                type="password"
+                style={ui.loginInput}
+              />
+            </label>
+            {error ? <div style={ui.loginError}>{error}</div> : null}
+            <button type="submit" style={ui.loginSubmit}>Sign in</button>
+          </form>
+          <div style={ui.loginHint}>Lab credentials: admin / admin. This is a local development gate, not production authentication.</div>
+        </div>
+      </section>
     </div>
   )
 }
