@@ -6,7 +6,7 @@
 
 ## Goal
 
-Bring Clarion's governed AI provider pattern into Aegis: providers are configured, tested, selected, monitored, and surfaced as platform health.
+Bring Clarion's governed AI provider pattern into AegisFlux: providers are configured, tested, selected, monitored, and surfaced as platform health.
 
 ## Scope
 
@@ -32,7 +32,7 @@ Bring Clarion's governed AI provider pattern into Aegis: providers are configure
 
 - Operator can view providers and default provider.
 - Operator can test provider connectivity.
-- Aegis can report AI Available, Degraded, Unavailable, or Unknown.
+- AegisFlux can report AI Available, Degraded, Unavailable, or Unknown.
 - AI-assisted UI can disable actions when AI is unavailable.
 - Provider secrets are never returned to the UI.
 

@@ -1,18 +1,18 @@
 # Visibility and Observability Work Orders
 
-**Program:** Aegis host/workload visibility for Clarion  
-**Phase:** Phase 1 - Aegis Stabilization and Visibility  
+**Program:** AegisFlux host/workload visibility for Clarion  
+**Phase:** Phase 1 - AegisFlux Stabilization and Visibility  
 **Status:** Draft  
 **Last updated:** April 24, 2026
 
 ## Objective
 
-Build the first useful Aegis visibility loop:
+Build the first useful AegisFlux visibility loop:
 
 1. A Windows test machine runs normal applications, developer tools, browser AI, local scripts, and downloaded software.
-2. The Aegis Windows sensor observes process, user, network, DNS, and application context.
-3. The Aegis backend receives and stores visibility events.
-4. The Aegis UI or API can show device -> user -> process -> parent process -> destination -> classification -> evidence.
+2. The AegisFlux Windows sensor observes process, user, network, DNS, and application context.
+3. The AegisFlux backend receives and stores visibility events.
+4. The AegisFlux UI or API can show device -> user -> process -> parent process -> destination -> classification -> evidence.
 5. Early AI-agent and automation detection produces explainable, non-blocking findings.
 
 This phase is observability only. Do not build blocking or WFP enforcement yet.
@@ -29,15 +29,15 @@ This phase is observability only. Do not build blocking or WFP enforcement yet.
 | WO-VIS-006 | Visibility API and UI Surface | Query/display device, process, flow, and evidence | WO-VIS-005 |
 | WO-VIS-007 | AI-Agent Detection Pack 1 | Non-blocking IDE/browser/local-script detections | WO-VIS-002, WO-VIS-003, WO-VIS-005 |
 | WO-VIS-008 | Test Harness and Evidence Capture | Repeatable scenario runner and expected outputs | WO-VIS-001, WO-VIS-007 |
-| WO-VIS-009 | Clarion Mapping Draft | Aegis visibility events mapped to Clarion context objects | WO-VIS-004 |
+| WO-VIS-009 | Clarion Mapping Draft | AegisFlux visibility events mapped to Clarion context objects | WO-VIS-004 |
 | WO-VIS-010 | macOS Agent Scaffold | Secure Rust macOS visibility-agent baseline | None |
 
 ## Phase Exit Criteria
 
-- Aegis can reliably identify process lineage on Windows.
-- Aegis can attribute outbound network flows to process and user context.
-- Aegis can correlate DNS/domain context to observed flows.
-- Aegis can classify at least three early AI/automation scenarios with evidence:
+- AegisFlux can reliably identify process lineage on Windows.
+- AegisFlux can attribute outbound network flows to process and user context.
+- AegisFlux can correlate DNS/domain context to observed flows.
+- AegisFlux can classify at least three early AI/automation scenarios with evidence:
   - Browser AI usage
   - IDE assistant helper process
   - Local Python or Node agent script
@@ -57,4 +57,4 @@ macOS is tracked as a parallel scaffold/future visibility lane. Windows remains 
 
 ## Related Planning
 
-- [Aegis Development and Clarion Integration Plan](../../plans/AEGIS_DEVELOPMENT_AND_CLARION_INTEGRATION_PLAN.md)
+- [AegisFlux Development and Clarion Integration Plan](../../plans/AEGIS_DEVELOPMENT_AND_CLARION_INTEGRATION_PLAN.md)

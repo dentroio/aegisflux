@@ -6,7 +6,7 @@
 
 ## Goal
 
-Define versioned event schemas for the first Aegis visibility loop and keep them compatible with future Clarion context ingestion.
+Define versioned event schemas for the first AegisFlux visibility loop and keep them compatible with future Clarion context ingestion.
 
 ## Scope
 

@@ -6,7 +6,7 @@
 
 ## Goal
 
-Map Aegis visibility events to Clarion context objects so the projects can integrate cleanly later.
+Map AegisFlux visibility events to Clarion context objects so the projects can integrate cleanly later.
 
 ## Scope
 
@@ -14,7 +14,7 @@ Documentation and contract mapping only. No Clarion implementation is required i
 
 ## Mapping Targets
 
-Aegis visibility events should map to Clarion objects:
+AegisFlux visibility events should map to Clarion objects:
 
 - `device`
 - `user`
@@ -30,7 +30,7 @@ Aegis visibility events should map to Clarion objects:
 
 ## Deliverables
 
-- Field-level mapping from Aegis v1 schemas to Clarion context objects
+- Field-level mapping from AegisFlux v1 schemas to Clarion context objects
 - ID strategy:
   - `device_id`
   - `agent_id`
@@ -39,12 +39,12 @@ Aegis visibility events should map to Clarion objects:
   - Clarion endpoint/device IDs
 - Confidence model for inferred relationships
 - Clarion ingestion assumptions and open questions
-- Boundary statement confirming Aegis emits evidence and Clarion owns cross-domain policy decisions
+- Boundary statement confirming AegisFlux emits evidence and Clarion owns cross-domain policy decisions
 
 ## Acceptance Criteria
 
-- Clarion can identify which Aegis fields are needed for context graph ingestion.
-- Aegis can identify which fields must remain stable for future Clarion integration.
+- Clarion can identify which AegisFlux fields are needed for context graph ingestion.
+- AegisFlux can identify which fields must remain stable for future Clarion integration.
 - Unknown or unavailable fields are explicitly marked.
 - No direct database coupling is introduced.
 
@@ -55,7 +55,7 @@ Aegis visibility events should map to Clarion objects:
 ## Risks
 
 - Clarion’s existing domain ownership model may need extension for host/process objects.
-- Aegis may produce evidence faster than Clarion can ingest it. Future buffering/aggregation may be needed.
+- AegisFlux may produce evidence faster than Clarion can ingest it. Future buffering/aggregation may be needed.
 
 ## Completion Evidence
 

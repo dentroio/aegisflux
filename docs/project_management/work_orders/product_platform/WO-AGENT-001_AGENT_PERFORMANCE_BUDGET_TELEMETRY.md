@@ -6,7 +6,7 @@
 
 ## Goal
 
-Prove that Aegis agents are low-resource and safe to run continuously. Every agent should report its own CPU, memory, collector runtime, skipped collectors, and health.
+Prove that AegisFlux agents are low-resource and safe to run continuously. Every agent should report its own CPU, memory, collector runtime, skipped collectors, and health.
 
 ## Scope
 
@@ -49,5 +49,5 @@ Prove that Aegis agents are low-resource and safe to run continuously. Every age
 
 ## Product Requirement
 
-Default target: Aegis should feel like it is not there. The agent must stay conservative on CPU, memory, disk, and network.
+Default target: AegisFlux should feel like it is not there. The agent must stay conservative on CPU, memory, disk, and network.
 

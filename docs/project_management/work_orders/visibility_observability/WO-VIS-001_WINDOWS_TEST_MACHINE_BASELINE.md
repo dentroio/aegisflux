@@ -11,13 +11,13 @@ Create a repeatable Windows 11 test machine that can exercise browser, IDE, scri
 
 ## Scope
 
-Build and document the baseline machine image. This machine is the first target for the Windows Aegis visibility sensor.
+Build and document the baseline machine image. This machine is the first target for the Windows AegisFlux visibility sensor.
 
 ## Deliverables
 
 - Windows 11 VM or physical test machine named `windows-dev-agent-01`
 - Local admin account and standard user account
-- Network access to Aegis backend
+- Network access to AegisFlux backend
 - Browser set: Edge and Chrome
 - Developer tools: Cursor, VS Code, Git, Python, Node.js, PowerShell 7
 - Test directories:
@@ -42,7 +42,7 @@ Build and document the baseline machine image. This machine is the first target 
 ## Acceptance Criteria
 
 - Machine can be rebuilt or restored from snapshot.
-- Machine can reach the Aegis backend.
+- Machine can reach the AegisFlux backend.
 - Test user can run browser, IDE, Python, Node, Git, and PowerShell scenarios.
 - All installed tools and versions are documented.
 - No enforcement driver or blocking component is required for this work order.
@@ -61,4 +61,4 @@ Build and document the baseline machine image. This machine is the first target 
 - Screenshot or command output showing installed tool versions
 - Snapshot name and location
 - Baseline inventory document
-- Successful outbound connection to Aegis backend health endpoint
+- Successful outbound connection to AegisFlux backend health endpoint

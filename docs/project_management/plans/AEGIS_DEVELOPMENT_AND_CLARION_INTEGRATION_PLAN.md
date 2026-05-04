@@ -1,14 +1,14 @@
-# Aegis Development and Clarion Integration Plan
+# AegisFlux Development and Clarion Integration Plan
 
 **Status:** Draft  
-**Owner:** Aegis / Clarion technical planning  
+**Owner:** AegisFlux / Clarion technical planning  
 **Last updated:** April 24, 2026
 
 ## 1. Purpose
 
-Aegis is the host and workload visibility and enforcement layer for Clarion. Clarion is the broader context-aware policy intelligence platform that owns enterprise context, network identity, policy intent, risk decisions, and integrations with systems such as ISE, TrustSec, firewalls, proxies, gateways, SIEM/SOAR, MDM, and EDR.
+AegisFlux is the host and workload visibility and enforcement layer for Clarion. Clarion is the broader context-aware policy intelligence platform that owns enterprise context, network identity, policy intent, risk decisions, and integrations with systems such as ISE, TrustSec, firewalls, proxies, gateways, SIEM/SOAR, MDM, and EDR.
 
-This plan defines how to mature Aegis as a standalone host/workload platform while creating a clean path for Clarion integration.
+This plan defines how to mature AegisFlux as a standalone host/workload platform while creating a clean path for Clarion integration.
 
 ## 2. Product Boundary
 
@@ -21,7 +21,7 @@ This plan defines how to mature Aegis as a standalone host/workload platform whi
 - Orchestration into ISE, TrustSec/SGT, SGACL, firewalls, proxies, model gateways, API gateways, SIEM/SOAR, MDM, and EDR
 - User-facing policy, investigation, and operations workflows
 
-### Aegis Owns
+### AegisFlux Owns
 
 - Host and workload agent lifecycle
 - Endpoint identity and agent identity
@@ -37,13 +37,13 @@ This plan defines how to mature Aegis as a standalone host/workload platform whi
 
 ### Shared Contract
 
-Aegis and Clarion should integrate through explicit events and APIs, not shared implicit database writes. Aegis emits host/workload evidence. Clarion evaluates policy and risk. Aegis applies local enforcement when Clarion chooses endpoint/workload enforcement.
+AegisFlux and Clarion should integrate through explicit events and APIs, not shared implicit database writes. AegisFlux emits host/workload evidence. Clarion evaluates policy and risk. AegisFlux applies local enforcement when Clarion chooses endpoint/workload enforcement.
 
 ## 3. Architecture Tracks
 
-### Track A: Aegis Core Agent
+### Track A: AegisFlux Core Agent
 
-Goal: make the Aegis agent reliable, identifiable, secure, and deployable.
+Goal: make the AegisFlux agent reliable, identifiable, secure, and deployable.
 
 Deliverables:
 
@@ -77,7 +77,7 @@ Deliverables:
 
 Exit criteria:
 
-- Aegis can answer: which user, process, application, workload, or suspected agent generated this flow?
+- AegisFlux can answer: which user, process, application, workload, or suspected agent generated this flow?
 
 ### Track C: AI Agent and Automation Detection
 
@@ -105,7 +105,7 @@ Outputs:
 
 Exit criteria:
 
-- Aegis can classify likely AI-agent activity with confidence and evidence, while avoiding a brittle allow/block-only model.
+- AegisFlux can classify likely AI-agent activity with confidence and evidence, while avoiding a brittle allow/block-only model.
 
 ### Track D: Local Enforcement
 
@@ -124,11 +124,11 @@ Deliverables:
 
 Exit criteria:
 
-- Aegis can block or redirect the risky process without quarantining the whole endpoint unless policy requires escalation.
+- AegisFlux can block or redirect the risky process without quarantining the whole endpoint unless policy requires escalation.
 
 ### Track E: Backend and Policy Pipeline
 
-Goal: make Aegis backend services production-shaped and Clarion-compatible.
+Goal: make AegisFlux backend services production-shaped and Clarion-compatible.
 
 Deliverables:
 
@@ -143,25 +143,25 @@ Deliverables:
 
 Exit criteria:
 
-- Clarion can send a policy decision to Aegis, Aegis can compile/apply it, and Clarion can observe enforcement status.
+- Clarion can send a policy decision to AegisFlux, AegisFlux can compile/apply it, and Clarion can observe enforcement status.
 
 ### Track F: Clarion Integration
 
-Goal: connect Aegis host/workload context into Clarion without collapsing project boundaries.
+Goal: connect AegisFlux host/workload context into Clarion without collapsing project boundaries.
 
 Deliverables:
 
-- Aegis -> Clarion telemetry events
-- Clarion -> Aegis policy decision API
+- AegisFlux -> Clarion telemetry events
+- Clarion -> AegisFlux policy decision API
 - Shared identity model: device, user, session, process, application, agent, flow, destination, policy decision, enforcement action
-- Clarion context graph ingestion of Aegis evidence
+- Clarion context graph ingestion of AegisFlux evidence
 - Clarion UI workflow for endpoint/process/agent evidence
-- Clarion policy workflow that can select endpoint enforcement through Aegis
-- ISE/SGT coordination based on Aegis risk posture
+- Clarion policy workflow that can select endpoint enforcement through AegisFlux
+- ISE/SGT coordination based on AegisFlux risk posture
 
 Exit criteria:
 
-- Clarion can reason over Aegis endpoint context and choose local enforcement, gateway enforcement, network action, or escalation.
+- Clarion can reason over AegisFlux endpoint context and choose local enforcement, gateway enforcement, network action, or escalation.
 
 ## 4. Test Machine and Lab Strategy
 
@@ -219,7 +219,7 @@ Each test pack should define setup, expected telemetry, expected classification,
 
 ## 5. Event and API Contract Plan
 
-### Aegis -> Clarion Events
+### AegisFlux -> Clarion Events
 
 - `aegis.agent.registered`
 - `aegis.agent.heartbeat`
@@ -234,7 +234,7 @@ Each test pack should define setup, expected telemetry, expected classification,
 - `aegis.endpoint.risk.changed`
 - `aegis.sensor.tamper_detected`
 
-### Clarion -> Aegis Commands
+### Clarion -> AegisFlux Commands
 
 - `clarion.policy.publish`
 - `clarion.enforcement.apply`
@@ -259,7 +259,7 @@ Each test pack should define setup, expected telemetry, expected classification,
 
 ## 6. Development Phases
 
-### Phase 1: Aegis Stabilization and Visibility
+### Phase 1: AegisFlux Stabilization and Visibility
 
 Work orders:
 
@@ -277,7 +277,7 @@ Build:
 
 Exit:
 
-- Aegis can reliably report host/process/flow context from Linux and Windows into its backend.
+- AegisFlux can reliably report host/process/flow context from Linux and Windows into its backend.
 
 ### Phase 2: AI-Agent Detection and Evidence
 
@@ -287,11 +287,11 @@ Build:
 - Detection confidence model
 - Evidence bundles
 - Browser, IDE, local agent, MCP, downloaded software, and shell automation test packs
-- Detection dashboard in Aegis UI
+- Detection dashboard in AegisFlux UI
 
 Exit:
 
-- Aegis can detect representative AI-agent and automation scenarios with explainable evidence.
+- AegisFlux can detect representative AI-agent and automation scenarios with explainable evidence.
 
 ### Phase 3: Local Enforcement
 
@@ -306,35 +306,35 @@ Build:
 
 Exit:
 
-- Aegis can block/redirect specific process/workload flows with rollback and auditability.
+- AegisFlux can block/redirect specific process/workload flows with rollback and auditability.
 
 ### Phase 4: Clarion Context Integration
 
 Build:
 
-- Aegis event ingestion into Clarion
+- AegisFlux event ingestion into Clarion
 - Clarion context graph mapping
 - Shared object IDs and correlation rules
 - Clarion investigation view for host/process/agent evidence
-- Clarion policy decision export to Aegis
+- Clarion policy decision export to AegisFlux
 
 Exit:
 
-- Clarion can use Aegis context in policy decisions and display Aegis evidence in investigations.
+- Clarion can use AegisFlux context in policy decisions and display AegisFlux evidence in investigations.
 
 ### Phase 5: Clarion Orchestration Integration
 
 Build:
 
 - Clarion decisions selecting endpoint, gateway, firewall, or SGT actions
-- ISE/SGT posture updates based on Aegis risk
+- ISE/SGT posture updates based on AegisFlux risk
 - Gateway/model-gateway policy coordination
 - Multi-control enforcement audit trail
 - Lab Tier 3 integration
 
 Exit:
 
-- Clarion can coordinate Aegis local enforcement with network and gateway controls.
+- Clarion can coordinate AegisFlux local enforcement with network and gateway controls.
 
 ### Phase 6: Customer Pattern Validation
 
@@ -348,21 +348,21 @@ Build:
 
 Exit:
 
-- Aegis and Clarion can be validated against customer-like endpoint, workload, and application behavior.
+- AegisFlux and Clarion can be validated against customer-like endpoint, workload, and application behavior.
 
 ## 7. Immediate Next Steps
 
 1. Convert the Clarion endpoint architecture PDF into a maintained Markdown source file.
-2. Create an Aegis-to-Clarion architecture mapping document.
+2. Create an AegisFlux-to-Clarion architecture mapping document.
 3. Define v1 event schemas for process, flow, DNS, agent detection, and enforcement status.
 4. Stand up Tier 1 lab machines: one Linux VM and one Windows 11 VM.
 5. Implement the first three detection packs: IDE AI assistant, local agent script, and browser AI.
 6. Add a test evidence format so every detection result includes why it fired.
-7. Decide whether Aegis remains a named subsystem or becomes branded as Clarion Host Enforcement.
+7. Decide whether AegisFlux remains a named subsystem or becomes branded as Clarion Host Enforcement.
 
 ## 8. Open Questions
 
-- Should Aegis keep its own UI long-term, or become an operator/developer console while Clarion owns the primary customer UI?
+- Should AegisFlux keep its own UI long-term, or become an operator/developer console while Clarion owns the primary customer UI?
 - Which platform gets first-class enforcement priority: Linux eBPF or Windows WFP?
 - What is the minimum event model Clarion needs before context graph integration starts?
 - Should AI-agent detection run primarily on the endpoint, in the backend, or as a split model?

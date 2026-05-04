@@ -7,7 +7,7 @@
 
 ## Goal
 
-Create a secure Rust scaffold for the macOS Aegis agent so macOS can become a supported visibility platform after the Windows Phase 1 path is proven.
+Create a secure Rust scaffold for the macOS AegisFlux agent so macOS can become a supported visibility platform after the Windows Phase 1 path is proven.
 
 ## Scope
 
@@ -24,7 +24,7 @@ Scaffold only. No Endpoint Security entitlement request, system extension, Netwo
 - Local JSONL event spool
 - Security baseline documentation
 - Lab-mode run command
-- Optional localhost-only `--post` to Aegis ingest
+- Optional localhost-only `--post` to AegisFlux ingest
 
 ## Acceptance Criteria
 
@@ -32,7 +32,7 @@ Scaffold only. No Endpoint Security entitlement request, system extension, Netwo
 - Crate runs in `--once --stdout` lab mode without root.
 - Event envelope includes OS and architecture.
 - Lab mode emits `aegis.process.started` snapshot events with command-line collection disabled by default.
-- `--post` can send the `--once` batch to local Aegis ingest without installing an agent service.
+- `--post` can send the `--once` batch to local AegisFlux ingest without installing an agent service.
 - README documents Endpoint Security and entitlement constraints.
 - Security doc explicitly excludes enforcement from Phase 1.
 

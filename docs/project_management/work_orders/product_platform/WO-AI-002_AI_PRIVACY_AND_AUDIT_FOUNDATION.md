@@ -6,7 +6,7 @@
 
 ## Goal
 
-Make all AI-agent usage auditable and safe for endpoint evidence. Aegis must redact sensitive data before external provider calls and record every AI run.
+Make all AI-agent usage auditable and safe for endpoint evidence. AegisFlux must redact sensitive data before external provider calls and record every AI run.
 
 ## Scope
 

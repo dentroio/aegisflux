@@ -1,38 +1,38 @@
-# Aegis Product Platform Work Orders
+# AegisFlux Product Platform Work Orders
 
-**Program:** Aegis product platform and Clarion-aligned management experience  
+**Program:** AegisFlux product platform and Clarion-aligned management experience  
 **Phase:** Phase 2 - Productization and AI-Agent Platform  
 **Status:** Draft  
 **Last updated:** May 4, 2026
 
 ## Objective
 
-Turn the current Aegis lab visibility foundation into a product-shaped platform that can be worked on safely by multiple agents.
+Turn the current AegisFlux lab visibility foundation into a product-shaped platform that can be worked on safely by multiple agents.
 
 The product direction is solid:
 
-- Aegis is the AI-era endpoint evidence and local-control platform.
-- Aegis endpoint agents stay lightweight, optimized, and observe-first.
-- Aegis backend and UI turn endpoint evidence into investigation, inventory, detection packs, and draft controls.
-- Aegis AI platform agents research, explain, validate, and draft, but do not bypass governance.
-- Clarion remains the broader enterprise context and policy intelligence platform; Aegis eventually integrates as the host/workload evidence and endpoint-control subsystem.
+- AegisFlux is the AI-era endpoint evidence and local-control platform.
+- AegisFlux endpoint agents stay lightweight, optimized, and observe-first.
+- AegisFlux backend and UI turn endpoint evidence into investigation, inventory, detection packs, and draft controls.
+- AegisFlux AI platform agents research, explain, validate, and draft, but do not bypass governance.
+- Clarion remains the broader enterprise context and policy intelligence platform; AegisFlux eventually integrates as the host/workload evidence and endpoint-control subsystem.
 
 ## Architecture Baseline
 
 These documents are the baseline for this program:
 
-- [Aegis Product Roadmap](../../../AEGIS_PRODUCT_ROADMAP.md)
-- [Aegis Platform Vision](../../../AEGIS_PLATFORM_VISION.md)
+- [AegisFlux Product Roadmap](../../../AEGIS_PRODUCT_ROADMAP.md)
+- [AegisFlux Platform Vision](../../../AEGIS_PLATFORM_VISION.md)
 - [Dynamic AI Detection Strategy](../../../AEGIS_DYNAMIC_AI_DETECTION_STRATEGY.md)
 - [AI Agent Platform Architecture](../../../AEGIS_AI_AGENT_PLATFORM_ARCHITECTURE.md)
 - [Sensor Fusion Architecture](../../../AEGIS_SENSOR_FUSION_ARCHITECTURE.md)
 - [Agent Performance Architecture](../../../AEGIS_AGENT_PERFORMANCE_ARCHITECTURE.md)
 - [UI Clarion Alignment](../../../AEGIS_UI_CLARION_ALIGNMENT.md)
-- [Aegis and Clarion Integration Contract](../../plans/AEGIS_CLARION_INTEGRATION_CONTRACT.md)
+- [AegisFlux and Clarion Integration Contract](../../plans/AEGIS_CLARION_INTEGRATION_CONTRACT.md)
 
 ## Product Workflow Target
 
-The Aegis UI should follow the Clarion shell pattern:
+The AegisFlux UI should follow the Clarion shell pattern:
 
 - Top header: product identity, global search, notifications, documentation, AI assistant, health, user controls.
 - Left navigation grouped by workflow:
@@ -61,7 +61,7 @@ The Aegis UI should follow the Clarion shell pattern:
 | WO-AGENT-001 | Agent Performance Budget Telemetry | CPU/memory/runtime collector budget events and UI | Windows/Linux agents reporting |
 | WO-INV-001 | Enterprise AI and Control Inventory | Browser, IDE, CLI, local model, SASE/SSE inventory pages | Visibility events and agents |
 | WO-CTRL-001 | Observe-Only Draft Controls and Simulation | Finding -> draft control -> historical match simulation | WO-PLAT-002, WO-DET-001 |
-| WO-INT-001 | Clarion Integration API Slice | Aegis evidence export and Clarion import contract implementation | WO-PLAT-002, WO-INV-001 |
+| WO-INT-001 | Clarion Integration API Slice | AegisFlux evidence export and Clarion import contract implementation | WO-PLAT-002, WO-INV-001 |
 
 ## Parallelization Guidance
 
@@ -71,11 +71,11 @@ These can run in parallel with low conflict:
 - WO-AI-001 and WO-AGENT-001 after backend ownership is clear.
 - WO-INV-001 can start from existing browser/SASE events while WO-AI work proceeds.
 - WO-CTRL-001 should wait until drill-in and detection-pack schema stabilize.
-- WO-INT-001 should wait until the Aegis evidence model is not churning daily.
+- WO-INT-001 should wait until the AegisFlux evidence model is not churning daily.
 
 ## Phase Exit Criteria
 
-- Aegis UI has a Clarion-like shell and clear workflow navigation.
+- AegisFlux UI has a Clarion-like shell and clear workflow navigation.
 - Dashboard is high-level and customizable without becoming an investigation page.
 - Operators can drill from agent list into device detail.
 - AI providers, AI health, privacy, and audit are first-class management capabilities.
@@ -91,6 +91,6 @@ These can run in parallel with low conflict:
 - No production enforcement by default.
 - No external LLM calls from endpoint agents.
 - No arbitrary code in detection packs.
-- No broad UI rewrite outside the active Aegis console unless explicitly scoped.
+- No broad UI rewrite outside the active AegisFlux console unless explicitly scoped.
 - No Clarion database coupling.
 

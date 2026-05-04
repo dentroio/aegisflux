@@ -6,7 +6,7 @@
 
 ## Goal
 
-Add the first Aegis AI platform agent action: explain AI activity on a selected endpoint using bounded, auditable context.
+Add the first AegisFlux AI platform agent action: explain AI activity on a selected endpoint using bounded, auditable context.
 
 ## Scope
 

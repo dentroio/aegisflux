@@ -6,11 +6,11 @@
 
 ## Goal
 
-Implement the first concrete Aegis -> Clarion integration slice without coupling databases or collapsing product boundaries.
+Implement the first concrete AegisFlux -> Clarion integration slice without coupling databases or collapsing product boundaries.
 
 ## Scope
 
-- Aegis evidence export.
+- AegisFlux evidence export.
 - Clarion-compatible shape.
 - Documentation and sample payloads.
 
@@ -35,7 +35,7 @@ Implement the first concrete Aegis -> Clarion integration slice without coupling
 
 ## Acceptance Criteria
 
-- Aegis can export a device evidence summary without Clarion running.
+- AegisFlux can export a device evidence summary without Clarion running.
 - Payloads validate against documented schema.
 - Contract avoids direct DB writes.
 - Clarion can consume or mock the payload independently.

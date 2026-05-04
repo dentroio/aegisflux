@@ -1,21 +1,21 @@
-# Aegis AI Agent Platform Architecture
+# AegisFlux AI Agent Platform Architecture
 
 ## Purpose
 
-Aegis should use AI agents the same way Clarion does: as governed product capabilities, not as a decorative chat feature. Clarion already has useful patterns for provider management, agent routing, health checks, privacy controls, audit records, and context-aware operator assistance. Aegis should carry those patterns forward and specialize them for AI endpoint visibility, dynamic detection, and safe control design.
+AegisFlux should use AI agents the same way Clarion does: as governed product capabilities, not as a decorative chat feature. Clarion already has useful patterns for provider management, agent routing, health checks, privacy controls, audit records, and context-aware operator assistance. AegisFlux should carry those patterns forward and specialize them for AI endpoint visibility, dynamic detection, and safe control design.
 
-The important distinction is that Aegis has two kinds of agents:
+The important distinction is that AegisFlux has two kinds of agents:
 
 - Endpoint agents: lightweight Windows, Linux, and future macOS collectors that observe local evidence and apply approved detection packs.
 - AI platform agents: backend/cloud-side research and reasoning workers that help operators understand evidence, generate detection candidates, and draft observe-only controls.
 
-AI platform agents must never directly bypass governance to instruct endpoint agents. They create candidates. Aegis validates, signs, stages, audits, and then distributes approved packs or control drafts through normal platform workflows.
+AI platform agents must never directly bypass governance to instruct endpoint agents. They create candidates. AegisFlux validates, signs, stages, audits, and then distributes approved packs or control drafts through normal platform workflows.
 
 ## Clarion Patterns To Reuse
 
 ### Provider Management
 
-Clarion has an AI connector that supports multiple provider types, a default provider, provider health, test chat, and provider error visibility. Aegis should reuse the same product model:
+Clarion has an AI connector that supports multiple provider types, a default provider, provider health, test chat, and provider error visibility. AegisFlux should reuse the same product model:
 
 - Local provider support for lab/private deployments.
 - External provider support for OpenAI, Anthropic, Google, and future enterprise gateways.
@@ -23,13 +23,13 @@ Clarion has an AI connector that supports multiple provider types, a default pro
 - Provider test actions and connection health.
 - Visible provider errors and last-connected timestamps.
 
-In Aegis, this belongs under Management > Connectors > AI Providers.
+In AegisFlux, this belongs under Management > Connectors > AI Providers.
 
 ### Registered AI Agents
 
-Clarion exposes registered agents as system-defined capabilities. Aegis should do the same. Operators should not think in raw prompts. They should see named agents with clear jobs, inputs, outputs, and governance state.
+Clarion exposes registered agents as system-defined capabilities. AegisFlux should do the same. Operators should not think in raw prompts. They should see named agents with clear jobs, inputs, outputs, and governance state.
 
-Initial Aegis registered agents:
+Initial AegisFlux registered agents:
 
 - Ecosystem Research Agent: tracks new AI tools, domains, protocols, package names, browser extensions, IDE extensions, MCP servers, local model runtimes, and agent-to-agent frameworks.
 - Detection Authoring Agent: converts research into candidate detection-pack changes with required evidence, confidence, risk, and false-positive notes.
@@ -40,9 +40,9 @@ Initial Aegis registered agents:
 
 ### AI Health Status
 
-Clarion's AI service health pattern should become an Aegis status surface. Every AI-assisted panel should show whether AI is available, degraded, unavailable, or unknown. If unavailable, Aegis should keep the workflow usable with deterministic summaries and stored evidence.
+Clarion's AI service health pattern should become an AegisFlux status surface. Every AI-assisted panel should show whether AI is available, degraded, unavailable, or unknown. If unavailable, AegisFlux should keep the workflow usable with deterministic summaries and stored evidence.
 
-Aegis UI behavior:
+AegisFlux UI behavior:
 
 - Dashboard shows AI service status as a small management signal, not as the main dashboard story.
 - Endpoint drill-in shows AI assistance status near AI actions.
@@ -51,7 +51,7 @@ Aegis UI behavior:
 
 ### Context-Aware Actions
 
-Clarion's device modal asks specific questions with structured context rather than opening a generic chat window. Aegis should follow that model.
+Clarion's device modal asks specific questions with structured context rather than opening a generic chat window. AegisFlux should follow that model.
 
 Examples:
 
@@ -67,9 +67,9 @@ The UI should send a bounded context object, not a loose data dump. For endpoint
 
 ### Privacy And Audit Controls
 
-Clarion's external LLM privacy controls are directly relevant to Aegis because endpoint evidence can contain sensitive hostnames, usernames, tokens, command lines, file paths, URLs, IPs, and business context.
+Clarion's external LLM privacy controls are directly relevant to AegisFlux because endpoint evidence can contain sensitive hostnames, usernames, tokens, command lines, file paths, URLs, IPs, and business context.
 
-Aegis should include:
+AegisFlux should include:
 
 - Sanitize external LLM requests.
 - Audit external LLM requests.
@@ -84,7 +84,7 @@ Aegis should include:
 
 This must be a first-class management section, not an afterthought.
 
-## Aegis-Specific AI Agent Loop
+## AegisFlux-Specific AI Agent Loop
 
 The differentiating loop should be:
 
@@ -94,14 +94,14 @@ The differentiating loop should be:
 4. Privacy review checks payload and rule metadata.
 5. Human or policy approval promotes the candidate to a signed detection pack.
 6. Endpoint agents fetch the signed pack and evaluate locally within CPU and memory budgets.
-7. Findings flow back to Aegis with evidence and pack version.
+7. Findings flow back to AegisFlux with evidence and pack version.
 8. Endpoint Evidence Analyst explains findings and Control Drafting Agent proposes observe-only controls.
 
 This creates a continuous update process without making endpoint agents heavy or uncontrolled.
 
 ## Backend Model
 
-Aegis should add backend concepts that mirror Clarion but are tuned for detection operations:
+AegisFlux should add backend concepts that mirror Clarion but are tuned for detection operations:
 
 - `ai_providers`: provider configuration, status, default provider, error state.
 - `ai_registered_agents`: system-defined agent metadata, route, status, allowed operations.
@@ -115,7 +115,7 @@ Aegis should add backend concepts that mirror Clarion but are tuned for detectio
 
 ## UI Model
 
-The Aegis management UI should eventually include these left-menu sections:
+The AegisFlux management UI should eventually include these left-menu sections:
 
 - Dashboard: clean platform overview and customizable widgets.
 - Agents: endpoint list and device drill-in.
@@ -141,7 +141,7 @@ AI platform agents do not run on endpoints. Endpoint agents must remain low-reso
 
 ## First Implementation Slice
 
-The first useful Aegis implementation should be small and concrete:
+The first useful AegisFlux implementation should be small and concrete:
 
 1. Add an AI Providers management page modeled after Clarion's provider connector.
 2. Add AI service health to the dashboard and endpoint drill-in.
@@ -153,6 +153,6 @@ The first useful Aegis implementation should be small and concrete:
 
 ## Product Principle
 
-Aegis should not say, "Ask AI anything about your endpoint."
+AegisFlux should not say, "Ask AI anything about your endpoint."
 
-Aegis should say, "Aegis agents continuously research the AI ecosystem, turn new behavior into validated detection intelligence, and explain endpoint evidence in a way operators can trust, approve, and control."
+AegisFlux should say, "AegisFlux agents continuously research the AI ecosystem, turn new behavior into validated detection intelligence, and explain endpoint evidence in a way operators can trust, approve, and control."

@@ -6,7 +6,7 @@
 
 ## Goal
 
-Make the Aegis console follow Clarion's core app-shell workflow: full-width top header, left workflow navigation, breadcrumb row, and clean dashboard content.
+Make the AegisFlux console follow Clarion's core app-shell workflow: full-width top header, left workflow navigation, breadcrumb row, and clean dashboard content.
 
 ## Scope
 
@@ -39,7 +39,7 @@ Make the Aegis console follow Clarion's core app-shell workflow: full-width top 
 
 ## Dependencies
 
-- Current Aegis console.
+- Current AegisFlux console.
 - Clarion frontend layout reference at `/Users/stevengerhart/workspace/github/sgerhart/clarion/frontend/src/components/Layout.tsx`.
 
 ## Implementation Notes

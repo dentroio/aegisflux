@@ -6,7 +6,7 @@
 
 ## Goal
 
-Allow the Aegis backend to receive, validate, store, and query visibility events from the Windows sensor.
+Allow the AegisFlux backend to receive, validate, store, and query visibility events from the Windows sensor.
 
 ## Scope
 

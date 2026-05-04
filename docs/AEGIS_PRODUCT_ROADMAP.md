@@ -1,14 +1,14 @@
-# Aegis Product Roadmap
+# AegisFlux Product Roadmap
 
 ## Product Thesis
 
-Aegis should become the evidence-to-control platform for the AI-era endpoint. The market already has tools that detect, alert, block, and aggregate. Aegis can be different by making every control recommendation traceable to live evidence: process, command line, network flow, DNS, identity, policy, blast radius, and rollback plan.
+AegisFlux should become the evidence-to-control platform for the AI-era endpoint. The market already has tools that detect, alert, block, and aggregate. AegisFlux can be different by making every control recommendation traceable to live evidence: process, command line, network flow, DNS, identity, policy, blast radius, and rollback plan.
 
 The practical wedge is simple: observe first, explain clearly, draft safely, enforce only when the operator trusts the evidence.
 
-The larger platform vision is captured in [AEGIS_PLATFORM_VISION.md](AEGIS_PLATFORM_VISION.md): Aegis should mature as a first-of-kind standalone innovation platform, then integrate into Clarion through explicit events and APIs as Clarion's host/workload evidence and local-control subsystem.
+The larger platform vision is captured in [AEGIS_PLATFORM_VISION.md](AEGIS_PLATFORM_VISION.md): AegisFlux should mature as a first-of-kind standalone innovation platform, then integrate into Clarion through explicit events and APIs as Clarion's host/workload evidence and local-control subsystem.
 
-Clarion's AI-agent patterns should also carry into Aegis. Aegis should support governed AI providers, registered AI platform agents, privacy controls, audit records, endpoint-specific AI assistance, and research-to-detection workflows. See [AEGIS_AI_AGENT_PLATFORM_ARCHITECTURE.md](AEGIS_AI_AGENT_PLATFORM_ARCHITECTURE.md).
+Clarion's AI-agent patterns should also carry into AegisFlux. AegisFlux should support governed AI providers, registered AI platform agents, privacy controls, audit records, endpoint-specific AI assistance, and research-to-detection workflows. See [AEGIS_AI_AGENT_PLATFORM_ARCHITECTURE.md](AEGIS_AI_AGENT_PLATFORM_ARCHITECTURE.md).
 
 ## Current Lab State
 
@@ -21,31 +21,31 @@ The lab now has a working visibility foundation:
 - Investigation drill-in from a process or finding to linked processes, flows, DNS records, and detections.
 - Observe-only UI that can show evidence without pretending to enforce policy yet.
 
-This is enough to demonstrate the core loop: endpoint evidence arrives, Aegis connects it into a path, then Aegis starts drafting the control that would reduce risk.
+This is enough to demonstrate the core loop: endpoint evidence arrives, AegisFlux connects it into a path, then AegisFlux starts drafting the control that would reduce risk.
 
 ## Differentiation
 
 ### Versus EDR
 
-EDR is optimized for malware detection and response. Aegis should focus on understandable control design: what should this endpoint be allowed to do, why, and what happens if we change it?
+EDR is optimized for malware detection and response. AegisFlux should focus on understandable control design: what should this endpoint be allowed to do, why, and what happens if we change it?
 
 ### Versus SIEM
 
-SIEM centralizes logs and correlation. Aegis should centralize evidence that can become action. The output is not only an alert; it is a candidate policy with supporting proof and rollback.
+SIEM centralizes logs and correlation. AegisFlux should centralize evidence that can become action. The output is not only an alert; it is a candidate policy with supporting proof and rollback.
 
 ### Versus ZTNA, SASE, and NAC
 
-These platforms often enforce network access but lack deep endpoint process context. Aegis can bridge endpoint behavior to enforcement surfaces: host firewall, eBPF, WFP, SASE policy, NAC identity groups, and segmentation tags.
+These platforms often enforce network access but lack deep endpoint process context. AegisFlux can bridge endpoint behavior to enforcement surfaces: host firewall, eBPF, WFP, SASE policy, NAC identity groups, and segmentation tags.
 
 ### Versus CNAPP and CSPM
 
-Cloud posture tools see cloud configuration well. Aegis should see the human and machine activity that reaches those services from real endpoints, especially AI tooling, automation, scripts, browsers, and local agents.
+Cloud posture tools see cloud configuration well. AegisFlux should see the human and machine activity that reaches those services from real endpoints, especially AI tooling, automation, scripts, browsers, and local agents.
 
 ## Core Concepts
 
 ### Agent Bill of Materials
 
-Aegis should maintain an Agent Bill of Materials for every endpoint:
+AegisFlux should maintain an Agent Bill of Materials for every endpoint:
 
 - AI desktop apps and browser AI sessions.
 - CLI agents, shell automation, scheduled tasks, and script runners.
@@ -57,7 +57,7 @@ This gives customers an inventory they do not reliably get today: which AI-capab
 
 ### Dynamic AI Detection
 
-AI tooling changes too quickly for static endpoint signatures to carry the product. Aegis should support a research-to-detection loop where cloud-side research agents monitor new AI tools, protocols, model gateways, MCP servers, browser agents, coding agents, and agent-to-agent ecosystems, then generate signed observe-only detection packs for endpoint agents.
+AI tooling changes too quickly for static endpoint signatures to carry the product. AegisFlux should support a research-to-detection loop where cloud-side research agents monitor new AI tools, protocols, model gateways, MCP servers, browser agents, coding agents, and agent-to-agent ecosystems, then generate signed observe-only detection packs for endpoint agents.
 
 See [AEGIS_DYNAMIC_AI_DETECTION_STRATEGY.md](AEGIS_DYNAMIC_AI_DETECTION_STRATEGY.md) for the detailed architecture.
 
@@ -71,7 +71,7 @@ Every finding should be able to produce a draft control:
 - Scope: process path, signer, command marker, user, host, remote IP, DNS name, port, protocol, or identity group.
 - Evidence: the exact process, flow, DNS, and finding records used.
 - Blast radius: what else would be affected if the control became active.
-- Rollback: how Aegis would revert the change and what success telemetry should look like.
+- Rollback: how AegisFlux would revert the change and what success telemetry should look like.
 
 The first implementation should stay observe-only. The UI can show the draft, but backend policy staging and enforcement adapters should come later.
 
@@ -105,7 +105,7 @@ The first implementation should stay observe-only. The UI can show the draft, bu
 
 - Add production enforcement adapters for host firewall, WFP, eBPF, SASE, NAC, SGT, and cloud access controls.
 - Add identity enrichment from directory, EDR, MDM, NAC, and network source-of-truth systems.
-- Add autonomous change windows where Aegis can stage, watch, verify, and roll back under human-approved constraints.
+- Add autonomous change windows where AegisFlux can stage, watch, verify, and roll back under human-approved constraints.
 - Add packaged installers, upgrade channels, fleet management, and tenant isolation.
 - Add compliance reporting that proves why a control exists and when it last matched real behavior.
 
@@ -115,12 +115,12 @@ The strongest demo path is:
 
 1. A Windows or Linux endpoint reports process, flow, DNS, and finding evidence.
 2. The operator selects a finding.
-3. Aegis shows the investigation path: process, command, remote service, DNS, and risk.
-4. Aegis drafts an observe-only control from the evidence.
+3. AegisFlux shows the investigation path: process, command, remote service, DNS, and risk.
+4. AegisFlux drafts an observe-only control from the evidence.
 5. The operator can see the proposed scope, expected blast radius, and rollback plan.
-6. Aegis makes clear that enforcement is not active until policy staging and approval exist.
+6. AegisFlux makes clear that enforcement is not active until policy staging and approval exist.
 
-This tells the market that Aegis is not another alert feed. It is a control design system grounded in endpoint truth.
+This tells the market that AegisFlux is not another alert feed. It is a control design system grounded in endpoint truth.
 
 ## Risks
 

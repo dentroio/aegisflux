@@ -7,7 +7,7 @@
 
 ## Goal
 
-Attribute outbound network connections and DNS observations to the Windows process and user context collected by the Aegis sensor.
+Attribute outbound network connections and DNS observations to the Windows process and user context collected by the AegisFlux sensor.
 
 ## Scope
 

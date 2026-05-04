@@ -1,8 +1,8 @@
-# Aegis UI Clarion Alignment
+# AegisFlux UI Clarion Alignment
 
 ## Goal
 
-Aegis should evolve as a Clarion-compatible management experience. The UI can have its own AI-security focus, but navigation, density, controls, and operational language should feel familiar to Clarion users.
+AegisFlux should evolve as a Clarion-compatible management experience. The UI can have its own AI-security focus, but navigation, density, controls, and operational language should feel familiar to Clarion users.
 
 Reference frontend:
 
@@ -20,11 +20,11 @@ Reference frontend:
 - Restrained Tailwind utility styling with light/dark support.
 - Lucide icons for navigation, actions, status, and compact controls.
 
-## Aegis Navigation Direction
+## AegisFlux Navigation Direction
 
-Initial Aegis sections should map cleanly to Clarion concepts:
+Initial AegisFlux sections should map cleanly to Clarion concepts:
 
-| Aegis Section | Purpose |
+| AegisFlux Section | Purpose |
 |---------------|---------|
 | Dashboard | AI/security posture, endpoint health, recent findings, collector coverage |
 | Devices | Windows/Linux/macOS agent inventory, resource health, last seen, collector status |
@@ -55,4 +55,4 @@ The UI must grow beyond a visibility console. It needs first-class management fo
 - Keep wording concrete: what was observed, why it matters, what is missing, and what can be done next.
 - Make resource impact visible wherever agent health appears.
 
-The UI should eventually look like Aegis belongs inside Clarion, while still making AI detection, endpoint evidence, and agent governance the center of the experience.
+The UI should eventually look like AegisFlux belongs inside Clarion, while still making AI detection, endpoint evidence, and agent governance the center of the experience.

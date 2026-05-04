@@ -6,7 +6,7 @@
 
 ## Goal
 
-Expose the first useful investigation workflow for Aegis visibility data.
+Expose the first useful investigation workflow for AegisFlux visibility data.
 
 ## Scope
 
@@ -51,7 +51,7 @@ Minimum API or UI should answer:
 
 ## Risks
 
-- Existing UI may assume current Aegis policy/agent objects only. Keep first surface simple.
+- Existing UI may assume current AegisFlux policy/agent objects only. Keep first surface simple.
 - Avoid building a polished investigation UI before the data model stabilizes.
 
 ## Completion Evidence

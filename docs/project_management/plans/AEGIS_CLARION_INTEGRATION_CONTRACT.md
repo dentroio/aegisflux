@@ -1,20 +1,20 @@
-# Aegis and Clarion Integration Contract
+# AegisFlux and Clarion Integration Contract
 
 **Status:** Draft  
-**Owner:** Aegis / Clarion architecture  
+**Owner:** AegisFlux / Clarion architecture  
 **Last updated:** April 26, 2026
 
 ## Purpose
 
-Aegis and Clarion should remain independent products with a deliberate integration boundary. Aegis provides host and workload visibility, local telemetry, and future endpoint/workload enforcement. Clarion provides enterprise context, policy intelligence, risk decisions, and orchestration across network, endpoint, gateway, identity, and security systems.
+AegisFlux and Clarion should remain independent products with a deliberate integration boundary. AegisFlux provides host and workload visibility, local telemetry, and future endpoint/workload enforcement. Clarion provides enterprise context, policy intelligence, risk decisions, and orchestration across network, endpoint, gateway, identity, and security systems.
 
-The integration model is event-driven and API-driven. Aegis must not become a Clarion subdirectory or share Clarion internals. Clarion must not depend on Aegis internal storage or agent implementation details.
+The integration model is event-driven and API-driven. AegisFlux must not become a Clarion subdirectory or share Clarion internals. Clarion must not depend on AegisFlux internal storage or agent implementation details.
 
-Aegis should mature first as a standalone innovation platform for AI-era endpoint and workload evidence, dynamic AI detection, Agent Bill of Materials, draft controls, simulation, and local-control readiness. Clarion integration should consume that maturity rather than collapse Aegis into a narrow feature too early. See [../../AEGIS_PLATFORM_VISION.md](../../AEGIS_PLATFORM_VISION.md).
+AegisFlux should mature first as a standalone innovation platform for AI-era endpoint and workload evidence, dynamic AI detection, Agent Bill of Materials, draft controls, simulation, and local-control readiness. Clarion integration should consume that maturity rather than collapse AegisFlux into a narrow feature too early. See [../../AEGIS_PLATFORM_VISION.md](../../AEGIS_PLATFORM_VISION.md).
 
 ## Product Boundary
 
-### Aegis Owns
+### AegisFlux Owns
 
 - Host and workload agent lifecycle.
 - Agent identity, registration, health, version, and capabilities.
@@ -37,8 +37,8 @@ Aegis should mature first as a standalone innovation platform for AI-era endpoin
 
 ## Integration Principles
 
-- Aegis emits evidence; Clarion decides enterprise action.
-- Clarion sends decisions; Aegis applies only the endpoint/workload actions it is responsible for.
+- AegisFlux emits evidence; Clarion decides enterprise action.
+- Clarion sends decisions; AegisFlux applies only the endpoint/workload actions it is responsible for.
 - Integration uses explicit versioned events and APIs.
 - No shared implicit database writes.
 - No direct coupling to internal service tables, local queues, or implementation-specific IDs.
@@ -47,11 +47,11 @@ Aegis should mature first as a standalone innovation platform for AI-era endpoin
 
 ## Phase 1: Observe-Only Contract
 
-Phase 1 keeps Aegis non-blocking. The goal is to make Clarion smarter with endpoint and workload evidence before any local enforcement is enabled.
+Phase 1 keeps AegisFlux non-blocking. The goal is to make Clarion smarter with endpoint and workload evidence before any local enforcement is enabled.
 
-### Aegis to Clarion Events
+### AegisFlux to Clarion Events
 
-Aegis should publish these event families:
+AegisFlux should publish these event families:
 
 - `aegis.agent.registered`
 - `aegis.agent.heartbeat`
@@ -66,7 +66,7 @@ Aegis should publish these event families:
 
 ### Required Event Envelope
 
-Every Aegis event sent to Clarion should include:
+Every AegisFlux event sent to Clarion should include:
 
 ```json
 {
@@ -84,9 +84,9 @@ Every Aegis event sent to Clarion should include:
 }
 ```
 
-### Clarion Context Objects Created from Aegis
+### Clarion Context Objects Created from AegisFlux
 
-Clarion should map Aegis evidence into these context objects:
+Clarion should map AegisFlux evidence into these context objects:
 
 - Device
 - Agent
@@ -103,9 +103,9 @@ Clarion should map Aegis evidence into these context objects:
 
 ## Identity Mapping
 
-Aegis must preserve both host identity and agent identity. Clarion should not assume they are the same object.
+AegisFlux must preserve both host identity and agent identity. Clarion should not assume they are the same object.
 
-| Concept | Aegis Field | Clarion Mapping | Notes |
+| Concept | AegisFlux Field | Clarion Mapping | Notes |
 |---|---|---|---|
 | Tenant | `tenant_id` or `org_id` | Tenant/customer | Required for multi-tenant deployments. |
 | Device | `device_id`, `host_id`, machine hash | Device node | Stable across agent reinstall when possible. |
@@ -118,9 +118,9 @@ Aegis must preserve both host identity and agent identity. Clarion should not as
 
 ## Phase 2: Decision Handoff
 
-After observe-only validation, Clarion can send endpoint/workload decisions to Aegis.
+After observe-only validation, Clarion can send endpoint/workload decisions to AegisFlux.
 
-Clarion to Aegis decision types:
+Clarion to AegisFlux decision types:
 
 - `observe_only`
 - `increase_monitoring`
@@ -143,9 +143,9 @@ Decision payloads must include:
 
 ## Enforcement Boundary
 
-Aegis may enforce only host/workload-local controls assigned to it. Clarion remains the system of record for why the action was selected.
+AegisFlux may enforce only host/workload-local controls assigned to it. Clarion remains the system of record for why the action was selected.
 
-Aegis enforcement examples:
+AegisFlux enforcement examples:
 
 - Block one process from one destination.
 - Redirect model API calls from one process to an approved model gateway.
@@ -162,25 +162,25 @@ Clarion orchestration examples:
 
 ## Non-Goals
 
-- Do not merge Clarion and Aegis repositories.
-- Do not make Aegis depend on Clarion database tables.
-- Do not make Clarion depend on Aegis local storage internals.
-- Do not place Clarion product documents permanently inside Aegis without an explicit docs decision.
+- Do not merge Clarion and AegisFlux repositories.
+- Do not make AegisFlux depend on Clarion database tables.
+- Do not make Clarion depend on AegisFlux local storage internals.
+- Do not place Clarion product documents permanently inside AegisFlux without an explicit docs decision.
 - Do not build blocking enforcement before observe-only telemetry is validated.
 
 ## Near-Term Implementation Plan
 
-1. Keep Aegis and Clarion as separate repos/products.
-2. Keep Aegis visibility event schemas in Aegis.
-3. Use the Aegis ingest lab export endpoint, `GET /v1/clarion/events`, to validate the first Clarion-facing event contract.
-4. Add a Clarion-side importer later that consumes Aegis events into Clarion context objects.
+1. Keep AegisFlux and Clarion as separate repos/products.
+2. Keep AegisFlux visibility event schemas in AegisFlux.
+3. Use the AegisFlux ingest lab export endpoint, `GET /v1/clarion/events`, to validate the first Clarion-facing event contract.
+4. Add a Clarion-side importer later that consumes AegisFlux events into Clarion context objects.
 5. Build macOS and Windows agent telemetry in observe-only mode first.
 6. Validate investigation paths before adding enforcement decisions.
 
 ## Open Decisions
 
-- Production transport for Aegis-to-Clarion events after the lab HTTP pull contract: HTTP push, NATS, Kafka, or file export.
-- Whether Clarion should store raw Aegis events, normalized context objects, or both.
-- Canonical tenant/device identity source when Aegis and Clarion see the same host through different systems.
+- Production transport for AegisFlux-to-Clarion events after the lab HTTP pull contract: HTTP push, NATS, Kafka, or file export.
+- Whether Clarion should store raw AegisFlux events, normalized context objects, or both.
+- Canonical tenant/device identity source when AegisFlux and Clarion see the same host through different systems.
 - Minimum evidence required before Clarion may send an endpoint enforcement decision.
 - Where the current Clarion architecture PDF should live long term.

@@ -542,7 +542,7 @@ export default function AegisDashboard() {
       })
       setLastRefresh(new Date())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load Aegis dashboard')
+      setError(err instanceof Error ? err.message : 'Failed to load AegisFlux dashboard')
     } finally {
       setLoading(false)
     }
@@ -577,7 +577,7 @@ export default function AegisDashboard() {
                 <ShieldCheck className="h-5 w-5 text-white" />
               </div>
               <div>
-                <div style={ui.brandTitle}>Aegis</div>
+                <div style={ui.brandTitle}>AegisFlux</div>
                 <div style={ui.mutedSmall}>AI endpoint governance</div>
               </div>
             </div>
@@ -654,7 +654,7 @@ export default function AegisDashboard() {
 
           <div style={ui.contentArea}>
             <div style={ui.breadcrumb}>
-              <span>Aegis</span>
+              <span>AegisFlux</span>
               <span>/</span>
               <span style={{ color: '#0f172a', fontWeight: 650 }}>Dashboard</span>
             </div>
@@ -667,7 +667,7 @@ export default function AegisDashboard() {
                       <StatusChip tone={health.tone} label={health.text} />
                     </div>
                     <p className="mt-2 text-sm text-slate-500" style={ui.subtitle}>
-                      Overall status, coverage, AI activity, and endpoint drill-in for the Aegis fleet.
+                      Overall status, coverage, AI activity, and endpoint drill-in for the AegisFlux fleet.
                     </p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -701,7 +701,7 @@ export default function AegisDashboard() {
                   Platform status
                 </div>
                 <div className="mt-3 text-4xl font-bold tracking-tight text-slate-950" style={ui.heroStatus}>{health.label}</div>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600" style={ui.heroText}>{health.text}. Aegis is running in observe-only mode while evidence, inventory, and control readiness mature.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600" style={ui.heroText}>{health.text}. AegisFlux is running in observe-only mode while evidence, inventory, and control readiness mature.</p>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]" style={ui.miniGrid}>
                 <MiniStat label="Endpoints" value={model.totalDevices} />
