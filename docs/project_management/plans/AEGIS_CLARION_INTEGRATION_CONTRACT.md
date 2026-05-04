@@ -10,6 +10,8 @@ Aegis and Clarion should remain independent products with a deliberate integrati
 
 The integration model is event-driven and API-driven. Aegis must not become a Clarion subdirectory or share Clarion internals. Clarion must not depend on Aegis internal storage or agent implementation details.
 
+Aegis should mature first as a standalone innovation platform for AI-era endpoint and workload evidence, dynamic AI detection, Agent Bill of Materials, draft controls, simulation, and local-control readiness. Clarion integration should consume that maturity rather than collapse Aegis into a narrow feature too early. See [../../AEGIS_PLATFORM_VISION.md](../../AEGIS_PLATFORM_VISION.md).
+
 ## Product Boundary
 
 ### Aegis Owns

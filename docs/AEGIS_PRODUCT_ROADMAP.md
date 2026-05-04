@@ -6,6 +6,8 @@ Aegis should become the evidence-to-control platform for the AI-era endpoint. Th
 
 The practical wedge is simple: observe first, explain clearly, draft safely, enforce only when the operator trusts the evidence.
 
+The larger platform vision is captured in [AEGIS_PLATFORM_VISION.md](AEGIS_PLATFORM_VISION.md): Aegis should mature as a first-of-kind standalone innovation platform, then integrate into Clarion through explicit events and APIs as Clarion's host/workload evidence and local-control subsystem.
+
 ## Current Lab State
 
 The lab now has a working visibility foundation:
