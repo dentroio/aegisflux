@@ -362,11 +362,11 @@ const ui: Record<string, CSSProperties> = {
     color: '#475569',
     background: '#f8fafc',
   },
-  headerLogo: { display: 'flex', alignItems: 'center', gap: 12, minWidth: 220 },
+  headerLogo: { display: 'flex', alignItems: 'center', gap: 12, minWidth: 260 },
   headerLogoMark: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 9,
     background: '#020617',
     display: 'flex',
     alignItems: 'center',
@@ -374,7 +374,17 @@ const ui: Record<string, CSSProperties> = {
     overflow: 'hidden',
   },
   logoImage: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
-  wordmarkImage: { width: 190, height: 'auto', display: 'block' },
+  wordmarkText: {
+    margin: 0,
+    fontSize: 21,
+    lineHeight: '23px',
+    fontWeight: 850,
+    letterSpacing: 0.4,
+    color: '#0f172a',
+  },
+  wordmarkFlux: {
+    color: '#2563eb',
+  },
   headerSearch: {
     height: 34,
     display: 'inline-flex',
@@ -578,8 +588,10 @@ export default function AegisDashboard() {
               <div style={ui.headerLogoMark}>
                 <img src="/aegisflux-icon.svg" alt="AegisFlux" style={ui.logoImage} />
               </div>
-              <div style={{ display: 'grid', gap: 2 }}>
-                <img src="/aegisflux-wordmark.svg" alt="AegisFlux" style={ui.wordmarkImage} />
+              <div style={{ display: 'grid', gap: 1 }}>
+                <div style={ui.wordmarkText}>
+                  Aegis<span style={ui.wordmarkFlux}>Flux</span>
+                </div>
                 <div style={ui.mutedSmall}>AI endpoint governance</div>
               </div>
             </div>
