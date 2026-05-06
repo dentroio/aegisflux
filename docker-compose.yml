@@ -77,7 +77,27 @@ services:
       - "9091:9090"
     environment:
       - NATS_URL=nats://nats:4222
-      
+      - AEGIS_VISIBILITY_STORE_PATH=/data/visibility-events.jsonl
+    volumes:
+      - ingest_visibility_data:/data
+
+  detection-pipeline:
+    build:
+      context: .
+      dockerfile: backend/detection-pipeline/Dockerfile
+    restart: unless-stopped
+    depends_on: [ingest]
+    ports:
+      - "8089:8089"
+    environment:
+      - DETECTION_PIPELINE_HTTP_ADDR=:8089
+      - INGEST_URL=http://ingest:9090
+      - DETECTION_PIPELINE_DATA_PATH=/data/detection-pipeline.json
+      - DETECTION_ROLLOUT_LAB_ONLY=true
+      - DETECTION_PIPELINE_PUBLIC_BASE_URL=http://detection-pipeline:8089
+    volumes:
+      - detection_pipeline_data:/data
+
   etl-enrich:
     build: backend/etl-enrich
     restart: unless-stopped
@@ -112,7 +132,9 @@ services:
       - CORR_HOT_RELOAD=false
 
   decision:
-    build: backend/decision
+    build:
+      context: .
+      dockerfile: backend/decision/Dockerfile
     restart: unless-stopped
     depends_on: [nats, neo4j, config-api]
     ports:
@@ -189,7 +211,31 @@ services:
       - ACTIONS_API_PORT=8083
       - ACTIONS_API_HOST=0.0.0.0
 
+  local-agent:
+    build:
+      context: .
+      dockerfile: agents/local-agent/Dockerfile
+    restart: unless-stopped
+    depends_on: [bpf-registry, nats, vault]
+    privileged: true
+    user: "0:0"
+    ports:
+      - "${LOCAL_AGENT_HTTP_PORT:-18080}:8080"
+    environment:
+      - AGENT_HOST_ID=${AGENT_HOST_ID:-localhost}
+      - AGENT_REGISTRY_URL=http://bpf-registry:8090
+      - AGENT_NATS_URL=nats://nats:4222
+      - AGENT_VAULT_URL=http://vault:8200
+      - AGENT_VAULT_TOKEN=root
+      - AGENT_HTTP_ADDRESS=0.0.0.0
+      - AGENT_HTTP_PORT=8080
+      - AGENT_LOG_LEVEL=${AGENT_LOG_LEVEL:-info}
+    volumes:
+      - /sys/fs/bpf:/sys/fs/bpf
+
 volumes:
   timescale_data:
   neo4j_data:
   vault-data:
+  detection_pipeline_data:
+  ingest_visibility_data:

@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aegisflux.local/schemas/visibility/detection-pack-status.schema.json",
+  "title": "Aegis Detection Pack Status",
+  "allOf": [
+    {
+      "$ref": "common-envelope.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "aegis.detection_pack.status"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "controller_endpoint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "rollout_state": {
+              "type": "string",
+              "enum": [
+                "not_checked",
+                "applied",
+                "rejected",
+                "stale",
+                "incompatible",
+                "expired",
+                "rollback"
+              ]
+            },
+            "reason_codes": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            },
+            "reason_detail": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "active_pack_id": {
+              "type": ["string", "null"],
+              "maxLength": 256
+            },
+            "active_pack_version": {
+              "type": ["string", "null"],
+              "maxLength": 64
+            },
+            "previous_pack_id": {
+              "type": ["string", "null"],
+              "maxLength": 256
+            },
+            "previous_pack_version": {
+              "type": ["string", "null"],
+              "maxLength": 64
+            },
+            "signature_status": {
+              "type": "string",
+              "enum": ["unknown", "ok", "failed"]
+            },
+            "hash_status": {
+              "type": "string",
+              "enum": ["unknown", "ok", "failed"]
+            },
+            "schema_status": {
+              "type": "string",
+              "enum": ["unknown", "ok", "failed"]
+            },
+            "compatibility_status": {
+              "type": "string",
+              "enum": ["unknown", "ok", "failed"]
+            },
+            "artifact_sha256": {
+              "type": ["string", "null"],
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "controller_endpoint",
+            "rollout_state",
+            "reason_codes",
+            "signature_status",
+            "hash_status",
+            "schema_status",
+            "compatibility_status"
+          ]
+        }
+      }
+    }
+  ]
+}

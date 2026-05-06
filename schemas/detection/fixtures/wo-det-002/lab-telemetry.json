@@ -1,0 +1,71 @@
+[
+  {
+    "schema_version": "visibility.v1",
+    "event_id": "wo-det-002-lab-proc-node-mcp",
+    "event_type": "aegis.process.started",
+    "timestamp_ms": 1715000001000,
+    "source": "aegis-lab-fixture",
+    "device_id": "lab-mcp-01",
+    "agent_id": "lab-agent",
+    "sensor_version": "0.1.0",
+    "sequence": 1,
+    "payload": {
+      "process_guid": "lab-p-node-1",
+      "parent_process_guid": null,
+      "pid": 8842,
+      "ppid": 1200,
+      "name": "node.exe",
+      "path": "C:\\Program Files\\nodejs\\node.exe",
+      "command_line": "node ./node_modules/@modelcontextprotocol/server-filesystem/dist/cli.js --mcp-server",
+      "user": "labuser",
+      "collection_method": "lab.fixture"
+    }
+  },
+  {
+    "schema_version": "visibility.v1",
+    "event_id": "wo-det-002-lab-dns-ollama",
+    "event_type": "aegis.dns.observed",
+    "timestamp_ms": 1715000002000,
+    "source": "aegis-lab-fixture",
+    "device_id": "lab-mcp-01",
+    "agent_id": "lab-agent",
+    "sensor_version": "0.1.0",
+    "sequence": 2,
+    "payload": {
+      "query": "ollama.internal.lab.local",
+      "query_type": "A",
+      "answers": ["127.0.0.1"],
+      "resolver": "stub",
+      "process_guid": "lab-p-node-1",
+      "pid": 8842,
+      "correlation_method": "lab.fixture",
+      "correlation_confidence": 0.9
+    }
+  },
+  {
+    "schema_version": "visibility.v1",
+    "event_id": "wo-det-002-lab-flow-443",
+    "event_type": "aegis.flow.started",
+    "timestamp_ms": 1715000003000,
+    "source": "aegis-lab-fixture",
+    "device_id": "lab-mcp-01",
+    "agent_id": "lab-agent",
+    "sensor_version": "0.1.0",
+    "sequence": 3,
+    "payload": {
+      "flow_id": "flow-lab-1",
+      "process_guid": "lab-p-node-1",
+      "pid": 8842,
+      "process_name": "node.exe",
+      "protocol": "tcp",
+      "direction": "outbound",
+      "local_ip": "10.0.0.5",
+      "local_port": 49812,
+      "remote_ip": "52.0.0.1",
+      "remote_port": 443,
+      "remote_hostname": "api.openai.com",
+      "attribution_method": "lab.fixture",
+      "attribution_confidence": 0.85
+    }
+  }
+]

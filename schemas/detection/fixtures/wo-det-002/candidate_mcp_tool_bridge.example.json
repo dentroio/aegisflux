@@ -1,0 +1,91 @@
+{
+  "research_item_id": "REPLACE_AFTER_CREATING_RESEARCH_ITEM",
+  "title": "MCP / local-model / tool-bridge lab candidate",
+  "description": "WO-DET-002 fixture: observe-only rules for MCP stdio servers, common gateway binaries, and DNS to local model listeners.",
+  "pack_id": "aegis.research.mcp_tool_bridge",
+  "pack_version": "0.1.0",
+  "min_agent_version": "0.1.0",
+  "supported_os": ["windows", "linux"],
+  "author": "aegisflux-lab",
+  "source": "fixture:schemas/detection/fixtures/wo-det-002",
+  "evaluator_limits": {
+    "max_wall_time_ms_per_batch": 75,
+    "max_heap_bytes": 4194304,
+    "max_rules_evaluated_per_batch": 128,
+    "max_cpu_percent_soft": 10,
+    "max_string_comparisons_per_rule": 8192,
+    "max_clause_depth": 8,
+    "max_clauses_per_rule": 64
+  },
+  "references": [
+    "https://modelcontextprotocol.io/"
+  ],
+  "proposed_rules": [
+    {
+      "rule_id": "mcp.stdio.server.cli",
+      "target_os": ["windows", "linux"],
+      "priority": 50,
+      "title": "MCP stdio server or bridge CLI observed",
+      "description": "Process command line references MCP SDK, stdio transport, or common MCP server packages.",
+      "classification": "ai_tooling_mcp",
+      "pattern_tags": ["mcp_stdio", "modelcontextprotocol"],
+      "agent_likelihood": 0.55,
+      "confidence": 0.58,
+      "risk_score": 22,
+      "recommended_action": "monitor",
+      "false_positive_notes": "Legitimate developer MCP servers are common in lab; correlate with user, repo path, and destinations.",
+      "required_evidence": ["process", "command_line"],
+      "match": {
+        "process": {
+          "case_insensitive": true,
+          "command_line_contains_any": [
+            "@modelcontextprotocol",
+            "modelcontextprotocol",
+            " mcp ",
+            "--mcp-server",
+            "mcp-server",
+            "mcp inspector",
+            "mcp-inspector",
+            "stdio mcp",
+            "sse+mcp",
+            "openai/gateway",
+            "litellm",
+            "ollama serve",
+            "vllm",
+            "llama.cpp",
+            "server.py --transport stdio"
+          ]
+        }
+      }
+    },
+    {
+      "rule_id": "mcp.local.gateway.listener",
+      "target_os": ["windows", "linux"],
+      "priority": 40,
+      "title": "Local model gateway / OpenAI-compatible listener DNS",
+      "description": "DNS suggests a local or loopback model gateway often used with MCP or IDE agents.",
+      "classification": "ai_tooling_local_model",
+      "pattern_tags": ["local_model_dns"],
+      "agent_likelihood": 0.35,
+      "confidence": 0.45,
+      "risk_score": 12,
+      "recommended_action": "monitor",
+      "false_positive_notes": "Many dev stacks use localhost model gateways; not evidence of exfiltration.",
+      "required_evidence": ["dns_query"],
+      "match": {
+        "dns": {
+          "query_contains_any": [
+            "localhost",
+            "127.0.0.1",
+            "ollama.",
+            "litellm.",
+            "vllm.",
+            "llamacpp",
+            "openai.local",
+            "mcp.local"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "title": "MCP servers, local OpenAI-compatible gateways, and IDE tool bridges",
+  "summary": "Research track for Model Context Protocol hosts, stdio MCP servers, and local model endpoints used by coding agents.",
+  "source_url": "https://modelcontextprotocol.io/"
+}

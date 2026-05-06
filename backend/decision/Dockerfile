@@ -21,8 +21,8 @@ RUN go mod download
 COPY backend/decision/ .
 
 # Copy LLM system prompts and models configuration
-COPY llm/system-prompts/ ./llm/system-prompts/
-COPY llm/models.yaml ./llm/models.yaml
+COPY backend/decision/config/system-prompts/ ./llm/system-prompts/
+COPY backend/decision/config/models.yaml ./llm/models.yaml
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o decision ./cmd/decision

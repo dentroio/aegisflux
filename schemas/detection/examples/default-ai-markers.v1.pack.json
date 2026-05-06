@@ -1,0 +1,277 @@
+{
+  "schema_version": "detection_pack.v1",
+  "pack_id": "aegis.default_ai_markers",
+  "pack_version": "1.0.0",
+  "created_at": "2026-05-01T12:00:00Z",
+  "author": "aegisflux",
+  "source": "fixture:agents/windows-agent/src/detection.rs",
+  "min_agent_version": "0.1.0",
+  "supported_os": ["windows", "linux"],
+  "mode": "observe",
+  "expires_at": null,
+  "rollback_pack_version": null,
+  "signature": {
+    "algorithm": "ed25519",
+    "key_id": "fixture-lab-2026-05",
+    "value_b64": "acfQaNWxmfEclng/se9xp7ZJ+sYJR+53u7J+Qj3FEZKn4r601+AwkMx3v6VoGMahgP5vSAc2Ht8ZH8wIxzXNSA=="
+  },
+  "evaluator_limits": {
+    "max_wall_time_ms_per_batch": 50,
+    "max_heap_bytes": 2097152,
+    "max_rules_evaluated_per_batch": 256,
+    "max_cpu_percent_soft": 5,
+    "max_string_comparisons_per_rule": 4096,
+    "max_clause_depth": 8,
+    "max_clauses_per_rule": 64
+  },
+  "references": [
+    "https://aegisflux.local/docs/project_management/work_orders/product_platform/WO-DET-001_DETECTION_PACK_SCHEMA_AND_LOCAL_EVALUATOR_CONTRACT.md"
+  ],
+  "rules": [
+    {
+      "rule_id": "ai.agent_marker.command_line",
+      "target_os": ["windows", "linux"],
+      "priority": 100,
+      "title": "Agent-like command line marker observed",
+      "description": "A process command line contained explicit agent or model-tooling markers (lab parity with detect_command_line_agent_marker).",
+      "classification": "script_or_agent_runtime",
+      "pattern_tags": ["agent_marker_command_line"],
+      "agent_likelihood": 0.7,
+      "confidence": 0.76,
+      "risk_score": 42,
+      "recommended_action": "review",
+      "false_positive_notes": "Developer machines often run legitimate agent frameworks; correlate with parent process, user, and destinations.",
+      "required_evidence": ["process", "command_line"],
+      "match": {
+        "process": {
+          "case_insensitive": true,
+          "command_line_contains_any": [
+            "agent_runner",
+            "autogen",
+            "crewai",
+            "langchain",
+            "llamaindex",
+            "semantic-kernel",
+            "openai",
+            "anthropic"
+          ]
+        }
+      }
+    },
+    {
+      "rule_id": "ai.script_or_agent.runtime_heuristic",
+      "target_os": ["windows", "linux"],
+      "priority": 90,
+      "title": "Possible local AI agent runtime observed",
+      "description": "Script/runtime process with at least two independent signals among agent-like CLI, IDE parent, python/node hints, or TLS flow (lab parity with detect_script_or_agent_runtime).",
+      "classification": "script_or_agent_runtime",
+      "pattern_tags": [
+        "agent_runtime_command_line",
+        "python_runtime",
+        "node_runtime",
+        "developer_tool_parent",
+        "runtime_network_connection"
+      ],
+      "agent_likelihood": 0.65,
+      "confidence": 0.72,
+      "risk_score": 40,
+      "recommended_action": "review",
+      "false_positive_notes": "IDEs and package managers spawn many runtimes; require multiple corroborating signals.",
+      "required_evidence": ["process", "command_line", "parent_process", "network_flow"],
+      "match": {
+        "op": "all_of",
+        "of": [
+          {
+            "process": {
+              "case_insensitive": true,
+              "executable_names_any": [
+                "python.exe",
+                "pythonw.exe",
+                "python3",
+                "python",
+                "node.exe",
+                "node",
+                "npm.exe",
+                "npm",
+                "npx.exe",
+                "npx",
+                "bun.exe",
+                "bun",
+                "uv.exe",
+                "uv"
+              ]
+            }
+          },
+          {
+            "op": "any_of",
+            "min_match": 2,
+            "of": [
+              {
+                "process": {
+                  "case_insensitive": true,
+                  "command_line_contains_any": [
+                    "agent",
+                    "autogen",
+                    "crewai",
+                    "langchain",
+                    "llamaindex",
+                    "semantic-kernel",
+                    "openai",
+                    "anthropic",
+                    "tool"
+                  ]
+                }
+              },
+              {
+                "process": {
+                  "case_insensitive": true,
+                  "parent_executable_names_any": ["cursor.exe", "code.exe", "devenv.exe"]
+                }
+              },
+              {
+                "process": {
+                  "case_insensitive": true,
+                  "executable_name_contains_any": ["python"]
+                }
+              },
+              {
+                "process": {
+                  "case_insensitive": true,
+                  "executable_names_any": ["node.exe", "npm.exe", "npx.exe", "node", "npm", "npx"]
+                }
+              },
+              {
+                "flow": {
+                  "same_process_only": true,
+                  "remote_ports_any": [443]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "ai.powershell.automation",
+      "target_os": ["windows"],
+      "priority": 80,
+      "title": "PowerShell automation signal observed",
+      "description": "PowerShell command shape or outbound flow attributed to the shell (lab parity with detect_powershell_automation).",
+      "classification": "shell_automation",
+      "pattern_tags": ["scripted_powershell_command", "powershell_network_connection"],
+      "agent_likelihood": 0.35,
+      "confidence": 0.65,
+      "risk_score": 35,
+      "recommended_action": "review",
+      "false_positive_notes": "Legitimate admin scripts use encoded commands and web requests; pair with user, schedule, and destination reputation.",
+      "required_evidence": ["process", "command_line", "network_flow"],
+      "match": {
+        "op": "all_of",
+        "of": [
+          {
+            "process": {
+              "case_insensitive": true,
+              "executable_names_any": ["powershell.exe", "pwsh.exe"]
+            }
+          },
+          {
+            "op": "any_of",
+            "min_match": 1,
+            "of": [
+              {
+                "process": {
+                  "case_insensitive": true,
+                  "command_line_contains_any": [
+                    "-encodedcommand",
+                    "frombase64string",
+                    "downloadstring",
+                    "invoke-webrequest",
+                    "invoke-restmethod",
+                    " iwr ",
+                    " irm ",
+                    "curl "
+                  ]
+                }
+              },
+              {
+                "flow": {
+                  "same_process_only": true,
+                  "has_any_flow": true
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "ai.browser.model_dns",
+      "target_os": ["windows", "linux"],
+      "priority": 70,
+      "title": "Browser AI destination observed",
+      "description": "Known model or AI SaaS domain observed in DNS (lab parity with detect_browser_ai_usage / is_ai_destination).",
+      "classification": "browser_ai_usage",
+      "pattern_tags": ["ai_destination_dns"],
+      "agent_likelihood": 0.22,
+      "confidence": 0.55,
+      "risk_score": 18,
+      "recommended_action": "monitor",
+      "false_positive_notes": "DNS alone does not prove autonomous agent behavior; prefer correlation with browser or helper processes.",
+      "required_evidence": ["dns_query"],
+      "match": {
+        "dns": {
+          "query_contains_any": [
+            "openai.com",
+            "chatgpt.com",
+            "chat.openai.com",
+            "oaistatic.com",
+            "oaiusercontent.com",
+            "openaiapi-site.azureedge.net",
+            "anthropic.com",
+            "claude.ai",
+            "gemini.google.com",
+            "generativelanguage.googleapis.com",
+            "copilot.microsoft.com",
+            "cursor.com",
+            "model-gateway"
+          ]
+        }
+      }
+    },
+    {
+      "rule_id": "sase.inventory.major_vendor_hint",
+      "target_os": ["windows"],
+      "priority": 10,
+      "title": "Major SASE/SSE component inventory signal",
+      "description": "Observed SASE component naming consistent with common enterprise clients (subset of windows-agent SASE_VENDOR_SIGNATURES patterns).",
+      "classification": "sase_component_observed",
+      "pattern_tags": ["sase_vendor_inventory"],
+      "agent_likelihood": 0.05,
+      "confidence": 0.5,
+      "risk_score": 5,
+      "recommended_action": "monitor",
+      "false_positive_notes": "Inventory-only signal; does not indicate compromise. Useful context for AI egress and split-tunnel behavior.",
+      "required_evidence": ["sase_component"],
+      "match": {
+        "sase_component": {
+          "display_name_contains_any": [
+            "zscaler",
+            "zscaler client connector",
+            "globalprotect",
+            "prisma access",
+            "cisco secure client",
+            "anyconnect",
+            "umbrella",
+            "netskope",
+            "cloudflare warp",
+            "warp-svc",
+            "forticlient",
+            "harmony endpoint",
+            "cato client",
+            "tailscale"
+          ]
+        }
+      }
+    }
+  ]
+}

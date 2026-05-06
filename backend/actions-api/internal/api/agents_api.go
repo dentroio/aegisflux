@@ -42,6 +42,7 @@ type AgentInfo struct {
 	Note          string         `json:"note,omitempty"`
 	Created       time.Time      `json:"created"`
 	LastSeen      time.Time      `json:"last_seen"`
+	Status        string         `json:"status"`
 }
 
 // AgentDetailResponse represents the full agent response
@@ -59,6 +60,7 @@ type AgentDetailResponse struct {
 	Note          string         `json:"note,omitempty"`
 	Created       time.Time      `json:"created"`
 	LastSeen      time.Time      `json:"last_seen"`
+	Status        string         `json:"status"`
 }
 
 // LabelsUpdateRequest represents a request to update agent labels
@@ -187,6 +189,7 @@ func (s *Server) getAgents(w http.ResponseWriter, r *http.Request) {
 			Note:          agent.Note,
 			Created:       agent.Created,
 			LastSeen:      agent.LastSeen,
+			Status:        agentConnectionStatus(agent.LastSeen),
 		}
 		filteredAgents = append(filteredAgents, agentInfo)
 	}
@@ -198,6 +201,13 @@ func (s *Server) getAgents(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("content-type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func agentConnectionStatus(lastSeen time.Time) string {
+	if time.Since(lastSeen) < 5*time.Minute {
+		return "online"
+	}
+	return "offline"
 }
 
 // agentDispatch handles sub-routes for individual agents
@@ -278,6 +288,7 @@ func (s *Server) getAgent(w http.ResponseWriter, r *http.Request, agentUID strin
 		Note:          agent.Note,
 		Created:       agent.Created,
 		LastSeen:      agent.LastSeen,
+		Status:        agentConnectionStatus(agent.LastSeen),
 	}
 
 	w.Header().Set("content-type", "application/json")
@@ -665,9 +676,19 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var heartbeatData struct {
-		AgentUID string `json:"agent_uid"`
-		LastSeen string `json:"last_seen"`
-		Status   string `json:"status"`
+		AgentUID      string         `json:"agent_uid"`
+		OrgID         string         `json:"org_id"`
+		HostID        string         `json:"host_id"`
+		Hostname      string         `json:"hostname"`
+		MachineIDHash string         `json:"machine_id_hash"`
+		AgentVersion  string         `json:"agent_version"`
+		LastSeen      string         `json:"last_seen"`
+		Status        string         `json:"status"`
+		Capabilities  map[string]any `json:"capabilities"`
+		Platform      map[string]any `json:"platform"`
+		Network       map[string]any `json:"network"`
+		Labels        []string       `json:"labels"`
+		Note          string         `json:"note"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&heartbeatData); err != nil {
@@ -693,7 +714,7 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 
 	// Try to find agent by UID first
 	if agent, exists := s.store.agents[heartbeatData.AgentUID]; exists {
-		agent.LastSeen = lastSeen
+		s.applyHeartbeat(agent, heartbeatData.OrgID, heartbeatData.HostID, heartbeatData.Hostname, heartbeatData.MachineIDHash, heartbeatData.AgentVersion, heartbeatData.Note, lastSeen, heartbeatData.Capabilities, heartbeatData.Platform, heartbeatData.Network, heartbeatData.Labels)
 		log.Printf("Updated heartbeat for agent %s: last_seen=%s", heartbeatData.AgentUID, heartbeatData.LastSeen)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -717,7 +738,7 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if foundAgent != nil {
-		foundAgent.LastSeen = lastSeen
+		s.applyHeartbeat(foundAgent, heartbeatData.OrgID, heartbeatData.HostID, heartbeatData.Hostname, heartbeatData.MachineIDHash, heartbeatData.AgentVersion, heartbeatData.Note, lastSeen, heartbeatData.Capabilities, heartbeatData.Platform, heartbeatData.Network, heartbeatData.Labels)
 		log.Printf("Updated heartbeat for agent %s (hostname %s): last_seen=%s", foundUID, heartbeatData.AgentUID, heartbeatData.LastSeen)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -727,7 +748,117 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 			"hostname":  heartbeatData.AgentUID,
 			"last_seen": heartbeatData.LastSeen,
 		})
-	} else {
-		http.Error(w, "Agent not found", http.StatusNotFound)
+		return
 	}
+
+	agent := s.newAgentFromHeartbeat(heartbeatData.AgentUID, heartbeatData.OrgID, heartbeatData.HostID, heartbeatData.Hostname, heartbeatData.MachineIDHash, heartbeatData.AgentVersion, heartbeatData.Note, lastSeen, heartbeatData.Capabilities, heartbeatData.Platform, heartbeatData.Network, heartbeatData.Labels)
+	s.store.agents[agent.AgentUID] = agent
+	if agent.HostID != "" {
+		s.store.byHost[agent.HostID] = agent
+	}
+	log.Printf("Registered agent from heartbeat %s (%s)", agent.AgentUID, agent.HostID)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":    "registered",
+		"agent_uid": agent.AgentUID,
+		"host_id":   agent.HostID,
+		"last_seen": heartbeatData.LastSeen,
+	})
+}
+
+func (s *Server) newAgentFromHeartbeat(agentUID, orgID, hostID, hostname, machineIDHash, agentVersion, note string, lastSeen time.Time, capabilities, platform, network map[string]any, labels []string) *Agent {
+	if orgID == "" {
+		orgID = "default-org"
+	}
+	if hostID == "" {
+		hostID = agentUID
+	}
+	if hostname == "" {
+		hostname = hostID
+	}
+	if agentVersion == "" {
+		agentVersion = "unknown"
+	}
+	if capabilities == nil {
+		capabilities = map[string]any{"visibility": true}
+	}
+	if platform == nil {
+		platform = map[string]any{"hostname": hostname, "os": "unknown"}
+	}
+	if network == nil {
+		network = map[string]any{}
+	}
+
+	agent := &Agent{
+		AgentUID:      agentUID,
+		OrgID:         orgID,
+		HostID:        hostID,
+		Hostname:      hostname,
+		MachineIDHash: machineIDHash,
+		AgentVersion:  agentVersion,
+		Capabilities:  capabilities,
+		Platform:      platform,
+		Network:       network,
+		Labels:        labelsToMap(labels),
+		Note:          note,
+		Created:       lastSeen,
+		LastSeen:      lastSeen,
+	}
+	if agent.Note == "" {
+		agent.Note = "Registered from lab agent heartbeat"
+	}
+	return agent
+}
+
+func (s *Server) applyHeartbeat(agent *Agent, orgID, hostID, hostname, machineIDHash, agentVersion, note string, lastSeen time.Time, capabilities, platform, network map[string]any, labels []string) {
+	previousHostID := agent.HostID
+	agent.LastSeen = lastSeen
+	if orgID != "" {
+		agent.OrgID = orgID
+	}
+	if hostID != "" {
+		agent.HostID = hostID
+	}
+	if hostname != "" {
+		agent.Hostname = hostname
+	}
+	if machineIDHash != "" {
+		agent.MachineIDHash = machineIDHash
+	}
+	if agentVersion != "" {
+		agent.AgentVersion = agentVersion
+	}
+	if capabilities != nil {
+		agent.Capabilities = capabilities
+	}
+	if platform != nil {
+		agent.Platform = platform
+	}
+	if network != nil {
+		agent.Network = network
+	}
+	if len(labels) > 0 {
+		agent.Labels = labelsToMap(labels)
+	}
+	if note != "" {
+		agent.Note = note
+	}
+	if previousHostID != "" && previousHostID != agent.HostID {
+		delete(s.store.byHost, previousHostID)
+	}
+	if agent.HostID != "" {
+		s.store.byHost[agent.HostID] = agent
+	}
+}
+
+func labelsToMap(labels []string) map[string]bool {
+	mapped := map[string]bool{}
+	for _, label := range labels {
+		label = strings.TrimSpace(label)
+		if label != "" {
+			mapped[label] = true
+		}
+	}
+	return mapped
 }
