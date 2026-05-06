@@ -45,6 +45,7 @@ visibility.v1
 | `aegis.sase_component.observed` | [sase-component-observed.schema.json](sase-component-observed.schema.json) |
 | `aegis.agent.detected` | [agent-detected.schema.json](agent-detected.schema.json) |
 | `aegis.risk_finding.created` | [risk-finding-created.schema.json](risk-finding-created.schema.json) |
+| `aegis.detection_pack.status` | [detection-pack-status.schema.json](detection-pack-status.schema.json) |
 
 ## Examples
 

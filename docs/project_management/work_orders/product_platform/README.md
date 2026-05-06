@@ -3,7 +3,7 @@
 **Program:** AegisFlux product platform and Clarion-aligned management experience  
 **Phase:** Phase 2 - Productization and AI-Agent Platform  
 **Status:** Draft  
-**Last updated:** May 4, 2026
+**Last updated:** May 5, 2026
 
 ## Objective
 
@@ -63,6 +63,9 @@ The AegisFlux UI should follow the Clarion shell pattern:
 | WO-AI-003 | Endpoint Evidence Analyst | First context-aware AI action on device detail | WO-PLAT-002, WO-AI-002 |
 | WO-DET-001 | Detection Pack Schema and Local Evaluator Contract | Versioned signed-pack schema for endpoint agents | Existing visibility schemas |
 | WO-DET-002 | Dynamic AI Detection Candidate Pipeline | Research item -> candidate -> validation -> approved pack workflow | WO-DET-001, WO-AI-002 |
+| WO-DET-003 | Detection Pack Controller Rollout and Agent Status | Latest approved pack API, artifact retrieval, and per-agent pack status | WO-DET-001, WO-DET-002 |
+| WO-DET-004 | Linux Dynamic Detection Pack Evaluator | Linux fetch/verify/cache/evaluate/status for observe-only packs | WO-DET-001, WO-DET-003 |
+| WO-DET-005 | Windows Dynamic Detection Pack Evaluator | Windows fetch/verify/cache/evaluate/status for observe-only packs | WO-DET-001, WO-DET-003 |
 | WO-AGENT-001 | Agent Performance Budget Telemetry | CPU/memory/runtime collector budget events and UI | Windows/Linux agents reporting |
 | WO-INV-001 | Enterprise AI and Control Inventory | Browser, IDE, CLI, local model, SASE/SSE inventory pages | Visibility events and agents |
 | WO-CTRL-001 | Observe-Only Draft Controls and Simulation | Finding -> draft control -> historical match simulation | WO-PLAT-002, WO-DET-001 |
@@ -75,6 +78,8 @@ These can run in parallel with low conflict:
 - WO-PLAT-001 and WO-DET-001 after agreeing on route and schema names.
 - WO-AI-001 and WO-AGENT-001 after backend ownership is clear.
 - WO-INV-001 can start from existing browser/SASE events while WO-AI work proceeds.
+- WO-DET-003 should start after WO-DET-002 defines signed approved-pack artifacts; Windows/Linux evaluator work can branch from its status contract.
+- WO-DET-004 and WO-DET-005 should run in parallel after WO-DET-003 stabilizes its endpoint contract; keep Linux and Windows write scopes separate.
 - WO-CTRL-001 should wait until drill-in and detection-pack schema stabilize.
 - WO-INT-001 should wait until the AegisFlux evidence model is not churning daily.
 

@@ -49,3 +49,10 @@ Create the backend workflow for research-to-detection: research item -> candidat
 - No fully autonomous publishing.
 - No production customer rollout.
 
+## Implementation notes
+
+- **Service:** `backend/detection-pipeline` (HTTP on `DETECTION_PIPELINE_HTTP_ADDR`, default `:8089`).
+- **Pack contract:** `schemas/detection/detection-pack.v1.schema.json` (WO-DET-001).
+- **Fixtures:** `schemas/detection/fixtures/wo-det-002/` (MCP / local-model / tool-bridge candidate + lab telemetry sample).
+- **Compose:** `detection-pipeline` and `ingest` volume `ingest_visibility_data` so lab events persist for validation queries.
+
