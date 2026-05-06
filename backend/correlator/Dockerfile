@@ -1,7 +1,7 @@
 FROM golang:1.23-alpine AS build
 WORKDIR /src
 COPY . .
-RUN go mod tidy && go build -o /out/correlator ./cmd/correlator
+RUN go mod tidy && go build -o /out/correlator ./cmd/correlator/main.go
 
 FROM alpine:3.20
 COPY --from=build /out/correlator /usr/local/bin/correlator

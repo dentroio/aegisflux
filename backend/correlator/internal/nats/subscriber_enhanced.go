@@ -5,9 +5,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/nats-io/nats.go"
+	"github.com/sgerhart/aegisflux/backend/correlator/internal/model"
 	"github.com/sgerhart/aegisflux/backend/correlator/internal/rules"
 	"github.com/sgerhart/aegisflux/backend/correlator/internal/store"
-	"github.com/nats-io/nats.go"
 )
 
 // EnhancedSubscriber handles NATS subscriptions with decision integration
@@ -192,12 +193,13 @@ func (s *EnhancedSubscriber) processEnrichedEvent(enrichedEvent map[string]inter
 
 	// Process each rule
 	for _, rule := range snapshot.Rules {
+		rule := rule
 		if !rule.IsEnabled() {
 			continue
 		}
 
 		// Check if rule matches
-		if s.ruleMatches(rule, enrichedEvent) {
+		if s.ruleMatches(&rule, enrichedEvent) {
 			// Generate finding
 			finding, err := s.findingGenerator.GenerateFindingFromEnrichedEvent(
 				&rule,
@@ -212,7 +214,7 @@ func (s *EnhancedSubscriber) processEnrichedEvent(enrichedEvent map[string]inter
 			}
 
 			// Store finding
-			s.store.AddFinding(finding)
+			s.store.AddFinding(toStoreFinding(finding))
 
 			// Publish finding
 			if err := s.findingPublisher.PublishFinding(finding); err != nil {
@@ -252,12 +254,13 @@ func (s *EnhancedSubscriber) processPackageCVEEnriched(pkgCVEEnriched map[string
 
 	// Process each rule
 	for _, rule := range snapshot.Rules {
+		rule := rule
 		if !rule.IsEnabled() {
 			continue
 		}
 
 		// Check if rule matches package CVE enriched event
-		if s.ruleMatchesPackageCVE(rule, pkgCVEEnriched) {
+		if s.ruleMatchesPackageCVE(&rule, pkgCVEEnriched) {
 			// Generate finding
 			finding, err := s.findingGenerator.GenerateFindingFromPackageCVE(
 				&rule,
@@ -272,7 +275,7 @@ func (s *EnhancedSubscriber) processPackageCVEEnriched(pkgCVEEnriched map[string
 			}
 
 			// Store finding
-			s.store.AddFinding(finding)
+			s.store.AddFinding(toStoreFinding(finding))
 
 			// Publish finding
 			if err := s.findingPublisher.PublishFinding(finding); err != nil {
@@ -314,6 +317,40 @@ func (s *EnhancedSubscriber) ruleMatches(rule *rules.Rule, enrichedEvent map[str
 
 	// Check other conditions
 	return s.checkConditions(rule.Spec.Condition.When, enrichedEvent)
+}
+
+func toStoreFinding(finding *rules.Finding) *model.Finding {
+	timestamp, err := time.Parse(time.RFC3339, finding.TS)
+	if err != nil {
+		timestamp = time.Now().UTC()
+	}
+
+	evidence := make([]model.Evidence, 0, len(finding.Evidence))
+	for key, value := range finding.Evidence {
+		evidence = append(evidence, model.Evidence{
+			Type:        key,
+			Description: key,
+			Data:        map[string]interface{}{"value": value},
+			Timestamp:   timestamp,
+		})
+	}
+
+	ttlSeconds := 0
+	if ttl, ok := finding.Metadata["ttl_seconds"].(int); ok {
+		ttlSeconds = ttl
+	}
+
+	return &model.Finding{
+		ID:         finding.ID,
+		Severity:   finding.Severity,
+		Confidence: finding.Confidence,
+		Status:     "open",
+		HostID:     finding.HostID,
+		Evidence:   evidence,
+		Timestamp:  timestamp,
+		RuleID:     finding.RuleID,
+		TTLSeconds: ttlSeconds,
+	}
 }
 
 // ruleMatchesPackageCVE checks if a rule matches a package CVE enriched event

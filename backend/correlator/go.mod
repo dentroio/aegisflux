@@ -2,6 +2,8 @@ module github.com/sgerhart/aegisflux/backend/correlator
 
 go 1.23.0
 
+toolchain go1.23.12
+
 require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
