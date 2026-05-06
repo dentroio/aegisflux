@@ -1,6 +1,7 @@
 services:
   nats:
     image: nats:2.10-alpine
+    restart: unless-stopped
     ports:
       - "${NATS_CLIENT_PORT:-4222}:4222"   # client port
       - "${NATS_MONITOR_PORT:-8222}:8222"   # monitoring port
@@ -8,6 +9,7 @@ services:
 
   timescale:
     image: timescale/timescaledb:latest-pg15
+    restart: unless-stopped
     environment:
       - POSTGRES_DB=aegisflux
       - POSTGRES_USER=postgres
@@ -19,6 +21,7 @@ services:
 
   neo4j:
     image: neo4j:5.15-community
+    restart: unless-stopped
     environment:
       - NEO4J_AUTH=neo4j/password
       - NEO4J_PLUGINS=["apoc"]
@@ -31,6 +34,7 @@ services:
   vault:
     image: hashicorp/vault:1.16
     container_name: aegisflux-vault
+    restart: unless-stopped
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: root
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
@@ -45,6 +49,7 @@ services:
 
   config-api:
     build: backend/config-api
+    restart: unless-stopped
     depends_on: [nats, vault, timescale, neo4j]
     ports:
       - "8085:8085"
@@ -65,6 +70,7 @@ services:
 
   ingest:
     build: backend/ingest
+    restart: unless-stopped
     depends_on: [nats]
     ports:
       - "50052:50051"
@@ -74,6 +80,7 @@ services:
       
   etl-enrich:
     build: backend/etl-enrich
+    restart: unless-stopped
     depends_on: [nats, timescale, neo4j]
     ports:
       - "8088:8088"
@@ -94,6 +101,7 @@ services:
 
   correlator:
     build: backend/correlator
+    restart: unless-stopped
     depends_on: [nats, config-api]
     ports:
       - "8082:8082"
@@ -105,6 +113,7 @@ services:
 
   decision:
     build: backend/decision
+    restart: unless-stopped
     depends_on: [nats, neo4j, config-api]
     ports:
       - "8087:8087"
@@ -118,6 +127,7 @@ services:
 
   segmenter:
     build: backend/segmenter
+    restart: unless-stopped
     ports:
       - "8086:8086"
     environment:
@@ -127,6 +137,7 @@ services:
     build:
       context: .
       dockerfile: backend/orchestrator/Dockerfile
+    restart: unless-stopped
     depends_on: [vault, nats]
     ports:
       - "${ORCHESTRATOR_HTTP_PORT:-8084}:8084"
@@ -139,6 +150,7 @@ services:
 
   bpf-registry:
     build: backend/bpf-registry
+    restart: unless-stopped
     depends_on: [vault, nats]
     ports:
       - "8090:8090"
@@ -151,6 +163,7 @@ services:
 
   websocket-gateway:
     build: backend/websocket-gateway
+    restart: unless-stopped
     depends_on: [nats, timescale]
     ports:
       - "8080:8080"
@@ -167,6 +180,7 @@ services:
 
   actions-api:
     build: backend/actions-api
+    restart: unless-stopped
     depends_on: [nats]
     ports:
       - "8083:8083"
