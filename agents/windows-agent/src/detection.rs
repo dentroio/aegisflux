@@ -561,6 +561,10 @@ mod tests {
             backend_url: None,
             event_spool: "/tmp/events.jsonl".into(),
             collect_command_line: true,
+            controller_url: None,
+            detection_packs_enabled: false,
+            detection_pack_cache: None,
+            detection_pack_public_key: None,
         }
     }
 

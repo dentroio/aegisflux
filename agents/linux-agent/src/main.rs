@@ -6,6 +6,7 @@
 mod collector;
 mod config;
 mod detection;
+mod dynamic_pack;
 mod event;
 mod security;
 mod transport;
@@ -51,7 +52,15 @@ fn run() -> Result<(), String> {
     for collector in collectors.collectors() {
         events.extend(collector.collect_once(&config)?);
     }
-    events.extend(detection::detect_ai_agent_activity(&config, &events));
+    let visibility_for_packs: Vec<AegisEvent> = events.clone();
+    events.extend(detection::detect_ai_agent_activity(
+        &config,
+        &visibility_for_packs,
+    ));
+    events.extend(dynamic_pack::run_dynamic_pack_pipeline(
+        &config,
+        &visibility_for_packs,
+    ));
 
     let spool = JsonlSpool::new(config.event_spool.clone());
     for event in &events {

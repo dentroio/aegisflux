@@ -164,7 +164,7 @@ fn visibility_events_path(raw_path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{HttpEndpoint, visibility_events_path};
+    use super::{visibility_events_path, HttpEndpoint};
 
     #[test]
     fn parses_localhost_endpoint_with_default_path() {

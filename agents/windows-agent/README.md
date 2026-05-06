@@ -61,6 +61,8 @@ See [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Build
 
+The crate pins a **Rust 1.82+** toolchain via `rust-toolchain.toml` for CI-style builds and dependency resolution.
+
 ```bash
 cargo check
 cargo build
@@ -160,3 +162,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\uninstall-lab-sche
 | `AEGIS_EVENT_SPOOL` | platform default | JSONL event spool path |
 | `AEGIS_BACKEND_URL` | empty | Optional Phase 1 ingest base URL for outbound lab telemetry |
 | `AEGIS_COLLECT_COMMAND_LINE` | `false` | Opt-in command-line collection for lab scenarios; values are sanitized and truncated |
+| `AEGIS_CONTROLLER_URL` | empty | Lab detection-pipeline base URL (`http://host:port`) for WO-DET-003 pack APIs |
+| `AEGIS_DETECTION_PACKS_ENABLED` | `false` | When `true`, fetch/verify/cache/evaluate signed `detection_pack.v1` documents (observe-only) |
+| `AEGIS_DETECTION_PACK_PUBLIC_KEY` | empty | Standard Base64 of the raw 32-byte Ed25519 verifying key (required when packs are enabled) |
+| `AEGIS_DETECTION_PACK_CACHE` | empty | Override directory for verified pack cache (default: `C:\ProgramData\Aegis\Agent\detection-pack\` for the standard lab spool) |
+
+See [docs/DYNAMIC_PACKS.md](docs/DYNAMIC_PACKS.md) for the controller contract and local evaluator behavior.

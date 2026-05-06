@@ -1766,11 +1766,9 @@ Windows IP Configuration
         assert_eq!(parsed.manifest_version, Some(3));
         assert!(parsed.permissions.contains(&"tabs".to_string()));
         assert!(parsed.host_permissions.contains(&"<all_urls>".to_string()));
-        assert!(
-            parsed
-                .host_permissions
-                .contains(&"https://chatgpt.com/*".to_string())
-        );
+        assert!(parsed
+            .host_permissions
+            .contains(&"https://chatgpt.com/*".to_string()));
     }
 
     #[test]
@@ -1855,6 +1853,10 @@ Windows IP Configuration
             backend_url: None,
             event_spool: PathBuf::from("/tmp/aegis-test.jsonl"),
             collect_command_line: false,
+            controller_url: None,
+            detection_packs_enabled: false,
+            detection_pack_cache: None,
+            detection_pack_public_key: None,
         }
     }
 }

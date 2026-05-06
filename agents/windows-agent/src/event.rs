@@ -561,7 +561,7 @@ fn evidence_array_json(values: &[DetectionEvidence]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{EventPayload, escape_json};
+    use super::{escape_json, EventPayload};
 
     #[test]
     fn escapes_json_control_characters() {
