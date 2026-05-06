@@ -66,8 +66,11 @@ The AegisFlux UI should follow the Clarion shell pattern:
 | WO-DET-003 | Detection Pack Controller Rollout and Agent Status | Latest approved pack API, artifact retrieval, and per-agent pack status | WO-DET-001, WO-DET-002 |
 | WO-DET-004 | Linux Dynamic Detection Pack Evaluator | Linux fetch/verify/cache/evaluate/status for observe-only packs | WO-DET-001, WO-DET-003 |
 | WO-DET-005 | Windows Dynamic Detection Pack Evaluator | Windows fetch/verify/cache/evaluate/status for observe-only packs | WO-DET-001, WO-DET-003 |
+| WO-LAB-001 | Agent Tunnel and Ingest Reliability | Reliable lab agent connectivity and ingest reachability | WO-DET-004, WO-DET-005 |
+| WO-DET-006 | Repeatable Detection Rollout Smoke | One-command lab validation for signed-pack rollout | WO-DET-002, WO-DET-003, WO-DET-004, WO-DET-005, WO-LAB-001 |
 | WO-AGENT-001 | Agent Performance Budget Telemetry | CPU/memory/runtime collector budget events and UI | Windows/Linux agents reporting |
 | WO-INV-001 | Enterprise AI and Control Inventory | Browser, IDE, CLI, local model, SASE/SSE inventory pages | Visibility events and agents |
+| WO-PLAT-004 | Detection Pack Status Visibility | Pack rollout health in agent list, device detail, and rollout views | WO-PLAT-002, WO-DET-003, WO-DET-006 |
 | WO-CTRL-001 | Observe-Only Draft Controls and Simulation | Finding -> draft control -> historical match simulation | WO-PLAT-002, WO-DET-001 |
 | WO-INT-001 | Clarion Integration API Slice | AegisFlux evidence export and Clarion import contract implementation | WO-PLAT-002, WO-INV-001 |
 
@@ -80,6 +83,9 @@ These can run in parallel with low conflict:
 - WO-INV-001 can start from existing browser/SASE events while WO-AI work proceeds.
 - WO-DET-003 should start after WO-DET-002 defines signed approved-pack artifacts; Windows/Linux evaluator work can branch from its status contract.
 - WO-DET-004 and WO-DET-005 should run in parallel after WO-DET-003 stabilizes its endpoint contract; keep Linux and Windows write scopes separate.
+- WO-LAB-001 should run immediately after evaluator basics exist, because lab instability will obscure real rollout bugs.
+- WO-DET-006 should follow WO-LAB-001 and become the regression check for the dynamic detection path.
+- WO-PLAT-004 can start once WO-PLAT-002 exists and the WO-DET-003 status contract is stable.
 - WO-CTRL-001 should wait until drill-in and detection-pack schema stabilize.
 - WO-INT-001 should wait until the AegisFlux evidence model is not churning daily.
 
@@ -91,6 +97,8 @@ These can run in parallel with low conflict:
 - AI providers, AI health, privacy, and audit are first-class management capabilities.
 - Endpoint evidence can be explained by an audited AI action.
 - Detection packs are data, signed/versioned, and safe for low-resource endpoint evaluation.
+- Detection-pack rollout status is visible per device and per pack.
+- The lab has a repeatable smoke test that proves dynamic detection rollout end to end.
 - Agent resource usage is visible and bounded.
 - Inventory surfaces show AI tools, browser extensions, local model runtimes, and enterprise control components.
 - Findings can produce observe-only draft controls and simulations.

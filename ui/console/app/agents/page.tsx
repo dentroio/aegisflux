@@ -58,6 +58,27 @@ interface Agent {
   created: string
   last_seen: string
   status: 'online' | 'offline' | 'unknown'
+  detection_pack_status?: DetectionPackStatus | null
+}
+
+interface DetectionPackStatus {
+  active_pack_id?: string
+  active_pack_version?: string
+  previous_pack_id?: string
+  previous_pack_version?: string
+  rollout_state?: string
+  reason_detail?: string
+  reason_codes?: string[]
+  signature_status?: string
+  hash_status?: string
+  schema_status?: string
+  compatibility_status?: string
+  last_check_at_ms?: number
+  last_applied_at_ms?: number
+  last_rejected_at_ms?: number
+  last_rejected_pack_id?: string
+  last_rejected_reason?: string
+  last_rejected_reason_codes?: string[]
 }
 
 export default function AgentsPage() {
@@ -156,6 +177,27 @@ export default function AgentsPage() {
         return <span className="badge badge-danger">Offline</span>
       default:
         return <span className="badge badge-warning">Unknown</span>
+    }
+  }
+
+  const getRolloutBadge = (rolloutState?: string) => {
+    switch (rolloutState) {
+      case 'applied':
+        return <span className="badge badge-success">Applied</span>
+      case 'rejected':
+        return <span className="badge badge-danger">Rejected</span>
+      case 'incompatible':
+        return <span className="badge badge-warning">Incompatible</span>
+      case 'expired':
+        return <span className="badge badge-warning">Expired</span>
+      case 'stale':
+        return <span className="badge badge-warning">Stale</span>
+      case 'rollback':
+        return <span className="badge badge-danger">Rollback</span>
+      case 'not_checked':
+        return <span className="badge badge-warning">Not checked</span>
+      default:
+        return <span className="badge badge-warning">No pack</span>
     }
   }
 
@@ -304,6 +346,15 @@ export default function AgentsPage() {
                             <p className="text-sm text-gray-500">
                               {agent.platform.os} • {agent.platform.architecture}
                             </p>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              {getRolloutBadge(agent.detection_pack_status?.rollout_state)}
+                              <span className="text-xs text-gray-500">
+                                Pack: {agent.detection_pack_status?.active_pack_id || 'none'}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                Version: {agent.detection_pack_status?.active_pack_version || 'none'}
+                              </span>
+                            </div>
                             <div className="mt-2 flex flex-wrap gap-1">
                               {agent.labels.map((label) => (
                                 <span key={label} className="badge badge-info">
@@ -478,6 +529,68 @@ export default function AgentsPage() {
                       </button>
                     </div>
                   </div>
+                </div>
+
+                {/* Detection Pack Status */}
+                <div className="card p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Detection Pack Status</h3>
+                  <p className="text-xs text-gray-500 mb-4">Observe-only visibility for rollout health.</p>
+                  {selectedAgent.detection_pack_status ? (
+                    <dl className="space-y-3">
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Rollout State</dt>
+                        <dd className="text-sm text-gray-900">{getRolloutBadge(selectedAgent.detection_pack_status.rollout_state)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Active Pack</dt>
+                        <dd className="text-sm text-gray-900 font-mono">
+                          {selectedAgent.detection_pack_status.active_pack_id || 'none'}
+                          {selectedAgent.detection_pack_status.active_pack_version
+                            ? ` @ ${selectedAgent.detection_pack_status.active_pack_version}`
+                            : ''}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Previous Pack</dt>
+                        <dd className="text-sm text-gray-900 font-mono">
+                          {selectedAgent.detection_pack_status.previous_pack_id || 'none'}
+                          {selectedAgent.detection_pack_status.previous_pack_version
+                            ? ` @ ${selectedAgent.detection_pack_status.previous_pack_version}`
+                            : ''}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Trust and Compatibility</dt>
+                        <dd className="text-sm text-gray-900">
+                          sig={selectedAgent.detection_pack_status.signature_status || 'unknown'} | hash={selectedAgent.detection_pack_status.hash_status || 'unknown'} | schema={selectedAgent.detection_pack_status.schema_status || 'unknown'} | compat={selectedAgent.detection_pack_status.compatibility_status || 'unknown'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Last Applied</dt>
+                        <dd className="text-sm text-gray-900">
+                          {selectedAgent.detection_pack_status.last_applied_at_ms
+                            ? formatDate(new Date(selectedAgent.detection_pack_status.last_applied_at_ms).toISOString())
+                            : 'n/a'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Last Check</dt>
+                        <dd className="text-sm text-gray-900">
+                          {selectedAgent.detection_pack_status.last_check_at_ms
+                            ? formatDate(new Date(selectedAgent.detection_pack_status.last_check_at_ms).toISOString())
+                            : 'n/a'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Last Rejection</dt>
+                        <dd className="text-sm text-gray-900">
+                          {selectedAgent.detection_pack_status.last_rejected_reason || selectedAgent.detection_pack_status.reason_detail || 'none'}
+                        </dd>
+                      </div>
+                    </dl>
+                  ) : (
+                    <p className="text-sm text-gray-500">No detection-pack telemetry reported for this agent.</p>
+                  )}
                 </div>
               </div>
             ) : (

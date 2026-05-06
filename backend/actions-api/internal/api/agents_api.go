@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -30,37 +31,64 @@ type AgentListResponse struct {
 
 // AgentInfo represents agent information for list responses (without sensitive data)
 type AgentInfo struct {
-	AgentUID      string         `json:"agent_uid"`
-	OrgID         string         `json:"org_id"`
-	HostID        string         `json:"host_id"`
-	Hostname      string         `json:"hostname,omitempty"`
-	MachineIDHash string         `json:"machine_id_hash,omitempty"`
-	AgentVersion  string         `json:"agent_version,omitempty"`
-	Platform      map[string]any `json:"platform,omitempty"`
-	Network       map[string]any `json:"network,omitempty"`
-	Labels        []string       `json:"labels"`
-	Note          string         `json:"note,omitempty"`
-	Created       time.Time      `json:"created"`
-	LastSeen      time.Time      `json:"last_seen"`
-	Status        string         `json:"status"`
+	AgentUID            string               `json:"agent_uid"`
+	OrgID               string               `json:"org_id"`
+	HostID              string               `json:"host_id"`
+	Hostname            string               `json:"hostname,omitempty"`
+	MachineIDHash       string               `json:"machine_id_hash,omitempty"`
+	AgentVersion        string               `json:"agent_version,omitempty"`
+	Platform            map[string]any       `json:"platform,omitempty"`
+	Network             map[string]any       `json:"network,omitempty"`
+	Labels              []string             `json:"labels"`
+	Note                string               `json:"note,omitempty"`
+	Created             time.Time            `json:"created"`
+	LastSeen            time.Time            `json:"last_seen"`
+	Status              string               `json:"status"`
+	DetectionPackStatus *DetectionPackStatus `json:"detection_pack_status,omitempty"`
 }
 
 // AgentDetailResponse represents the full agent response
 type AgentDetailResponse struct {
-	AgentUID      string         `json:"agent_uid"`
-	OrgID         string         `json:"org_id"`
-	HostID        string         `json:"host_id"`
-	Hostname      string         `json:"hostname,omitempty"`
-	MachineIDHash string         `json:"machine_id_hash,omitempty"`
-	AgentVersion  string         `json:"agent_version,omitempty"`
-	Capabilities  map[string]any `json:"capabilities,omitempty"`
-	Platform      map[string]any `json:"platform,omitempty"`
-	Network       map[string]any `json:"network,omitempty"`
-	Labels        []string       `json:"labels"`
-	Note          string         `json:"note,omitempty"`
-	Created       time.Time      `json:"created"`
-	LastSeen      time.Time      `json:"last_seen"`
-	Status        string         `json:"status"`
+	AgentUID            string               `json:"agent_uid"`
+	OrgID               string               `json:"org_id"`
+	HostID              string               `json:"host_id"`
+	Hostname            string               `json:"hostname,omitempty"`
+	MachineIDHash       string               `json:"machine_id_hash,omitempty"`
+	AgentVersion        string               `json:"agent_version,omitempty"`
+	Capabilities        map[string]any       `json:"capabilities,omitempty"`
+	Platform            map[string]any       `json:"platform,omitempty"`
+	Network             map[string]any       `json:"network,omitempty"`
+	Labels              []string             `json:"labels"`
+	Note                string               `json:"note,omitempty"`
+	Created             time.Time            `json:"created"`
+	LastSeen            time.Time            `json:"last_seen"`
+	Status              string               `json:"status"`
+	DetectionPackStatus *DetectionPackStatus `json:"detection_pack_status,omitempty"`
+}
+
+// DetectionPackStatus represents per-agent detection rollout visibility (WO-PLAT-004).
+type DetectionPackStatus struct {
+	AgentUID                string   `json:"agent_uid"`
+	ActivePackID            string   `json:"active_pack_id,omitempty"`
+	ActivePackVersion       string   `json:"active_pack_version,omitempty"`
+	LastCheckAtMS           int64    `json:"last_check_at_ms"`
+	LastAppliedAtMS         int64    `json:"last_applied_at_ms,omitempty"`
+	LastRejectedAtMS        int64    `json:"last_rejected_at_ms,omitempty"`
+	LastRejectedPackID      string   `json:"last_rejected_pack_id,omitempty"`
+	LastRejectedReason      string   `json:"last_rejected_reason,omitempty"`
+	LastRejectedReasonCodes []string `json:"last_rejected_reason_codes,omitempty"`
+	SignatureStatus         string   `json:"signature_status,omitempty"`
+	HashStatus              string   `json:"hash_status,omitempty"`
+	SchemaStatus            string   `json:"schema_status,omitempty"`
+	CompatibilityStatus     string   `json:"compatibility_status,omitempty"`
+	PreviousPackID          string   `json:"previous_pack_id,omitempty"`
+	PreviousPackVersion     string   `json:"previous_pack_version,omitempty"`
+	RolloutState            string   `json:"rollout_state"`
+	ReasonDetail            string   `json:"reason_detail,omitempty"`
+	ReasonCodes             []string `json:"reason_codes,omitempty"`
+	DeviceID                string   `json:"device_id,omitempty"`
+	ReportedAgentVersion    string   `json:"reported_agent_version,omitempty"`
+	UpdatedAtMS             int64    `json:"updated_at_ms"`
 }
 
 // LabelsUpdateRequest represents a request to update agent labels
@@ -177,19 +205,20 @@ func (s *Server) getAgents(w http.ResponseWriter, r *http.Request) {
 		}
 
 		agentInfo := AgentInfo{
-			AgentUID:      agent.AgentUID,
-			OrgID:         agent.OrgID,
-			HostID:        agent.HostID,
-			Hostname:      agent.Hostname,
-			MachineIDHash: agent.MachineIDHash,
-			AgentVersion:  agent.AgentVersion,
-			Platform:      agent.Platform,
-			Network:       agent.Network,
-			Labels:        labels,
-			Note:          agent.Note,
-			Created:       agent.Created,
-			LastSeen:      agent.LastSeen,
-			Status:        agentConnectionStatus(agent.LastSeen),
+			AgentUID:            agent.AgentUID,
+			OrgID:               agent.OrgID,
+			HostID:              agent.HostID,
+			Hostname:            agent.Hostname,
+			MachineIDHash:       agent.MachineIDHash,
+			AgentVersion:        agent.AgentVersion,
+			Platform:            agent.Platform,
+			Network:             agent.Network,
+			Labels:              labels,
+			Note:                agent.Note,
+			Created:             agent.Created,
+			LastSeen:            agent.LastSeen,
+			Status:              agentConnectionStatus(agent.LastSeen),
+			DetectionPackStatus: s.fetchDetectionPackStatus(agent.AgentUID),
 		}
 		filteredAgents = append(filteredAgents, agentInfo)
 	}
@@ -275,24 +304,51 @@ func (s *Server) getAgent(w http.ResponseWriter, r *http.Request, agentUID strin
 	}
 
 	response := AgentDetailResponse{
-		AgentUID:      agent.AgentUID,
-		OrgID:         agent.OrgID,
-		HostID:        agent.HostID,
-		Hostname:      agent.Hostname,
-		MachineIDHash: agent.MachineIDHash,
-		AgentVersion:  agent.AgentVersion,
-		Capabilities:  agent.Capabilities,
-		Platform:      agent.Platform,
-		Network:       agent.Network,
-		Labels:        labels,
-		Note:          agent.Note,
-		Created:       agent.Created,
-		LastSeen:      agent.LastSeen,
-		Status:        agentConnectionStatus(agent.LastSeen),
+		AgentUID:            agent.AgentUID,
+		OrgID:               agent.OrgID,
+		HostID:              agent.HostID,
+		Hostname:            agent.Hostname,
+		MachineIDHash:       agent.MachineIDHash,
+		AgentVersion:        agent.AgentVersion,
+		Capabilities:        agent.Capabilities,
+		Platform:            agent.Platform,
+		Network:             agent.Network,
+		Labels:              labels,
+		Note:                agent.Note,
+		Created:             agent.Created,
+		LastSeen:            agent.LastSeen,
+		Status:              agentConnectionStatus(agent.LastSeen),
+		DetectionPackStatus: s.fetchDetectionPackStatus(agent.AgentUID),
 	}
 
 	w.Header().Set("content-type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func (s *Server) fetchDetectionPackStatus(agentUID string) *DetectionPackStatus {
+	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("DETECTION_PIPELINE_URL")), "/")
+	if baseURL == "" {
+		baseURL = "http://detection-pipeline:8089"
+	}
+
+	url := fmt.Sprintf("%s/v1/agents/%s/detection-pack-status", baseURL, agentUID)
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil
+	}
+
+	var body struct {
+		Status *DetectionPackStatus `json:"status"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return nil
+	}
+	return body.Status
 }
 
 // updateAgentLabels handles PUT /agents/{agent_uid}/labels
