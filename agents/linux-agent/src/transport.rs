@@ -4,6 +4,8 @@ use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
 
 use crate::event::AegisEvent;
 
@@ -101,9 +103,31 @@ impl HttpEndpoint {
     }
 
     fn post_jsonl(&self, body: &str) -> Result<(), String> {
+        const MAX_ATTEMPTS: usize = 3;
         let address = format!("{}:{}", self.host, self.port);
-        let mut stream = TcpStream::connect(&address)
-            .map_err(|err| format!("failed to connect to Aegis ingest at {address}: {err}"))?;
+        let mut last_error = String::new();
+        for attempt in 1..=MAX_ATTEMPTS {
+            match self.post_jsonl_once(body, &address) {
+                Ok(()) => return Ok(()),
+                Err(PostError::Retryable(error)) => {
+                    last_error = error;
+                    if attempt < MAX_ATTEMPTS {
+                        thread::sleep(Duration::from_millis((attempt as u64) * 250));
+                    }
+                }
+                Err(PostError::NonRetryable(error)) => return Err(error),
+            }
+        }
+
+        Err(format!(
+            "failed to deliver events to Aegis ingest after {MAX_ATTEMPTS} attempts: {last_error}"
+        ))
+    }
+
+    fn post_jsonl_once(&self, body: &str, address: &str) -> Result<(), PostError> {
+        let mut stream = TcpStream::connect(address).map_err(|err| {
+            PostError::Retryable(format!("failed to connect to Aegis ingest at {address}: {err}"))
+        })?;
 
         let request = format!(
             "POST {} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/x-ndjson\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -115,22 +139,31 @@ impl HttpEndpoint {
 
         stream
             .write_all(request.as_bytes())
-            .map_err(|err| format!("failed to send events to Aegis ingest: {err}"))?;
+            .map_err(|err| PostError::Retryable(format!("failed to send events to Aegis ingest: {err}")))?;
 
         let mut response = String::new();
         stream
             .read_to_string(&mut response)
-            .map_err(|err| format!("failed to read Aegis ingest response: {err}"))?;
+            .map_err(|err| PostError::Retryable(format!("failed to read Aegis ingest response: {err}")))?;
 
         let status_line = response.lines().next().unwrap_or_default();
         if status_line.starts_with("HTTP/1.1 2") || status_line.starts_with("HTTP/1.0 2") {
             return Ok(());
         }
-
-        Err(format!(
+        if status_line.starts_with("HTTP/1.1 4") || status_line.starts_with("HTTP/1.0 4") {
+            return Err(PostError::NonRetryable(format!(
+                "Aegis ingest rejected visibility events: {status_line}"
+            )));
+        }
+        Err(PostError::Retryable(format!(
             "Aegis ingest rejected visibility events: {status_line}"
-        ))
+        )))
     }
+}
+
+enum PostError {
+    Retryable(String),
+    NonRetryable(String),
 }
 
 fn parse_authority(authority: &str) -> Result<(String, u16), String> {

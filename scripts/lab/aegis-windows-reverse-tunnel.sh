@@ -11,6 +11,36 @@ ACTIONS_REMOTE_PORT="${AEGIS_ACTIONS_TUNNEL_REMOTE_PORT:-8083}"
 ACTIONS_LOCAL_PORT="${AEGIS_ACTIONS_TUNNEL_LOCAL_PORT:-8083}"
 DETECTION_REMOTE_PORT="${AEGIS_DETECTION_TUNNEL_REMOTE_PORT:-8089}"
 DETECTION_LOCAL_PORT="${AEGIS_DETECTION_TUNNEL_LOCAL_PORT:-8089}"
+CLEAN_STALE="${AEGIS_TUNNEL_CLEAN_STALE:-true}"
+
+cleanup_stale_remote_forwards() {
+  if [[ "${CLEAN_STALE}" != "true" ]]; then
+    return 0
+  fi
+
+  /usr/bin/ssh \
+    -i "$SSH_KEY" \
+    -T \
+    -o StrictHostKeyChecking=accept-new \
+    -o UserKnownHostsFile=/private/tmp/aegisflux_known_hosts \
+    -o ConnectTimeout=8 \
+    "${WINDOWS_USER}@${WINDOWS_HOST}" \
+    sh -s -- "$REMOTE_PORT" "$ACTIONS_REMOTE_PORT" "$DETECTION_REMOTE_PORT" <<'REMOTE' || true
+for port in "$@"; do
+  listeners="$(ss -ltnp 2>/dev/null || true)"
+  printf '%s\n' "$listeners" |
+    awk -v suffix=":$port" '$4 ~ suffix "$" && /sshd-session/ { print }' |
+    sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' |
+    sort -u |
+    while read -r pid; do
+      [ -n "$pid" ] || continue
+      kill "$pid" 2>/dev/null || true
+    done
+done
+REMOTE
+}
+
+cleanup_stale_remote_forwards
 
 exec /usr/bin/ssh \
   -i "$SSH_KEY" \

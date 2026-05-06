@@ -52,6 +52,91 @@ Optional environment overrides:
 | `AEGIS_TUNNEL_LOCAL_HOST` | `127.0.0.1` |
 | `AEGIS_TUNNEL_LOCAL_PORT` | `9091` |
 
+## Expected Tunnel Port Map
+
+Both lab tunnels expose the same service map on each remote lab machine:
+
+| Remote Port (lab host) | Local Port (developer Mac) | Service |
+|------------------------|----------------------------|---------|
+| `9091` | `9091` | Ingest (`/v1/visibility/events`, `/healthz`) |
+| `8083` | `8083` | Actions API (`/agents`, `/agents/heartbeat`) |
+| `8089` | `8089` | Detection pipeline (`/healthz`, pack endpoints) |
+
+This means each remote host uses local loopback URLs:
+
+- Ingest: `http://127.0.0.1:9091`
+- Actions API: `http://127.0.0.1:8083`
+- Detection pipeline: `http://127.0.0.1:8089`
+
+## Reliability Notes
+
+- Both tunnel scripts now clean stale remote forward listeners before creating new
+  `-R` forwards. Set `AEGIS_TUNNEL_CLEAN_STALE=false` to disable cleanup.
+- To avoid silent disconnects, both scripts use `ServerAliveInterval=30`,
+  `ServerAliveCountMax=3`, and `ExitOnForwardFailure=yes`.
+
+## Restart Runbook
+
+Use this order after local stack or network changes:
+
+1. Restart Docker Compose on the developer machine.
+2. Restart macOS launchd tunnels.
+3. Restart Linux systemd timer/service.
+4. Restart Windows scheduled task (or one-shot run script).
+5. Run health checks.
+
+### 1) Restart Docker Compose
+
+```bash
+docker compose down
+docker compose up -d
+```
+
+### 2) Restart macOS launchd tunnels
+
+```bash
+./scripts/lab/install-macos-windows-tunnel-launchd.sh
+./scripts/lab/install-macos-linux-tunnel-launchd.sh
+```
+
+### 3) Restart Linux lab agent timer/service
+
+```bash
+ssh -i ~/.ssh/aegis_windows_lab clarion@192.168.101.31 'sudo systemctl restart aegis-linux-agent-lab.timer && sudo systemctl start aegis-linux-agent-lab.service'
+```
+
+### 4) Restart Windows scheduled task or one-shot run
+
+```powershell
+schtasks /Run /TN "AegisLabWindowsAgent"
+```
+
+or:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\AegisLab\aegisflux\agents\windows-agent\scripts\run-lab-once.ps1
+```
+
+### 5) Run health checks
+
+```bash
+AEGIS_WINDOWS_HOST=192.168.12.101 \
+AEGIS_LINUX_HOST=192.168.101.31 \
+./scripts/lab/check-agents.sh
+```
+
+## Troubleshooting
+
+- **Stale heartbeat:** verify `/agents` shows recent `last_seen`; if stale, run the
+  one-shot agent scripts and inspect local logs.
+- **Tunnel collision (`remote port forwarding failed`):** rerun install scripts.
+  Stale `sshd-session` listeners are cleaned automatically.
+- **Local port drift:** ensure Docker maps services on `8083`, `8089`, and `9091`
+  on the developer machine before restarting tunnels.
+- **Tunnel process drift on lab hosts:** run `./scripts/lab/check-agents.sh` with
+  `AEGIS_WINDOWS_HOST` and `AEGIS_LINUX_HOST`; it now validates that remote
+  `sshd-session` listeners exist for ports `9091`, `8083`, and `8089`.
+
 ## Linux Reverse Tunnel on macOS
 
 The Linux lab systemd timer also posts to `http://127.0.0.1:9091` on the Linux
