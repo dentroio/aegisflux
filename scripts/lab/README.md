@@ -1,5 +1,53 @@
 # Aegis Lab Scripts
 
+## Detection Rollout Smoke (WO-DET-006)
+
+Use this smoke to verify the full WO-DET-002 + WO-DET-003 dynamic detection path in one run:
+fixture ingest -> research -> candidate -> validate -> approve -> sign -> latest/artifact -> rollout status.
+
+### Prerequisites
+
+- Local compose stack is up and healthy.
+- Lab tunnels are active (see sections below).
+- Linux and Windows lab agents are installed and can post status to Actions API.
+
+Quick pre-check:
+
+```bash
+./scripts/lab/check-agents.sh
+```
+
+### Run
+
+```bash
+./scripts/lab/smoke-detection-rollout.sh
+```
+
+### Default endpoints
+
+| Variable | Default |
+|----------|---------|
+| `DETECTION_URL` | `http://127.0.0.1:8089` |
+| `INGEST_URL` | `http://127.0.0.1:9090` |
+| `ACTIONS_URL` | `http://127.0.0.1:8083` |
+| `LINUX_AGENT_UID` | `linux-dev-agent-01` |
+| `WINDOWS_AGENT_UID` | `windows-dev-agent-01` |
+| `AGENT_VERSION` | `0.1.0` |
+
+Example with overrides:
+
+```bash
+DETECTION_URL=http://127.0.0.1:8089 \
+INGEST_URL=http://127.0.0.1:9091 \
+./scripts/lab/smoke-detection-rollout.sh
+```
+
+### If rollout-status fails
+
+The smoke prints a `next:` command that reruns both one-shot agents with the
+current signer key and controller URL. Use that command directly, then rerun
+the smoke.
+
 ## Windows Reverse Tunnel on macOS
 
 The Windows lab scheduled task posts to `http://127.0.0.1:9091` on the Windows
