@@ -61,6 +61,14 @@ interface Agent {
   last_seen: string
   status: 'online' | 'offline' | 'unknown'
   detection_pack_status?: DetectionPackStatus | null
+  visibility?: VisibilitySummary | null
+}
+
+interface VisibilitySummary {
+  event_count?: number
+  event_type_count?: Record<string, number>
+  last_seen_ms?: number
+  last_event_type?: string
 }
 
 interface DetectionPackStatus {
@@ -106,9 +114,16 @@ export default function AgentsPage() {
       setRefreshing(true)
       setError(null)
 
-      const response = await fetch('/api/actions/agents')
+      const [response, visibilityResponse] = await Promise.all([
+        fetch('/api/actions/agents'),
+        fetch('/api/visibility/devices?limit=200')
+      ])
       if (response.ok) {
         const data = await response.json()
+        const visibilityData = visibilityResponse.ok ? await visibilityResponse.json() : {}
+        const visibilityByDevice = new Map<string, VisibilitySummary>(
+          (visibilityData.devices || []).map((device: any) => [device.device_id, device])
+        )
         // Ensure all agents have a status property and normalize data structure
         const agentsWithStatus = (data.agents || []).map((agent: any) => ({
           ...agent,
@@ -144,7 +159,8 @@ export default function AgentsPage() {
             supported_hooks: ['tc', 'xdp'],
             max_programs: 10,
             max_maps: 50
-          }
+          },
+          visibility: visibilityByDevice.get(agent.host_id) || visibilityByDevice.get(agent.agent_uid) || null
         }))
         // Sort agents by last_seen (most recent first) and group by host_id
         const sortedAgents = agentsWithStatus.sort((a: any, b: any) => 
@@ -250,6 +266,10 @@ export default function AgentsPage() {
       .map((row) => `${row.status.active_pack_id || 'none'}@${row.status.active_pack_version || 'none'}`)
       .filter((pack) => pack !== 'none@none')
   ).size
+
+  const eventTypeCount = (agent: Agent, eventType: string) => {
+    return Number(agent.visibility?.event_type_count?.[eventType] || 0)
+  }
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
@@ -466,11 +486,30 @@ export default function AgentsPage() {
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                               {getPackHealthBadge(agent.detection_pack_status)}
                               <span className="text-xs text-gray-500">
+                                Events: {agent.visibility?.event_count || 0}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                Findings: {eventTypeCount(agent, 'aegis.risk_finding.created')}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                Extensions: {eventTypeCount(agent, 'aegis.browser_extension.observed')}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                Collectors: {eventTypeCount(agent, 'aegis.collector.status')}
+                              </span>
+                              <span className="text-xs text-gray-500">
                                 Pack: {agent.detection_pack_status?.active_pack_id || 'none'}
                               </span>
                               <span className="text-xs text-gray-500">
                                 Version: {agent.detection_pack_status?.active_pack_version || 'none'}
                               </span>
+                              <a
+                                href={`/agents/${encodeURIComponent(agent.host_id || agent.agent_uid)}`}
+                                className="text-xs font-medium text-primary-700 hover:text-primary-900"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                Open detail
+                              </a>
                             </div>
                             <div className="mt-2 flex flex-wrap gap-1">
                               {agent.labels.map((label) => (

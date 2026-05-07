@@ -1,6 +1,6 @@
 # WO-PLAT-002: Agent List and Device Drill-In
 
-**Status:** Draft  
+**Status:** Complete  
 **Phase:** Product Platform  
 **Primary owner:** UI / Backend  
 
@@ -54,3 +54,12 @@ Move endpoint detail out of the dashboard into a product workflow: agent list ->
 - No enforcement actions.
 - No AI-generated conclusions yet; that belongs to WO-AI-003.
 
+## Implementation Update (May 7, 2026)
+
+- Added direct device drill-in route: `/agents/[device_id]`.
+- Device detail loads directly from URL and fetches device-scoped visibility evidence from ingest-backed console APIs.
+- Added tabs for Overview, AI Activity, Processes, Network, DNS, Browser, Inventory, Findings, and Collector Health.
+- Added stale telemetry treatment and empty states for missing evidence.
+- Added links from the dashboard device panel and `/agents` list to the device detail page.
+- Enriched `/agents` list rows with visibility event count, finding count, browser extension count, and collector status count.
+- Verification: `npm run build` passes.

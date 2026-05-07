@@ -1202,7 +1202,12 @@ function AgentDetailPanel({ detail }: { detail: ReturnType<typeof buildDeviceDet
             </div>
             <p className="mt-1 text-sm text-slate-500" style={ui.mutedText}>{platformName(device.source)} · {device.sensor_version}</p>
           </div>
-          <StatusChip tone={active ? 'emerald' : 'amber'} label={active ? 'Fresh' : 'Stale'} />
+          <div className="flex flex-col items-end gap-2">
+            <StatusChip tone={active ? 'emerald' : 'amber'} label={active ? 'Fresh' : 'Stale'} />
+            <a href={`/agents/${encodeURIComponent(device.device_id)}`} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
+              Open detail
+            </a>
+          </div>
         </div>
       </div>
 
