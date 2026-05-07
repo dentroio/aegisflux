@@ -123,6 +123,21 @@ type CollectorStatus = {
   message?: string
 }
 
+type AgentPerformance = {
+  event_id?: string
+  timestamp_ms?: number
+  os?: string
+  process_cpu_percent?: number | null
+  process_memory_rss_mb?: number | null
+  collector_runtime_ms?: number
+  collector_name?: string
+  collection_interval_ms?: number | null
+  skipped_reason?: string | null
+  event_queue_depth?: number
+  spool_bytes?: number
+  pack_eval_runtime_ms?: number | null
+}
+
 type VisibilityState = {
   devices: DeviceRecord[]
   events: EventRecord[]
@@ -133,6 +148,7 @@ type VisibilityState = {
   extensions: BrowserExtension[]
   sase: SaseComponent[]
   collectors: CollectorStatus[]
+  performance: AgentPerformance[]
 }
 
 const tabs = [
@@ -175,6 +191,7 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
     extensions: [],
     sase: [],
     collectors: [],
+    performance: [],
   })
 
   useEffect(() => {
@@ -184,7 +201,7 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
   const loadDevice = async () => {
     setRefreshing(true)
     const encoded = encodeURIComponent(deviceId)
-    const [devices, events, processes, flows, dns, findings, extensions, sase, collectors] = await Promise.all([
+    const [devices, events, processes, flows, dns, findings, extensions, sase, collectors, performance] = await Promise.all([
       fetchJson<{ devices?: DeviceRecord[] }>(`/api/visibility/devices?limit=200`, {}),
       fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&limit=260`, {}),
       fetchJson<{ processes?: ProcessRecord[] }>(`/api/visibility/processes?device_id=${encoded}&limit=220`, {}),
@@ -194,6 +211,7 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
       fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.browser_extension.observed&limit=160`, {}),
       fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.sase_component.observed&limit=160`, {}),
       fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.collector.status&limit=160`, {}),
+      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.agent.performance&limit=160`, {}),
     ])
 
     setData({
@@ -206,6 +224,7 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
       extensions: (extensions.events || []).map((event) => ({ event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...event.payload })),
       sase: (sase.events || []).map((event) => ({ event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...event.payload })),
       collectors: (collectors.events || []).map((event) => ({ event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...event.payload })),
+      performance: (performance.events || []).map((event) => ({ event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...event.payload })),
     })
     setLoading(false)
     setRefreshing(false)
@@ -311,6 +330,7 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
               extensions={filterRows(data.extensions, query)}
               sase={filterRows(data.sase, query)}
               collectors={filterRows(data.collectors, query)}
+              performance={filterRows(data.performance, query)}
               aiDns={aiDns}
               aiProcesses={aiProcesses}
               aiFindings={aiFindings}
@@ -333,6 +353,7 @@ function TabContent(props: {
   extensions: BrowserExtension[]
   sase: SaseComponent[]
   collectors: CollectorStatus[]
+  performance: AgentPerformance[]
   aiDns: DnsRecord[]
   aiProcesses: ProcessRecord[]
   aiFindings: FindingRecord[]
@@ -371,7 +392,27 @@ function TabContent(props: {
   if (activeTab === 'Browser') return <Table rows={props.extensions} empty="No browser extension telemetry for this device." columns={['browser', 'profile', 'extension_id', 'name', 'version']} />
   if (activeTab === 'Inventory') return <Table rows={props.sase} empty="No enterprise control inventory for this device." columns={['component_type', 'vendor', 'product', 'name', 'status']} />
   if (activeTab === 'Findings') return <Table rows={props.findings} empty="No findings for this device." columns={['severity', 'title', 'classification', 'risk_score', 'recommended_action']} />
-  if (activeTab === 'Collector Health') return <Table rows={props.collectors} empty="No collector health telemetry for this device." columns={['collector', 'status', 'message']} />
+  if (activeTab === 'Collector Health') {
+    const latest = props.performance[0]
+    return (
+      <div className="space-y-5">
+        <div className="grid gap-4 md:grid-cols-4">
+          <Metric label="CPU" value={formatPercent(latest?.process_cpu_percent)} />
+          <Metric label="RSS" value={formatMb(latest?.process_memory_rss_mb)} />
+          <Metric label="Queue" value={latest?.event_queue_depth ?? 'n/a'} />
+          <Metric label="Spool" value={formatBytes(latest?.spool_bytes)} />
+        </div>
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Panel icon={Activity} title="Collector Status">
+            <Table rows={props.collectors} empty="No collector health telemetry for this device." columns={['collector', 'status', 'message']} />
+          </Panel>
+          <Panel icon={Cpu} title="Performance Budget">
+            <Table rows={props.performance} empty="No agent performance telemetry for this device." columns={['collector_name', 'collector_runtime_ms', 'process_cpu_percent', 'process_memory_rss_mb', 'event_queue_depth', 'spool_bytes', 'pack_eval_runtime_ms']} />
+          </Panel>
+        </div>
+      </div>
+    )
+  }
   return <Table rows={props.events} empty="No events for this device." columns={['event_type', 'source', 'sensor_version']} />
 }
 
@@ -493,6 +534,21 @@ function formatCell(value: any) {
   if (value === null || value === undefined || value === '') return 'n/a'
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
+}
+
+function formatPercent(value?: number | null) {
+  return typeof value === 'number' ? `${value.toFixed(1)}%` : 'n/a'
+}
+
+function formatMb(value?: number | null) {
+  return typeof value === 'number' ? `${value.toFixed(1)} MB` : 'n/a'
+}
+
+function formatBytes(value?: number | null) {
+  if (typeof value !== 'number') return 'n/a'
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function labelize(value: string) {

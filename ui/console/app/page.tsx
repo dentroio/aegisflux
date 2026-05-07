@@ -116,6 +116,19 @@ type SaseComponentRecord = {
   evidence?: string[]
 }
 
+type AgentPerformanceRecord = {
+  device_id?: string
+  os?: string
+  process_cpu_percent?: number | null
+  process_memory_rss_mb?: number | null
+  collector_runtime_ms?: number
+  collector_name?: string
+  event_queue_depth?: number
+  spool_bytes?: number
+  pack_eval_runtime_ms?: number | null
+  received_at_ms?: number
+}
+
 type VisibilityData = {
   events: EventRecord[]
   processes: ProcessRecord[]
@@ -659,12 +672,13 @@ export default function AegisDashboard() {
     try {
       setLoading(true)
       setError(null)
-      const [deviceResponse, events, extensionEvents, saseEvents, collectorEvents, processes, flows, dns, findings] = await Promise.all([
+      const [deviceResponse, events, extensionEvents, saseEvents, collectorEvents, performanceEvents, processes, flows, dns, findings] = await Promise.all([
         fetchJson<{ devices?: DeviceRecord[] }>('/api/visibility/devices?limit=100'),
         fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?limit=240'),
         fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.browser_extension.observed&limit=160'),
         fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.sase_component.observed&limit=160'),
         fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.collector.status&limit=220'),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.agent.performance&limit=220'),
         fetchJson<{ processes?: ProcessRecord[] }>('/api/visibility/processes?limit=180'),
         fetchJson<{ flows?: FlowRecord[] }>('/api/visibility/flows?limit=180'),
         fetchJson<{ dns?: DnsRecord[] }>('/api/visibility/dns?limit=180'),
@@ -680,6 +694,7 @@ export default function AegisDashboard() {
           ...(extensionEvents.events || []),
           ...(saseEvents.events || []),
           ...(collectorEvents.events || []),
+          ...(performanceEvents.events || []),
         ]),
         processes: processes.processes || [],
         flows: flows.flows || [],
@@ -953,7 +968,7 @@ export default function AegisDashboard() {
               icon={widget.icon}
               title={widget.title}
               value={widgetValue(widget.id, model, data)}
-              detail={widget.id === 'evidence' ? `${data.processes.length} process, ${data.flows.length} flow, ${data.dns.length} DNS records` : widget.detail}
+              detail={widgetDetail(widget.id, model, data)}
             />
           ))}
         </section>
@@ -1075,6 +1090,19 @@ function buildDashboardModel(data: VisibilityData, devices: DeviceRecord[]) {
       message: String(event.payload.message || ''),
       received_at_ms: event.received_at_ms || event.timestamp_ms,
     }))
+  const performance = data.events
+    .filter((event) => event.event_type === 'aegis.agent.performance')
+    .map((event) => ({
+      ...event.payload,
+      device_id: event.device_id,
+      received_at_ms: event.received_at_ms || event.timestamp_ms,
+    }) as AgentPerformanceRecord)
+  const cpuSamples = performance
+    .map((record) => record.process_cpu_percent)
+    .filter((value): value is number => typeof value === 'number')
+  const memorySamples = performance
+    .map((record) => record.process_memory_rss_mb)
+    .filter((value): value is number => typeof value === 'number')
 
   const onlineDevices = devices.filter((device) => Date.now() - device.last_seen_ms < 5 * 60 * 1000).length
   const maxRisk = data.findings.reduce((max, finding) => Math.max(max, finding.risk_score || 0), 0)
@@ -1094,6 +1122,10 @@ function buildDashboardModel(data: VisibilityData, devices: DeviceRecord[]) {
     extensions,
     sase,
     collectorStatuses,
+    performance,
+    maxCpuPercent: cpuSamples.length ? Math.max(...cpuSamples) : null,
+    avgCpuPercent: cpuSamples.length ? cpuSamples.reduce((sum, value) => sum + value, 0) / cpuSamples.length : null,
+    maxMemoryRssMb: memorySamples.length ? Math.max(...memorySamples) : null,
     healthyCollectorPairs: new Set(collectorStatuses.filter((status) => status.status === 'healthy').map((status) => `${status.device_id}:${status.collector}`)).size,
   }
 }
@@ -1109,6 +1141,7 @@ function buildDeviceDetail(device: DeviceRecord, data: VisibilityData, model: Re
     extensions: model.extensions.filter((record) => record.device_id === deviceId),
     sase: model.sase.filter((record) => record.device_id === deviceId),
     collectors: model.collectorStatuses.filter((record) => record.device_id === deviceId),
+    performance: model.performance.filter((record) => record.device_id === deviceId),
   }
 }
 
@@ -1124,8 +1157,18 @@ function widgetValue(id: string, model: ReturnType<typeof buildDashboardModel>, 
   if (id === 'evidence') return model.eventCount
   if (id === 'browser') return model.extensionCount
   if (id === 'sase') return model.saseCount
-  if (id === 'budget') return 'Low'
+  if (id === 'budget') return model.maxCpuPercent === null ? 'n/a' : `${model.maxCpuPercent.toFixed(1)}%`
   return data.events.length
+}
+
+function widgetDetail(id: string, model: ReturnType<typeof buildDashboardModel>, data: VisibilityData) {
+  if (id === 'evidence') return `${data.processes.length} process, ${data.flows.length} flow, ${data.dns.length} DNS records`
+  if (id === 'budget') {
+    const avg = model.avgCpuPercent === null ? 'n/a' : `${model.avgCpuPercent.toFixed(1)}% avg CPU`
+    const memory = model.maxMemoryRssMb === null ? 'n/a RSS' : `${model.maxMemoryRssMb.toFixed(1)} MB max RSS`
+    return `${avg}, ${memory}`
+  }
+  return widgetCatalog.find((widget) => widget.id === id)?.detail || ''
 }
 
 function AgentList({
@@ -1230,6 +1273,18 @@ function AgentDetailPanel({ detail }: { detail: ReturnType<typeof buildDeviceDet
               </div>
               <p className="mt-1 text-xs leading-5 text-slate-500">{collector.message}</p>
             </div>
+          ))}
+        </DetailSection>
+
+        <DetailSection icon={Cpu} title="Agent budget">
+          {detail.performance.length === 0 ? (
+            <EmptyLine text="No performance telemetry in current window." />
+          ) : detail.performance.slice(0, 4).map((record) => (
+            <CompactRow
+              key={`${record.collector_name}-${record.received_at_ms}`}
+              title={record.collector_name || 'collector'}
+              subtitle={`${record.collector_runtime_ms ?? 0} ms · queue ${record.event_queue_depth ?? 'n/a'} · spool ${formatBytes(record.spool_bytes)}`}
+            />
           ))}
         </DetailSection>
 
@@ -1358,4 +1413,11 @@ function ageFromMs(ms?: number) {
   const minutes = Math.round(seconds / 60)
   if (minutes < 60) return `${minutes}m ago`
   return `${Math.round(minutes / 60)}h ago`
+}
+
+function formatBytes(value?: number | null) {
+  if (typeof value !== 'number') return 'n/a'
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`
 }

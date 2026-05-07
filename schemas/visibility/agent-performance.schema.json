@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aegisflux.local/schemas/visibility/agent-performance.schema.json",
+  "title": "Aegis Agent Performance",
+  "allOf": [
+    {
+      "$ref": "common-envelope.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "aegis.agent.performance"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "os": {
+              "type": "string",
+              "minLength": 1
+            },
+            "process_cpu_percent": {
+              "type": ["number", "null"],
+              "minimum": 0
+            },
+            "process_memory_rss_mb": {
+              "type": ["number", "null"],
+              "minimum": 0
+            },
+            "collector_runtime_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "collector_name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "collection_interval_ms": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "skipped_reason": {
+              "type": ["string", "null"]
+            },
+            "event_queue_depth": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "spool_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pack_eval_runtime_ms": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            }
+          },
+          "required": [
+            "os",
+            "process_cpu_percent",
+            "process_memory_rss_mb",
+            "collector_runtime_ms",
+            "collector_name",
+            "collection_interval_ms",
+            "skipped_reason",
+            "event_queue_depth",
+            "spool_bytes",
+            "pack_eval_runtime_ms"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

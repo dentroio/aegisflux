@@ -1,0 +1,23 @@
+{
+  "schema_version": "visibility.v1",
+  "event_id": "windows-dev-agent-01-1778000000000-42",
+  "event_type": "aegis.agent.performance",
+  "timestamp_ms": 1778000000000,
+  "source": "aegis-windows-agent",
+  "device_id": "windows-dev-agent-01",
+  "agent_id": "windows-agent-dev",
+  "sensor_version": "0.1.0",
+  "sequence": 42,
+  "payload": {
+    "os": "windows",
+    "process_cpu_percent": null,
+    "process_memory_rss_mb": null,
+    "collector_runtime_ms": 18,
+    "collector_name": "windows.process",
+    "collection_interval_ms": null,
+    "skipped_reason": null,
+    "event_queue_depth": 74,
+    "spool_bytes": 16384,
+    "pack_eval_runtime_ms": null
+  }
+}

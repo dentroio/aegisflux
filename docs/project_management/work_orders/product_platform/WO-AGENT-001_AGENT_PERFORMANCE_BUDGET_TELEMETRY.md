@@ -1,6 +1,6 @@
 # WO-AGENT-001: Agent Performance Budget Telemetry
 
-**Status:** Draft  
+**Status:** Complete
 **Phase:** Product Platform  
 **Primary owner:** Agent / Backend / UI  
 
@@ -51,3 +51,16 @@ Prove that AegisFlux agents are low-resource and safe to run continuously. Every
 
 Default target: AegisFlux should feel like it is not there. The agent must stay conservative on CPU, memory, disk, and network.
 
+## Implementation Notes
+
+- Added `aegis.agent.performance` visibility schema and example fixture.
+- Windows and Linux agents now emit performance records for each collector plus dynamic-pack evaluation timing.
+- Performance telemetry includes best-effort process CPU/RSS, collector runtime, queue depth, spool size, and pack evaluation runtime.
+- Dashboard Agent Budget now computes fleet max/avg CPU and max RSS from performance events.
+- Device drill-in Collector Health now includes budget summary metrics and a collector runtime table.
+
+## Verification
+
+- `cargo test` in `agents/linux-agent`
+- `cargo test` in `agents/windows-agent`
+- `npm run build` in `ui/console`

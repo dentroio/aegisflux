@@ -35,6 +35,7 @@ visibility.v1
 | Event Type | Schema |
 |------------|--------|
 | `aegis.agent.heartbeat` | [agent-heartbeat.schema.json](agent-heartbeat.schema.json) |
+| `aegis.agent.performance` | [agent-performance.schema.json](agent-performance.schema.json) |
 | `aegis.collector.status` | [collector-status.schema.json](collector-status.schema.json) |
 | `aegis.process.started` | [process-started.schema.json](process-started.schema.json) |
 | `aegis.process.ended` | [process-ended.schema.json](process-ended.schema.json) |

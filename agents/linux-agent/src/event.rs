@@ -55,6 +55,29 @@ pub enum EventPayload {
         /// Human-readable status message.
         message: String,
     },
+    /// Agent performance budget payload.
+    AgentPerformance {
+        /// Operating system family reported by the compiled agent.
+        os: String,
+        /// Process CPU percent when sampled.
+        process_cpu_percent: Option<f32>,
+        /// Process resident memory in megabytes when sampled.
+        process_memory_rss_mb: Option<f32>,
+        /// Collector runtime in milliseconds.
+        collector_runtime_ms: u64,
+        /// Collector or subsystem name.
+        collector_name: String,
+        /// Collection interval in milliseconds when applicable.
+        collection_interval_ms: Option<u64>,
+        /// Reason collection was skipped when applicable.
+        skipped_reason: Option<String>,
+        /// Number of events queued in the current batch.
+        event_queue_depth: u64,
+        /// Local JSONL spool size in bytes before this event is appended.
+        spool_bytes: u64,
+        /// Dynamic pack evaluation runtime in milliseconds when applicable.
+        pack_eval_runtime_ms: Option<u64>,
+    },
     /// Process started or observed in a snapshot payload.
     ProcessStarted {
         /// Stable local process instance identifier.
@@ -247,6 +270,30 @@ impl AegisEvent {
                 escape_json(status),
                 escape_json(message)
             ),
+            EventPayload::AgentPerformance {
+                os,
+                process_cpu_percent,
+                process_memory_rss_mb,
+                collector_runtime_ms,
+                collector_name,
+                collection_interval_ms,
+                skipped_reason,
+                event_queue_depth,
+                spool_bytes,
+                pack_eval_runtime_ms,
+            } => format!(
+                r#"{{"os":"{}","process_cpu_percent":{},"process_memory_rss_mb":{},"collector_runtime_ms":{},"collector_name":"{}","collection_interval_ms":{},"skipped_reason":{},"event_queue_depth":{},"spool_bytes":{},"pack_eval_runtime_ms":{}}}"#,
+                escape_json(os),
+                option_f32_json(*process_cpu_percent),
+                option_f32_json(*process_memory_rss_mb),
+                collector_runtime_ms,
+                escape_json(collector_name),
+                option_u64_json(*collection_interval_ms),
+                option_json(skipped_reason.as_deref()),
+                event_queue_depth,
+                spool_bytes,
+                option_u64_json(*pack_eval_runtime_ms)
+            ),
             EventPayload::ProcessStarted {
                 process_guid,
                 parent_process_guid,
@@ -429,6 +476,20 @@ fn option_u16_json(value: Option<u16>) -> String {
     match value {
         Some(value) => value.to_string(),
         None => "null".to_string(),
+    }
+}
+
+fn option_u64_json(value: Option<u64>) -> String {
+    match value {
+        Some(value) => value.to_string(),
+        None => "null".to_string(),
+    }
+}
+
+fn option_f32_json(value: Option<f32>) -> String {
+    match value {
+        Some(value) if value.is_finite() => value.max(0.0).to_string(),
+        _ => "null".to_string(),
     }
 }
 

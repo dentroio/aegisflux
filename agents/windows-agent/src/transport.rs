@@ -126,7 +126,9 @@ impl HttpEndpoint {
 
     fn post_jsonl_once(&self, body: &str, address: &str) -> Result<(), PostError> {
         let mut stream = TcpStream::connect(address).map_err(|err| {
-            PostError::Retryable(format!("failed to connect to Aegis ingest at {address}: {err}"))
+            PostError::Retryable(format!(
+                "failed to connect to Aegis ingest at {address}: {err}"
+            ))
         })?;
 
         let request = format!(
@@ -137,14 +139,14 @@ impl HttpEndpoint {
             body
         );
 
-        stream
-            .write_all(request.as_bytes())
-            .map_err(|err| PostError::Retryable(format!("failed to send events to Aegis ingest: {err}")))?;
+        stream.write_all(request.as_bytes()).map_err(|err| {
+            PostError::Retryable(format!("failed to send events to Aegis ingest: {err}"))
+        })?;
 
         let mut response = String::new();
-        stream
-            .read_to_string(&mut response)
-            .map_err(|err| PostError::Retryable(format!("failed to read Aegis ingest response: {err}")))?;
+        stream.read_to_string(&mut response).map_err(|err| {
+            PostError::Retryable(format!("failed to read Aegis ingest response: {err}"))
+        })?;
 
         let status_line = response.lines().next().unwrap_or_default();
         if status_line.starts_with("HTTP/1.1 2") || status_line.starts_with("HTTP/1.0 2") {
