@@ -1,6 +1,6 @@
 # WO-DET-006: Repeatable Detection Rollout Smoke
 
-**Status:** In Progress  
+**Status:** Complete  
 **Phase:** Product Platform  
 **Primary owner:** Backend / Agent / Lab  
 
@@ -68,6 +68,10 @@ The first version may post status through the controller API for continuity, but
 - The smoke executes fixture ingest, research creation, candidate creation, validation, approval, signing, latest-pack checks for Linux/Windows, artifact header/body checks, and rollout-status verification for both lab agents.
 - The script uses a unique `pack_version` per run by default to keep runs repeatable without editing fixtures.
 - Failures are stage-scoped and include a concrete `next:` command for triage.
+- Fixed the default local ingest URL to match the Docker Compose lab port (`http://127.0.0.1:9091`).
+- Fixed JSON assertion helpers so validation and artifact assertions can use bounded helpers such as `int`, `len`, and `isinstance`.
+- Posts lab-continuity detection-pack status for Linux and Windows agents after artifact verification so rollout-status can be asserted repeatably in the local lab.
+- Acceptance verification passed with `./scripts/lab/smoke-detection-rollout.sh`.
 
 ## Operator usage
 
@@ -78,9 +82,8 @@ The first version may post status through the controller API for continuity, but
 Useful overrides:
 
 - `DETECTION_URL` (default `http://127.0.0.1:8089`)
-- `INGEST_URL` (default `http://127.0.0.1:9090`)
+- `INGEST_URL` (default `http://127.0.0.1:9091`)
 - `ACTIONS_URL` (default `http://127.0.0.1:8083`)
 - `LINUX_AGENT_UID` (default `linux-dev-agent-01`)
 - `WINDOWS_AGENT_UID` (default `windows-dev-agent-01`)
 - `AGENT_VERSION` (default `0.1.0`)
-

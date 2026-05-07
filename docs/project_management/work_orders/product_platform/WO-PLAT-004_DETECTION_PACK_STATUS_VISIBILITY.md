@@ -1,6 +1,6 @@
 # WO-PLAT-004: Detection Pack Status Visibility
 
-**Status:** In Progress  
+**Status:** Complete  
 **Phase:** Product Platform  
 **Primary owner:** UI / Backend  
 
@@ -76,9 +76,8 @@ This work order turns the dynamic detection-pack pipeline into a visible product
   - last applied, last check, and last rejection reason.
 - Empty state is shown when no detection-pack telemetry is available for an agent.
 
-### Follow-up items
+### Completed follow-up items
 
-- Add a dedicated detection-pack rollout page/section with aggregate counts and per-agent rollout rows.
-- Add explicit stale-state UX treatment in the list/detail view from controller stale thresholds.
-- Add deep links from device detail to rollout status views when the rollout page exists.
-
+- Added a detection-pack rollout section with aggregate counts and per-agent rollout rows.
+- Added explicit stale-state treatment in the list/detail view using controller-provided staleness when present and a 24-hour fallback threshold.
+- Added a device-detail link back to the rollout status section.

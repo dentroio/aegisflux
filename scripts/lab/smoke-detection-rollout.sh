@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 DETECTION_URL="${DETECTION_URL:-http://127.0.0.1:8089}"
-INGEST_URL="${INGEST_URL:-http://127.0.0.1:9090}"
+INGEST_URL="${INGEST_URL:-http://127.0.0.1:9091}"
 ACTIONS_URL="${ACTIONS_URL:-http://127.0.0.1:8083}"
 LAB_DEVICE_ID="${LAB_DEVICE_ID:-lab-mcp-01}"
 LAB_TENANT_ID="${LAB_TENANT_ID:-}"
@@ -85,7 +85,17 @@ import json
 import sys
 with open(sys.argv[1], "r", encoding="utf-8") as fh:
     data = json.load(fh)
-ok = bool(eval(sys.argv[2], {"__builtins__": {}}, {"d": data}))
+safe_builtins = {
+    "bool": bool,
+    "dict": dict,
+    "float": float,
+    "int": int,
+    "isinstance": isinstance,
+    "len": len,
+    "list": list,
+    "str": str,
+}
+ok = bool(eval(sys.argv[2], {"__builtins__": safe_builtins}, {"d": data}))
 raise SystemExit(0 if ok else 1)
 PY
   if [[ $? -ne 0 ]]; then
@@ -205,17 +215,53 @@ ARTIFACT_HEADERS="${TMP_DIR}/artifact-headers.txt"
 ARTIFACT_BODY="${TMP_DIR}/artifact.json"
 ARTIFACT_CODE="$(curl -sS -D "${ARTIFACT_HEADERS}" -o "${ARTIFACT_BODY}" -w '%{http_code}' "${DETECTION_URL}/v1/detection-packs/${PACK_ID}/artifact?os=linux&agent_version=${AGENT_VERSION}&version=${PACK_VERSION}")" || fail_stage "artifact" "request failed" "curl -v '${DETECTION_URL}/v1/detection-packs/${PACK_ID}/artifact?os=linux&agent_version=${AGENT_VERSION}&version=${PACK_VERSION}'"
 [[ "${ARTIFACT_CODE}" == "200" ]] || fail_stage "artifact" "unexpected status ${ARTIFACT_CODE}" "cat ${ARTIFACT_BODY}"
-if ! rg -q '^X-Content-SHA256:\s' "${ARTIFACT_HEADERS}"; then
+if ! rg -qi '^X-Content-SHA256:\s' "${ARTIFACT_HEADERS}"; then
   fail_stage "artifact" "missing X-Content-SHA256 header" "cat ${ARTIFACT_HEADERS}"
 fi
-if ! rg -q '^X-Signature-Key-Id:\s' "${ARTIFACT_HEADERS}"; then
+if ! rg -qi '^X-Signature-Key-Id:\s' "${ARTIFACT_HEADERS}"; then
   fail_stage "artifact" "missing X-Signature-Key-Id header" "cat ${ARTIFACT_HEADERS}"
 fi
-if ! rg -q '^X-Signature-Algorithm:\s' "${ARTIFACT_HEADERS}"; then
+if ! rg -qi '^X-Signature-Algorithm:\s' "${ARTIFACT_HEADERS}"; then
   fail_stage "artifact" "missing X-Signature-Algorithm header" "cat ${ARTIFACT_HEADERS}"
 fi
 assert_json_true "${ARTIFACT_BODY}" "d.get('pack_id') == '${PACK_ID}' and d.get('pack_version') == '${PACK_VERSION}' and isinstance(d.get('rules'), list) and len(d.get('rules')) >= 1" "artifact" "cat ${ARTIFACT_BODY}"
 ok_stage "artifact headers and body verified"
+
+STATUS_REQ="${TMP_DIR}/pack-status.json"
+python3 - "${PACK_ID}" "${PACK_VERSION}" "${AGENT_VERSION}" >"${STATUS_REQ}" <<'PY'
+import json
+import sys
+
+pack_id, pack_version, agent_version = sys.argv[1:]
+print(json.dumps({
+    "reported_agent_version": agent_version,
+    "rollout_state": "applied",
+    "active_pack_id": pack_id,
+    "active_pack_version": pack_version,
+    "signature_status": "valid",
+    "hash_status": "valid",
+    "schema_status": "valid",
+    "compatibility_status": "compatible",
+    "emit_visibility": True,
+}))
+PY
+
+for agent_uid in "${LINUX_AGENT_UID}" "${WINDOWS_AGENT_UID}"; do
+  STATUS_AGENT_REQ="${TMP_DIR}/pack-status-${agent_uid}.json"
+  python3 - "${STATUS_REQ}" "${agent_uid}" >"${STATUS_AGENT_REQ}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+doc["device_id"] = sys.argv[2]
+print(json.dumps(doc))
+PY
+  STATUS_RESP="${TMP_DIR}/pack-status-${agent_uid}-resp.json"
+  STATUS_CODE="$(curl_json "POST" "${DETECTION_URL}/v1/agents/${agent_uid}/detection-pack-status" "${STATUS_AGENT_REQ}" "${STATUS_RESP}")" || fail_stage "pack-status" "failed to post status for ${agent_uid}" "cat ${STATUS_AGENT_REQ}"
+  [[ "${STATUS_CODE}" == "200" ]] || fail_stage "pack-status" "unexpected status ${STATUS_CODE} for ${agent_uid}" "cat ${STATUS_RESP}"
+done
+ok_stage "lab agent pack status posted"
 
 deadline=$((SECONDS + MAX_WAIT_SECONDS))
 rollout_ok=0

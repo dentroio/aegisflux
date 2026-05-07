@@ -13,7 +13,9 @@ import {
   RefreshCw,
   Tag,
   Edit,
-  Trash2
+  Trash2,
+  ShieldCheck,
+  Link
 } from 'lucide-react'
 
 interface Agent {
@@ -79,7 +81,10 @@ interface DetectionPackStatus {
   last_rejected_pack_id?: string
   last_rejected_reason?: string
   last_rejected_reason_codes?: string[]
+  computed_stale?: boolean
 }
+
+const ROLLOUT_STALE_MS = 24 * 60 * 60 * 1000
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([])
@@ -146,6 +151,10 @@ export default function AgentsPage() {
           new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime()
         )
         setAgents(sortedAgents)
+        setSelectedAgent((current) => {
+          if (!current) return current
+          return sortedAgents.find((agent: Agent) => agent.agent_uid === current.agent_uid) || current
+        })
       } else {
         setError('Failed to fetch agents')
       }
@@ -204,6 +213,43 @@ export default function AgentsPage() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString()
   }
+
+  const isPackStatusStale = (status?: DetectionPackStatus | null) => {
+    if (!status) return false
+    if (status.computed_stale) return true
+    if (!status.last_check_at_ms) return false
+    return Date.now() - status.last_check_at_ms > ROLLOUT_STALE_MS
+  }
+
+  const getPackHealthBadge = (status?: DetectionPackStatus | null) => {
+    if (!status) return <span className="badge badge-warning">No telemetry</span>
+    if (isPackStatusStale(status)) return <span className="badge badge-warning">Stale</span>
+    return getRolloutBadge(status.rollout_state)
+  }
+
+  const formatTimeMS = (value?: number) => {
+    return value ? formatDate(new Date(value).toISOString()) : 'n/a'
+  }
+
+  const rolloutRows = agents
+    .filter((agent) => agent.detection_pack_status)
+    .map((agent) => ({
+      agent,
+      status: agent.detection_pack_status as DetectionPackStatus,
+      stale: isPackStatusStale(agent.detection_pack_status)
+    }))
+
+  const rolloutCounts = rolloutRows.reduce<Record<string, number>>((counts, row) => {
+    const key = row.stale ? 'stale' : (row.status.rollout_state || 'not_checked')
+    counts[key] = (counts[key] || 0) + 1
+    return counts
+  }, {})
+
+  const activePackCount = new Set(
+    rolloutRows
+      .map((row) => `${row.status.active_pack_id || 'none'}@${row.status.active_pack_version || 'none'}`)
+      .filter((pack) => pack !== 'none@none')
+  ).size
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
@@ -298,6 +344,77 @@ export default function AgentsPage() {
           </div>
         )}
 
+        <section id="detection-pack-rollout" className="mb-8 card">
+	          <div className="px-6 py-4 border-b border-gray-200">
+	            <div className="flex items-center justify-between">
+	              <div className="flex items-center space-x-3">
+	                <ShieldCheck className="h-6 w-6 text-primary-600" />
+	                <div>
+	                  <h2 className="text-lg font-semibold text-gray-900">Detection Pack Rollout</h2>
+	                  <p className="text-sm text-gray-500">Observe-only pack health across reporting agents</p>
+	                </div>
+	              </div>
+	              <span className="badge badge-info">{rolloutRows.length} reporting</span>
+	            </div>
+	          </div>
+	          <div className="p-6">
+	            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+	              <div className="rounded-md border border-gray-200 p-3">
+	                <p className="text-xs text-gray-500">Active Packs</p>
+	                <p className="text-xl font-semibold text-gray-900">{activePackCount}</p>
+	              </div>
+	              {['applied', 'rejected', 'incompatible', 'expired', 'stale'].map((state) => (
+	                <div key={state} className="rounded-md border border-gray-200 p-3">
+	                  <p className="text-xs text-gray-500 capitalize">{state}</p>
+	                  <p className="text-xl font-semibold text-gray-900">{rolloutCounts[state] || 0}</p>
+	                </div>
+	              ))}
+	            </div>
+
+	            {rolloutRows.length === 0 ? (
+	              <p className="text-sm text-gray-500">No detection-pack rollout telemetry is available.</p>
+	            ) : (
+	              <div className="overflow-x-auto">
+	                <table className="min-w-full divide-y divide-gray-200 text-sm">
+	                  <thead>
+	                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+	                      <th className="py-2 pr-4">Agent</th>
+	                      <th className="py-2 pr-4">State</th>
+	                      <th className="py-2 pr-4">Active Pack</th>
+	                      <th className="py-2 pr-4">Trust</th>
+	                      <th className="py-2 pr-4">Last Check</th>
+	                    </tr>
+	                  </thead>
+	                  <tbody className="divide-y divide-gray-100">
+	                    {rolloutRows.map(({ agent, status }) => (
+	                      <tr key={agent.agent_uid}>
+	                        <td className="py-3 pr-4">
+	                          <button
+	                            onClick={() => setSelectedAgent(agent)}
+	                            className="text-left font-medium text-primary-700 hover:text-primary-900"
+	                          >
+	                            {agent.hostname || agent.agent_uid}
+	                          </button>
+	                          <p className="text-xs text-gray-500">{agent.platform.os} • {agent.agent_version}</p>
+	                        </td>
+	                        <td className="py-3 pr-4">{getPackHealthBadge(status)}</td>
+	                        <td className="py-3 pr-4 font-mono text-xs">
+	                          {status.active_pack_id || 'none'}
+	                          {status.active_pack_version ? ` @ ${status.active_pack_version}` : ''}
+	                        </td>
+	                        <td className="py-3 pr-4 text-xs text-gray-600">
+	                          sig={status.signature_status || 'unknown'} · hash={status.hash_status || 'unknown'} · schema={status.schema_status || 'unknown'}
+	                        </td>
+	                        <td className="py-3 pr-4 text-xs text-gray-600">{formatTimeMS(status.last_check_at_ms)}</td>
+	                      </tr>
+	                    ))}
+	                  </tbody>
+	                </table>
+	              </div>
+	            )}
+	          </div>
+        </section>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Agents List */}
           <div className="lg:col-span-2">
@@ -347,7 +464,7 @@ export default function AgentsPage() {
                               {agent.platform.os} • {agent.platform.architecture}
                             </p>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
-                              {getRolloutBadge(agent.detection_pack_status?.rollout_state)}
+                              {getPackHealthBadge(agent.detection_pack_status)}
                               <span className="text-xs text-gray-500">
                                 Pack: {agent.detection_pack_status?.active_pack_id || 'none'}
                               </span>
@@ -539,7 +656,7 @@ export default function AgentsPage() {
                     <dl className="space-y-3">
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Rollout State</dt>
-                        <dd className="text-sm text-gray-900">{getRolloutBadge(selectedAgent.detection_pack_status.rollout_state)}</dd>
+                        <dd className="text-sm text-gray-900">{getPackHealthBadge(selectedAgent.detection_pack_status)}</dd>
                       </div>
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Active Pack</dt>
@@ -568,23 +685,34 @@ export default function AgentsPage() {
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Last Applied</dt>
                         <dd className="text-sm text-gray-900">
-                          {selectedAgent.detection_pack_status.last_applied_at_ms
-                            ? formatDate(new Date(selectedAgent.detection_pack_status.last_applied_at_ms).toISOString())
-                            : 'n/a'}
+                          {formatTimeMS(selectedAgent.detection_pack_status.last_applied_at_ms)}
                         </dd>
                       </div>
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Last Check</dt>
                         <dd className="text-sm text-gray-900">
-                          {selectedAgent.detection_pack_status.last_check_at_ms
-                            ? formatDate(new Date(selectedAgent.detection_pack_status.last_check_at_ms).toISOString())
-                            : 'n/a'}
+                          {formatTimeMS(selectedAgent.detection_pack_status.last_check_at_ms)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Telemetry Freshness</dt>
+                        <dd className="text-sm text-gray-900">
+                          {isPackStatusStale(selectedAgent.detection_pack_status) ? 'stale' : 'fresh'}
                         </dd>
                       </div>
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Last Rejection</dt>
                         <dd className="text-sm text-gray-900">
                           {selectedAgent.detection_pack_status.last_rejected_reason || selectedAgent.detection_pack_status.reason_detail || 'none'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Rollout View</dt>
+                        <dd className="text-sm">
+                          <a href="#detection-pack-rollout" className="inline-flex items-center text-primary-700 hover:text-primary-900">
+                            <Link className="h-3 w-3 mr-1" />
+                            Pack rollout status
+                          </a>
                         </dd>
                       </div>
                     </dl>

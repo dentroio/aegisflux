@@ -1,6 +1,6 @@
 # WO-LAB-001: Agent Tunnel and Ingest Reliability
 
-**Status:** In Progress  
+**Status:** Complete  
 **Phase:** Product Platform  
 **Primary owner:** Lab / Agent / Backend  
 
@@ -70,6 +70,9 @@ This work order exists because the dynamic pack path is now backend-complete eno
 - Stale remote forward cleanup is implemented in both tunnel runners:
   - `scripts/lab/aegis-linux-reverse-tunnel.sh`
   - `scripts/lab/aegis-windows-reverse-tunnel.sh`
+- Windows stale remote forward cleanup now uses PowerShell on the Windows host
+  instead of a Unix shell. This clears bad OpenSSH listeners for `9091/8083/8089`
+  before rebinding the reverse tunnel.
 - Agent ingest delivery now retries transient tunnel/network failures for both
   Linux and Windows transport paths before surfacing failure.
 - `scripts/lab/check-agents.sh` now validates:
@@ -80,4 +83,8 @@ This work order exists because the dynamic pack path is now backend-complete eno
   - freshness of expected agents (`last_seen` threshold).
 - Lab restart and troubleshooting runbook details are documented in
   `scripts/lab/README.md`.
-
+- Manual verification after the tunnel cleanup fix confirmed Windows can reach
+  ingest at `http://127.0.0.1:9091/healthz` and the Windows one-shot agent can
+  post visibility events and heartbeat successfully.
+- Acceptance verification passed with `./scripts/lab/check-agents.sh`; both
+  `windows-dev-agent-01` and `linux-dev-agent-01` reported online and fresh.

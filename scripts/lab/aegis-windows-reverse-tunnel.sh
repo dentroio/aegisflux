@@ -25,19 +25,7 @@ cleanup_stale_remote_forwards() {
     -o UserKnownHostsFile=/private/tmp/aegisflux_known_hosts \
     -o ConnectTimeout=8 \
     "${WINDOWS_USER}@${WINDOWS_HOST}" \
-    sh -s -- "$REMOTE_PORT" "$ACTIONS_REMOTE_PORT" "$DETECTION_REMOTE_PORT" <<'REMOTE' || true
-for port in "$@"; do
-  listeners="$(ss -ltnp 2>/dev/null || true)"
-  printf '%s\n' "$listeners" |
-    awk -v suffix=":$port" '$4 ~ suffix "$" && /sshd-session/ { print }' |
-    sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' |
-    sort -u |
-    while read -r pid; do
-      [ -n "$pid" ] || continue
-      kill "$pid" 2>/dev/null || true
-    done
-done
-REMOTE
+    "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"\$ports=@(${REMOTE_PORT},${ACTIONS_REMOTE_PORT},${DETECTION_REMOTE_PORT}); Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { \$ports -contains \$_.LocalPort } | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id \$_ -Force -ErrorAction SilentlyContinue }\"" || true
 }
 
 cleanup_stale_remote_forwards
@@ -51,7 +39,7 @@ exec /usr/bin/ssh \
   -o ExitOnForwardFailure=yes \
   -o ServerAliveInterval=30 \
   -o ServerAliveCountMax=3 \
-  -R "${REMOTE_PORT}:${LOCAL_HOST}:${LOCAL_PORT}" \
-  -R "${ACTIONS_REMOTE_PORT}:${LOCAL_HOST}:${ACTIONS_LOCAL_PORT}" \
-  -R "${DETECTION_REMOTE_PORT}:${LOCAL_HOST}:${DETECTION_LOCAL_PORT}" \
+  -R "127.0.0.1:${REMOTE_PORT}:${LOCAL_HOST}:${LOCAL_PORT}" \
+  -R "127.0.0.1:${ACTIONS_REMOTE_PORT}:${LOCAL_HOST}:${ACTIONS_LOCAL_PORT}" \
+  -R "127.0.0.1:${DETECTION_REMOTE_PORT}:${LOCAL_HOST}:${DETECTION_LOCAL_PORT}" \
   "${WINDOWS_USER}@${WINDOWS_HOST}"

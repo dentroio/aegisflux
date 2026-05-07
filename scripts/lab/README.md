@@ -28,7 +28,7 @@ Quick pre-check:
 | Variable | Default |
 |----------|---------|
 | `DETECTION_URL` | `http://127.0.0.1:8089` |
-| `INGEST_URL` | `http://127.0.0.1:9090` |
+| `INGEST_URL` | `http://127.0.0.1:9091` |
 | `ACTIONS_URL` | `http://127.0.0.1:8083` |
 | `LINUX_AGENT_UID` | `linux-dev-agent-01` |
 | `WINDOWS_AGENT_UID` | `windows-dev-agent-01` |
