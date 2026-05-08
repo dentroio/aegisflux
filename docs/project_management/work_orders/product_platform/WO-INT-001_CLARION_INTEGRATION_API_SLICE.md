@@ -1,6 +1,6 @@
 # WO-INT-001: Clarion Integration API Slice
 
-**Status:** Draft  
+**Status:** Completed (May 2026 — lab slice implemented)
 **Phase:** Product Platform  
 **Primary owner:** Backend / Integration  
 

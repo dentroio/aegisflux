@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Activity,
   AlertTriangle,
@@ -17,6 +18,8 @@ import {
   Server,
   ShieldCheck,
 } from 'lucide-react'
+import { ConsoleShell } from '@/components/shell/ConsoleShell'
+import { readLabAuthenticated } from '@/lib/labAuth'
 
 type DeviceRecord = {
   device_id: string
@@ -151,17 +154,7 @@ type VisibilityState = {
   performance: AgentPerformance[]
 }
 
-const tabs = [
-  'Overview',
-  'AI Activity',
-  'Processes',
-  'Network',
-  'DNS',
-  'Browser',
-  'Inventory',
-  'Findings',
-  'Collector Health',
-]
+const tabs = ['Overview', 'Evidence', 'Inventory', 'Detection Packs', 'Performance', 'Policy']
 
 const aiPattern = /chatgpt|openai|anthropic|claude|gemini|copilot|mistral|ollama|litellm|vllm|mcp|modelcontextprotocol/i
 
@@ -176,7 +169,9 @@ async function fetchJson<T>(url: string, fallback: T): Promise<T> {
 }
 
 export default function DeviceDetailPage({ params }: { params: { device_id: string } }) {
+  const router = useRouter()
   const deviceId = decodeURIComponent(params.device_id)
+  const [authGate, setAuthGate] = useState(false)
   const [activeTab, setActiveTab] = useState('Overview')
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -195,8 +190,18 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
   })
 
   useEffect(() => {
+    if (!readLabAuthenticated()) {
+      router.replace('/')
+      return
+    }
+    setAuthGate(true)
+  }, [router])
+
+  useEffect(() => {
+    if (!authGate) return undefined
     loadDevice()
-  }, [deviceId])
+    return undefined
+  }, [deviceId, authGate])
 
   const loadDevice = async () => {
     setRefreshing(true)
@@ -248,43 +253,116 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
   const aiFindings = data.findings.filter((record) => aiPattern.test(`${record.title || ''} ${record.classification || ''} ${(record.detected_patterns || []).join(' ')}`))
   const filteredEvents = filterRows(data.events, query)
 
+  const [analystBusy, setAnalystBusy] = useState(false)
+  const [analystNote, setAnalystNote] = useState<string | null>(null)
+
+  async function runEvidenceAnalyst() {
+    setAnalystBusy(true)
+    setAnalystNote(null)
+    try {
+      const payload = {
+        device_id: deviceId,
+        context: {
+          findings: data.findings.length,
+          processes: data.processes.length,
+          flows: data.flows.length,
+          dns: data.dns.length,
+          collectors: data.collectors.filter((c) => c.status !== 'healthy').length,
+          extensions: data.extensions.length,
+          sase: data.sase.length,
+        },
+      }
+      const res = await fetch('/api/actions/platform/ai/endpoint-evidence-analyst', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const body = res.ok ? await res.json() : null
+      setAnalystNote(
+        body
+          ? `${body.assessment} | ${body.confidence} → ${body.recommended_next_action}`
+          : `Analyst request failed (HTTP ${res.status})`,
+      )
+    } finally {
+      setAnalystBusy(false)
+    }
+  }
+
+  if (!authGate) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 text-sm text-gray-600">
+        Checking session…
+      </div>
+    )
+  }
+
+  const shellHealth = isFresh
+    ? { label: 'Fresh', tone: 'emerald' as const, text: 'Telemetry current' }
+    : { label: 'Stale', tone: 'amber' as const, text: 'Telemetry stale' }
+
+  function onLogoutShell() {
+    window.localStorage.removeItem('aegisflux.labAuth')
+    router.replace('/')
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-4">
-              <a href="/agents" className="btn btn-secondary h-9 px-3">
+    <ConsoleShell
+      activeNavId="agents"
+      breadcrumbs={[
+        { label: 'Agents', href: '/agents' },
+        { label: device.device_id },
+      ]}
+      health={shellHealth}
+      onLogout={onLogoutShell}
+    >
+      <div className="min-w-0 bg-gray-50 pb-10">
+        <div className="border-b border-gray-200 bg-white">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex min-w-0 items-center gap-3">
+              <a href="/agents" className="btn btn-secondary h-9 shrink-0 px-3">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Agents
               </a>
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Server className="h-6 w-6 text-primary-600" />
-                  <h1 className="truncate text-2xl font-bold text-gray-900">{device.device_id}</h1>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <Server className="h-5 w-5 shrink-0 text-primary-600" />
+                  <h1 className="truncate text-xl font-bold text-gray-900">{device.device_id}</h1>
                   <FreshBadge fresh={isFresh} />
                 </div>
-                <p className="mt-1 text-sm text-gray-500">
-                  {device.source || 'visibility'} | {device.sensor_version || 'unknown'} | last seen {formatAge(device.last_seen_ms)}
+                <p className="mt-1 truncate text-xs text-gray-500 sm:text-sm">
+                  {device.source || 'visibility'} | {device.sensor_version || 'unknown'} | last seen{' '}
+                  {formatAge(device.last_seen_ms)}
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={runEvidenceAnalyst}
+                disabled={analystBusy}
+                className="btn btn-secondary h-9 px-3 text-primary-800"
+              >
+                {analystBusy ? 'Analyzing…' : 'Explain AI activity'}
+              </button>
               <a
                 href={`/?panel=inventory&device=${encodeURIComponent(deviceId)}`}
                 className="btn btn-secondary h-9 px-3 text-primary-700"
               >
                 <Database className="mr-2 h-4 w-4" />
-                Fleet inventory
+                Inventory
               </a>
-              <button onClick={loadDevice} disabled={refreshing} className="btn btn-secondary h-9 px-3">
+              <button type="button" onClick={loadDevice} disabled={refreshing} className="btn btn-secondary h-9 px-3">
                 <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
             </div>
           </div>
         </div>
-      </header>
+        {analystNote ? (
+          <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{analystNote}</div>
+          </div>
+        ) : null}
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-6 grid gap-4 md:grid-cols-5">
@@ -343,12 +421,30 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
               aiDns={aiDns}
               aiProcesses={aiProcesses}
               aiFindings={aiFindings}
+              deviceFresh={isFresh}
             />
           )}
         </section>
       </main>
-    </div>
+      </div>
+    </ConsoleShell>
   )
+}
+
+function nextBestAction(props: {
+  collectors: CollectorStatus[]
+  performance: AgentPerformance[]
+  findings: FindingRecord[]
+  isFresh: boolean
+}): string {
+  const badCollector = props.collectors.some((c) => c.status && c.status !== 'healthy')
+  const budget = props.performance[0]
+  const queue = budget?.event_queue_depth ?? 0
+  if (!props.isFresh) return 'Prioritize agent connectivity; evidence is stale.'
+  if (props.findings.length) return 'Triage findings and validate scope before drafting observe-only controls.'
+  if (badCollector) return 'Inspect collector health signals; restore telemetry before policy work.'
+  if (queue > 500) return 'Investigate event queue pressure; confirm performance budget headroom.'
+  return 'Continue monitoring; endpoint looks healthy in this window.'
 }
 
 function TabContent(props: {
@@ -366,42 +462,87 @@ function TabContent(props: {
   aiDns: DnsRecord[]
   aiProcesses: ProcessRecord[]
   aiFindings: FindingRecord[]
+  deviceFresh: boolean
 }) {
   const { activeTab } = props
   if (activeTab === 'Overview') {
+    const confidence =
+      props.findings.length > 5 ? 'Moderate' : props.findings.length ? 'Watch' : 'Stable'
+    const unhealthy = props.collectors.filter((c) => c.status !== 'healthy').length
     return (
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Panel icon={Activity} title="Telemetry Summary">
-          <KeyValue label="Agent ID" value={props.device.agent_id || 'unknown'} />
-          <KeyValue label="Source" value={props.device.source || 'unknown'} />
-          <KeyValue label="Sensor Version" value={props.device.sensor_version || 'unknown'} />
-          <KeyValue label="Last Event" value={props.device.last_event_type || 'unknown'} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel icon={Activity} title="Identity / freshness">
+          <KeyValue label="Device" value={props.device.device_id} />
+          <KeyValue label="Sensor" value={props.device.sensor_version || 'unknown'} />
+          <KeyValue label="Freshness" value={props.deviceFresh ? 'Fresh' : 'Stale'} />
         </Panel>
-        <Panel icon={ShieldCheck} title="Evidence Counts">
-          {Object.entries(props.device.event_type_count || {}).slice(0, 8).map(([type, count]) => (
-            <KeyValue key={type} label={type} value={String(count)} />
-          ))}
-          {Object.keys(props.device.event_type_count || {}).length === 0 && <EmptyLine text="No event counts reported for this device." />}
+        <Panel icon={Globe2} title="Network context">
+          <KeyValue label="Flows" value={String(props.flows.length)} />
+          <KeyValue label="DNS observations" value={String(props.dns.length)} />
+        </Panel>
+        <Panel icon={ShieldCheck} title="Evidence confidence">
+          <KeyValue label="Findings" value={String(props.findings.length)} />
+          <KeyValue label="Heuristic confidence" value={confidence} />
+        </Panel>
+        <Panel icon={Cpu} title="Detection / policy context">
+          <KeyValue label="Collector alerts" value={String(unhealthy)} />
+          <KeyValue label="Observe-only" value="No enforcement from this console" />
+        </Panel>
+        <Panel icon={Chrome} title="AI signal surface">
+          <KeyValue label="AI DNS hints" value={String(props.aiDns.length)} />
+          <KeyValue label="AI findings" value={String(props.aiFindings.length)} />
+          <KeyValue label="AI-ish processes" value={String(props.aiProcesses.length)} />
+        </Panel>
+        <Panel icon={AlertTriangle} title="Next best action">
+          <EmptyLine text={nextBestAction({
+            collectors: props.collectors,
+            performance: props.performance,
+            findings: props.findings,
+            isFresh: props.deviceFresh,
+          })} />
         </Panel>
       </div>
     )
   }
-  if (activeTab === 'AI Activity') {
+  if (activeTab === 'Evidence') {
     return (
-      <div className="grid gap-5 lg:grid-cols-3">
-        <ListPanel title="AI Findings" rows={props.aiFindings} empty="No AI findings in the current window." render={(row) => <EvidenceRow title={row.title || row.classification || 'AI finding'} detail={`${row.severity || 'info'} | risk ${row.risk_score || 0}`} />} />
-        <ListPanel title="AI DNS" rows={props.aiDns} empty="No AI destinations in DNS evidence." render={(row) => <EvidenceRow title={row.query || 'dns'} detail={(row.answers || []).join(', ') || row.correlation_method || 'dns'} />} />
-        <ListPanel title="AI Processes" rows={props.aiProcesses} empty="No MCP/model/tooling process signals." render={(row) => <EvidenceRow title={row.name || 'process'} detail={row.command_line || row.path || `pid ${row.pid || 'unknown'}`} />} />
+      <div className="grid gap-6">
+        <Panel icon={Activity} title="Processes (sample)">
+          <Table rows={props.processes} empty="No process telemetry for this device." columns={['pid', 'name', 'path', 'command_line']} />
+        </Panel>
+        <Panel icon={Network} title="Flows (sample)">
+          <Table rows={props.flows} empty="No network flow telemetry." columns={['protocol', 'direction', 'remote_ip', 'remote_hostname']} />
+        </Panel>
+        <Panel icon={Globe2} title="DNS (sample)">
+          <Table rows={props.dns} empty="No DNS telemetry." columns={['query', 'answers', 'correlation_method']} />
+        </Panel>
+        <Panel icon={ShieldCheck} title="Findings">
+          <Table rows={props.findings} empty="No findings." columns={['severity', 'title', 'classification', 'risk_score']} />
+        </Panel>
       </div>
     )
   }
-  if (activeTab === 'Processes') return <Table rows={props.processes} empty="No process telemetry for this device." columns={['pid', 'name', 'path', 'command_line', 'user']} />
-  if (activeTab === 'Network') return <Table rows={props.flows} empty="No network flow telemetry for this device." columns={['process_name', 'protocol', 'direction', 'remote_ip', 'remote_port', 'remote_hostname']} />
-  if (activeTab === 'DNS') return <Table rows={props.dns} empty="No DNS telemetry for this device." columns={['query', 'query_type', 'answers', 'resolver', 'correlation_method']} />
-  if (activeTab === 'Browser') return <Table rows={props.extensions} empty="No browser extension telemetry for this device." columns={['browser', 'profile', 'extension_id', 'name', 'version']} />
-  if (activeTab === 'Inventory') return <Table rows={props.sase} empty="No enterprise control inventory for this device." columns={['component_type', 'vendor', 'product', 'name', 'status']} />
-  if (activeTab === 'Findings') return <Table rows={props.findings} empty="No findings for this device." columns={['severity', 'title', 'classification', 'risk_score', 'recommended_action']} />
-  if (activeTab === 'Collector Health') {
+  if (activeTab === 'Inventory') {
+    return (
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Panel icon={Chrome} title="Browser extensions">
+          <Table rows={props.extensions} empty="No browser extension telemetry." columns={['browser', 'name', 'extension_id', 'version']} />
+        </Panel>
+        <Panel icon={ShieldCheck} title="SSE / SASE components">
+          <Table rows={props.sase} empty="No enterprise inventory signals." columns={['vendor', 'product', 'name', 'status']} />
+        </Panel>
+      </div>
+    )
+  }
+  if (activeTab === 'Detection Packs') {
+    return (
+      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-700">
+        Detection pack telemetry is summarized on the Agents workbench rollout table. This tab focuses on endpoint-local findings (
+        {props.findings.length}) as a proxy until pack version strings are joined here.
+      </div>
+    )
+  }
+  if (activeTab === 'Performance') {
     const latest = props.performance[0]
     return (
       <div className="space-y-5">
@@ -412,13 +553,31 @@ function TabContent(props: {
           <Metric label="Spool" value={formatBytes(latest?.spool_bytes)} />
         </div>
         <div className="grid gap-5 lg:grid-cols-2">
-          <Panel icon={Activity} title="Collector Status">
-            <Table rows={props.collectors} empty="No collector health telemetry for this device." columns={['collector', 'status', 'message']} />
+          <Panel icon={Activity} title="Collector status">
+            <Table rows={props.collectors} empty="No collector health telemetry." columns={['collector', 'status', 'message']} />
           </Panel>
-          <Panel icon={Cpu} title="Performance Budget">
-            <Table rows={props.performance} empty="No agent performance telemetry for this device." columns={['collector_name', 'collector_runtime_ms', 'process_cpu_percent', 'process_memory_rss_mb', 'event_queue_depth', 'spool_bytes', 'pack_eval_runtime_ms']} />
+          <Panel icon={Cpu} title="Performance budget sample">
+            <Table
+              rows={props.performance}
+              empty="No agent performance telemetry."
+              columns={['collector_name', 'collector_runtime_ms', 'process_cpu_percent', 'event_queue_depth', 'spool_bytes']}
+            />
           </Panel>
         </div>
+      </div>
+    )
+  }
+  if (activeTab === 'Policy') {
+    return (
+      <div className="space-y-3 text-sm text-slate-700">
+        <p className="font-semibold text-slate-900">Observe-only posture</p>
+        <p>
+          This console does not push enforcement. Use Control → Controls to work observe-only drafts derived from findings, then simulate
+          blast radius before any future enforcement project.
+        </p>
+        <a href="/control/controls" className="font-semibold text-primary-700 hover:text-primary-900">
+          Open draft controls
+        </a>
       </div>
     )
   }
@@ -442,24 +601,6 @@ function Panel({ icon: Icon, title, children }: { icon: typeof Activity; title: 
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700">{title}</h2>
       </div>
       <div className="space-y-3">{children}</div>
-    </div>
-  )
-}
-
-function ListPanel<T>({ title, rows, empty, render }: { title: string; rows: T[]; empty: string; render: (row: T) => React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-gray-200 p-4">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-700">{title}</h2>
-      {rows.length === 0 ? <EmptyLine text={empty} /> : <div className="space-y-2">{rows.slice(0, 12).map((row, index) => <div key={index}>{render(row)}</div>)}</div>}
-    </div>
-  )
-}
-
-function EvidenceRow({ title, detail }: { title: string; detail: string }) {
-  return (
-    <div className="rounded-md border border-gray-200 px-3 py-2">
-      <p className="truncate text-sm font-medium text-gray-900">{title}</p>
-      <p className="mt-1 line-clamp-2 text-xs text-gray-500">{detail}</p>
     </div>
   )
 }

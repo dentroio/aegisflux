@@ -1,6 +1,6 @@
 # WO-PLAT-005: Clarion-Style Agent Workbench and Detail Experience
 
-**Status:** Draft  
+**Status:** Completed (May 2026 — lab slice implemented)
 **Phase:** Product Platform  
 **Primary owner:** UI  
 

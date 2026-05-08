@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { 
   ArrowLeft, 
   Users, 
@@ -102,6 +102,24 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [editingLabels, setEditingLabels] = useState<string>('')
   const [editingNote, setEditingNote] = useState<string>('')
+  const [embeddedFilter, setEmbeddedFilter] = useState<
+    'all' | 'online' | 'offline' | 'windows' | 'linux' | 'pack_issue' | 'budget'
+  >(() => {
+    if (typeof window === 'undefined') return 'all'
+    const saved = window.localStorage.getItem('aegis.agents.workbench.filter')
+    return saved === 'online' ||
+      saved === 'offline' ||
+      saved === 'windows' ||
+      saved === 'linux' ||
+      saved === 'pack_issue' ||
+      saved === 'budget'
+      ? saved
+      : 'all'
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem('aegis.agents.workbench.filter', embeddedFilter)
+  }, [embeddedFilter])
 
   useEffect(() => {
     fetchAgents()
@@ -271,6 +289,50 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
     return Number(agent.visibility?.event_type_count?.[eventType] || 0)
   }
 
+  const workbenchAgents = useMemo(() => {
+    return agents.filter((agent) => {
+      switch (embeddedFilter) {
+        case 'all':
+          return true
+        case 'online':
+          return agent.status === 'online'
+        case 'offline':
+          return agent.status === 'offline'
+        case 'windows':
+          return (agent.platform.os || '').toLowerCase().includes('win')
+        case 'linux':
+          return (agent.platform.os || '').toLowerCase().includes('linux')
+        case 'pack_issue':
+          const st = agent.detection_pack_status
+          return Boolean(st && st.rollout_state && st.rollout_state !== 'applied')
+        case 'budget':
+          return eventTypeCount(agent, 'aegis.agent.performance') > 3 || eventTypeCount(agent, 'aegis.collector.status') > 12
+        default:
+          return true
+      }
+    })
+  }, [agents, embeddedFilter])
+
+  const filterCounts = useMemo(() => {
+    const c = (fn: (a: Agent) => boolean) => agents.filter(fn).length
+    return {
+      all: agents.length,
+      online: c((a) => a.status === 'online'),
+      offline: c((a) => a.status === 'offline'),
+      windows: c((a) => (a.platform.os || '').toLowerCase().includes('win')),
+      linux: c((a) => (a.platform.os || '').toLowerCase().includes('linux')),
+      pack_issue: c((a) => {
+        const st = a.detection_pack_status
+        return Boolean(st && st.rollout_state && st.rollout_state !== 'applied')
+      }),
+      budget: c(
+        (a) =>
+          Number(a.visibility?.event_type_count?.['aegis.agent.performance'] || 0) > 3 ||
+          Number(a.visibility?.event_type_count?.['aegis.collector.status'] || 0) > 12,
+      ),
+    }
+  }, [agents])
+
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -385,6 +447,38 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
           </div>
         )}
 
+        {embedded ? (
+          <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Workbench filters</div>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ['all', filterCounts.all],
+                  ['online', filterCounts.online],
+                  ['offline', filterCounts.offline],
+                  ['windows', filterCounts.windows],
+                  ['linux', filterCounts.linux],
+                  ['pack_issue', filterCounts.pack_issue],
+                  ['budget', filterCounts.budget],
+                ] as const
+              ).map(([id, count]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setEmbeddedFilter(id)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                    embeddedFilter === id
+                      ? 'border-primary-600 bg-primary-600 text-white'
+                      : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {id.replace('_', ' ')} ({count})
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <section id="detection-pack-rollout" className="mb-8 card">
 	          <div className="px-6 py-4 border-b border-gray-200">
 	            <div className="flex items-center justify-between">
@@ -462,7 +556,8 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
             <div className="card">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  Registered Agents ({agents.length})
+                  Registered Agents ({workbenchAgents.length}
+                  {embeddedFilter !== 'all' ? ` / ${agents.length} total` : ''})
                 </h2>
               </div>
               <div className="divide-y divide-gray-200">
@@ -470,12 +565,12 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
                   <div className="p-6 text-center text-gray-500">
                     Loading agents...
                   </div>
-                ) : agents.length === 0 ? (
+                ) : workbenchAgents.length === 0 ? (
                   <div className="p-6 text-center text-gray-500">
-                    No agents registered
+                    {agents.length === 0 ? 'No agents registered' : 'No agents match this workbench filter.'}
                   </div>
                 ) : (
-                  agents.map((agent) => (
+                  workbenchAgents.map((agent) => (
                     <div
                       key={agent.agent_uid}
                       className={`p-6 hover:bg-gray-50 cursor-pointer transition-colors ${

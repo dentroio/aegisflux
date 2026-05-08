@@ -1,6 +1,6 @@
 # WO-AI-001: AI Provider Management and Health
 
-**Status:** Draft  
+**Status:** Completed (May 2026 — lab slice implemented)
 **Phase:** Product Platform  
 **Primary owner:** Backend / UI  
 

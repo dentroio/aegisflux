@@ -1,6 +1,6 @@
 # WO-AI-003: Endpoint Evidence Analyst
 
-**Status:** Draft  
+**Status:** Completed (May 2026 — lab slice implemented)
 **Phase:** Product Platform  
 **Primary owner:** Backend / UI  
 

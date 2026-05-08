@@ -1,6 +1,6 @@
 # WO-PLAT-001: Clarion-Aligned Console Shell
 
-**Status:** Started  
+**Status:** Completed (May 2026)  
 **Phase:** Product Platform  
 **Primary owner:** UI  
 
@@ -45,5 +45,7 @@ Make the AegisFlux console follow Clarion's core app-shell workflow: full-width 
 ## Implementation Notes
 
 - Existing commit `e73c04d` is the first shell alignment pass.
-- Next UI pass should convert shell pieces into reusable components before adding more pages.
+- Reusable `ConsoleShell`, `shellNav`, and breadcrumb helpers now back the dashboard, agent detail routes, connectors, operational feed, AI settings, and draft controls surfaces.
+- `/agents` + `/inventory` URLs continue to peel into dashboard shell query params (`/?panel=`).
+- Sidebar includes Operational Event Feed; placeholder Analyze/Operate routes backed by shell while deeper product pages mature.
 

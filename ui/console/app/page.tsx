@@ -2,36 +2,24 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { AgentsManagementPanel } from '@/components/AgentsManagementPanel'
 import { InventoryPanel } from '@/components/InventoryPanel'
+import { ConsoleShell } from '@/components/shell/ConsoleShell'
 import {
   Activity,
   AlertTriangle,
-  Bell,
   Bot,
-  BookText,
-  CheckCircle2,
   Chrome,
   Cpu,
-  Database,
   Globe2,
-  HardDrive,
-  LayoutDashboard,
   LockKeyhole,
-  LogOut,
-  Moon,
-  Network,
-  Plug,
   RefreshCw,
   Search,
   Server,
-  Settings,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  TerminalSquare,
-  UserCircle,
 } from 'lucide-react'
 
 type EventRecord = {
@@ -584,59 +572,73 @@ const statusStyles: Record<'emerald' | 'amber' | 'slate', CSSProperties> = {
   slate: { borderColor: '#e2e8f0', background: '#f8fafc', color: '#334155' },
 }
 
-const navGroups = [
-  {
-    label: 'Overview',
-    items: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }],
-  },
-  {
-    label: 'Discover',
-    items: [
-      { id: 'agents', label: 'Agents', icon: Server },
-      { id: 'inventory', label: 'Inventory', icon: Database },
-      { id: 'activity', label: 'AI Activity', icon: Bot },
-    ],
-  },
-  {
-    label: 'Analyze',
-    items: [
-      { id: 'evidence', label: 'Evidence Graph', icon: Network },
-      { id: 'detections', label: 'Detection Packs', icon: Sparkles },
-      { id: 'activity-log', label: 'Findings', icon: Activity },
-    ],
-  },
-  {
-    label: 'Control',
-    items: [
-      { id: 'controls', label: 'Controls', icon: ShieldCheck },
-      { id: 'simulation', label: 'Policy Simulation', icon: TerminalSquare },
-    ],
-  },
-  {
-    label: 'Operate',
-    items: [
-      { id: 'monitoring', label: 'Monitoring', icon: Cpu },
-      { id: 'reports', label: 'Reports', icon: BookText },
-    ],
-  },
-  {
-    label: 'Configure',
-    items: [
-      { id: 'connectors', label: 'Connectors', icon: Plug },
-      { id: 'settings', label: 'Settings', icon: Settings },
-    ],
-  },
-] as const
+const DASHBOARD_WIDGET_STORAGE = 'aegisflux.dashboard.widgets.v1'
 
-const widgetCatalog = [
-  { id: 'evidence', icon: Database, title: 'Evidence', detail: 'process, flow, and DNS records' },
-  { id: 'browser', icon: Chrome, title: 'Browser Surface', detail: 'extension and profile observations' },
-  { id: 'sase', icon: LockKeyhole, title: 'Enterprise Controls', detail: 'SSE/SASE endpoint components' },
-  { id: 'budget', icon: Cpu, title: 'Agent Budget', detail: 'near-zero idle, bounded collectors' },
-] as const
+type DashboardWidgetDef = {
+  id: string
+  title: string
+  description: string
+  dataSource: string
+  defaultSize: 'sm' | 'md' | 'lg'
+  icon: typeof Activity
+}
+
+const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDef[] = [
+  {
+    id: 'platform_status',
+    title: 'Platform Status',
+    description: 'Overall console health from endpoint freshness',
+    dataSource: 'visibility.devices + derived health',
+    defaultSize: 'md',
+    icon: Activity,
+  },
+  {
+    id: 'endpoint_freshness',
+    title: 'Endpoint Freshness',
+    description: 'Fresh vs total reporting endpoints',
+    dataSource: 'visibility.devices last_seen',
+    defaultSize: 'md',
+    icon: Server,
+  },
+  {
+    id: 'ai_activity',
+    title: 'AI Activity',
+    description: 'Heuristic AI-related findings',
+    dataSource: 'visibility.findings + patterns',
+    defaultSize: 'sm',
+    icon: Bot,
+  },
+  {
+    id: 'detection_pack_coverage',
+    title: 'Detection Pack Coverage',
+    description: 'Healthy collector pairs as pack-readiness proxy',
+    dataSource: 'visibility events aegis.collector.status',
+    defaultSize: 'md',
+    icon: ShieldCheck,
+  },
+  {
+    id: 'agent_performance_budget',
+    title: 'Agent Performance Budget',
+    description: 'CPU/RSS pressure from agent performance stream',
+    dataSource: 'visibility events aegis.agent.performance',
+    defaultSize: 'md',
+    icon: Cpu,
+  },
+  {
+    id: 'enterprise_control_inventory',
+    title: 'Enterprise Control Inventory',
+    description: 'SSE/SASE component observations',
+    dataSource: 'visibility events aegis.sase_component.observed',
+    defaultSize: 'sm',
+    icon: LockKeyhole,
+  },
+]
+
+function dashboardRegistryMap(): Map<string, DashboardWidgetDef> {
+  return new Map(DASHBOARD_WIDGET_REGISTRY.map((widget) => [widget.id, widget]))
+}
 
 function AegisDashboardBody() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const panelParam = searchParams.get('panel')
   const mainPanel = panelParam === 'agents' || panelParam === 'inventory' ? panelParam : 'dashboard'
@@ -656,10 +658,53 @@ function AegisDashboardBody() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [customizeOpen, setCustomizeOpen] = useState(false)
   const [hiddenWidgets, setHiddenWidgets] = useState<string[]>([])
+  const [widgetOrder, setWidgetOrder] = useState<string[]>(() => DASHBOARD_WIDGET_REGISTRY.map((widget) => widget.id))
+  const [aiChip, setAiChip] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!authenticated) return undefined
+    let cancelled = false
+    fetch('/api/actions/platform/ai/providers/summary', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (cancelled || !json || typeof json.summary !== 'string') return
+        setAiChip(json.summary as string)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [authenticated])
+
+  useEffect(() => {
+    if (!authChecked || !authenticated || typeof window === 'undefined') return undefined
+    window.localStorage.setItem(
+      DASHBOARD_WIDGET_STORAGE,
+      JSON.stringify({ hidden: hiddenWidgets, order: widgetOrder }),
+    )
+    return undefined
+  }, [hiddenWidgets, widgetOrder, authChecked, authenticated])
 
   useEffect(() => {
     setAuthenticated(window.localStorage.getItem('aegisflux.labAuth') === 'admin')
     setAuthChecked(true)
+    try {
+      const raw = window.localStorage.getItem(DASHBOARD_WIDGET_STORAGE)
+      if (!raw) return undefined
+      const parsed = JSON.parse(raw) as { hidden?: string[]; order?: string[] }
+      const regIds = new Set(DASHBOARD_WIDGET_REGISTRY.map((w) => w.id))
+      if (Array.isArray(parsed.hidden)) setHiddenWidgets(parsed.hidden.filter((id) => regIds.has(id)))
+      if (Array.isArray(parsed.order)) {
+        const next = parsed.order.filter((id) => regIds.has(id))
+        regIds.forEach((id) => {
+          if (!next.includes(id)) next.push(id)
+        })
+        setWidgetOrder(next)
+      }
+      return undefined
+    } catch {
+      return undefined
+    }
   }, [])
 
   useEffect(() => {
@@ -753,7 +798,10 @@ function AegisDashboardBody() {
     : model.totalDevices > 0
       ? { label: 'Healthy', tone: 'emerald' as const, text: 'All reporting endpoints are fresh' }
       : { label: 'Waiting', tone: 'slate' as const, text: 'No endpoint telemetry yet' }
-  const visibleWidgets = widgetCatalog.filter((widget) => !hiddenWidgets.includes(widget.id))
+  const regMap = dashboardRegistryMap()
+  const visibleWidgets = widgetOrder
+    .map((wid) => regMap.get(wid))
+    .filter((widget): widget is DashboardWidgetDef => Boolean(widget && !hiddenWidgets.includes(widget.id)))
 
   if (!authChecked) {
     return (
@@ -776,154 +824,22 @@ function AegisDashboardBody() {
     )
   }
 
+  const shellNavId =
+    mainPanel === 'agents' ? 'agents' : mainPanel === 'inventory' ? 'inventory' : 'dashboard'
+  const shellBreadcrumbs = [
+    {
+      label: mainPanel === 'dashboard' ? 'Dashboard' : mainPanel === 'agents' ? 'Agents' : 'Inventory',
+    },
+  ]
+
   return (
-    <div className="min-h-screen bg-gray-50 text-slate-900" style={ui.page}>
-      <div style={ui.appShell}>
-        <header className="border-b border-gray-200 bg-white shadow-sm" style={ui.header}>
-          <div className="flex h-16 items-center justify-between px-5" style={ui.headerInner}>
-            <div style={ui.headerLogo}>
-              <div style={ui.headerLogoMark}>
-                <img src="/aegisflux-shield.png" alt="AegisFlux" style={ui.logoImage} />
-              </div>
-              <div>
-                <div style={ui.wordmarkText}>
-                  Aegis<span style={ui.wordmarkFlux}>Flux</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3" style={ui.headerActions}>
-              <button style={ui.headerSearch} title="Search">
-                <Search className="h-4 w-4" />
-                <span>Search</span>
-                <span style={ui.keycap}>Cmd K</span>
-              </button>
-              <button style={ui.iconButton} title="Notifications">
-                <Bell className="h-5 w-5" />
-              </button>
-              <button style={ui.iconButton} title="Theme">
-                <Moon className="h-5 w-5" />
-              </button>
-              <button style={ui.iconButton} title="Documentation">
-                <BookText className="h-5 w-5" />
-              </button>
-              <button style={ui.iconButton} title="AI Assistant">
-                <Bot className="h-5 w-5" />
-              </button>
-              <div style={ui.headerStatus}>
-                <FreshDot active={health.tone === 'emerald'} />
-                <span style={{ fontSize: 14, fontWeight: 650, color: health.tone === 'emerald' ? '#334155' : '#92400e' }}>
-                  {health.label}
-                </span>
-              </div>
-              <div style={ui.userBadge}>
-                <UserCircle className="h-5 w-5 text-slate-500" />
-                <span style={{ fontSize: 14, fontWeight: 650, color: '#334155' }}>operator</span>
-                <span style={ui.rolePill}>Admin</span>
-                <button onClick={handleLogout} style={{ ...ui.iconButton, width: 28, height: 28 }} title="Sign out">
-                  <LogOut className="h-4 w-4 text-slate-400" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div style={ui.bodyShell}>
-          <aside style={ui.sidebar}>
-            <nav style={ui.sideNav}>
-              {navGroups.map((group) => (
-                <div key={group.label}>
-                  <div style={ui.sideGroupLabel}>{group.label}</div>
-                  {group.items.map((item) => {
-                    const Icon = item.icon
-                    const navActive =
-                      (item.id === 'dashboard' && mainPanel === 'dashboard') ||
-                      (item.id === 'agents' && mainPanel === 'agents') ||
-                      (item.id === 'inventory' && mainPanel === 'inventory')
-                    if (item.id === 'dashboard') {
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => router.replace('/', { scroll: false })}
-                          style={{
-                            ...ui.sideButton,
-                            ...(navActive ? ui.sideButtonActive : ui.sideButtonMuted),
-                          }}
-                        >
-                          <Icon className="h-4 w-4" />
-                          {item.label}
-                        </button>
-                      )
-                    }
-                    if (item.id === 'agents') {
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => router.replace('/?panel=agents', { scroll: false })}
-                          style={{
-                            ...ui.sideButton,
-                            ...(navActive ? ui.sideButtonActive : ui.sideButtonMuted),
-                          }}
-                        >
-                          <Icon className="h-4 w-4" />
-                          {item.label}
-                        </button>
-                      )
-                    }
-                    if (item.id === 'inventory') {
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => router.replace('/?panel=inventory', { scroll: false })}
-                          style={{
-                            ...ui.sideButton,
-                            ...(navActive ? ui.sideButtonActive : ui.sideButtonMuted),
-                          }}
-                        >
-                          <Icon className="h-4 w-4" />
-                          {item.label}
-                        </button>
-                      )
-                    }
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        style={{
-                          ...ui.sideButton,
-                          ...(navActive ? ui.sideButtonActive : ui.sideButtonMuted),
-                        }}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {item.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              ))}
-            </nav>
-            <div style={ui.sideFooter}>
-              <div style={ui.sideFooterCard}>
-                <div style={{ fontSize: 13, fontWeight: 750, color: '#075985' }}>Observe-only</div>
-                <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.45, color: '#0369a1' }}>
-                  Controls remain staged until approval and rollback are ready.
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          <div style={ui.contentArea}>
-            <div style={ui.breadcrumb}>
-              <span>AegisFlux</span>
-              <span>/</span>
-              <span style={{ color: '#0f172a', fontWeight: 650 }}>
-                {mainPanel === 'dashboard' ? 'Dashboard' : mainPanel === 'agents' ? 'Agents' : 'Inventory'}
-              </span>
-            </div>
-            <div style={ui.scrollArea}>
+    <ConsoleShell
+      activeNavId={shellNavId}
+      breadcrumbs={shellBreadcrumbs}
+      health={health}
+      onLogout={handleLogout}
+      aiHealthSummary={aiChip}
+    >
               <main
                 className={`mx-auto max-w-[1500px] ${mainPanel === 'dashboard' ? 'px-5 py-6' : 'min-w-0 px-4 py-4'}`}
                 style={ui.main}
@@ -1008,20 +924,61 @@ function AegisDashboardBody() {
           </div>
           {customizeOpen && (
             <div style={ui.customizePanel}>
-              {widgetCatalog.map((widget) => (
-                <label key={widget.id} style={ui.widgetToggle}>
-                  <input
-                    type="checkbox"
-                    checked={!hiddenWidgets.includes(widget.id)}
-                    onChange={() => setHiddenWidgets((current) =>
-                      current.includes(widget.id)
-                        ? current.filter((id) => id !== widget.id)
-                        : [...current, widget.id],
-                    )}
-                  />
-                  {widget.title}
-                </label>
-              ))}
+              {widgetOrder.map((wid, idx) => {
+                const widget = regMap.get(wid)
+                if (!widget) return null
+                return (
+                  <div key={wid} style={{ ...ui.widgetToggle, flexWrap: 'wrap' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={!hiddenWidgets.includes(wid)}
+                        onChange={() =>
+                          setHiddenWidgets((current) =>
+                            current.includes(wid)
+                              ? current.filter((hid) => hid !== wid)
+                              : [...current, wid],
+                          )
+                        }
+                      />
+                      <span>{widget.title}</span>
+                    </label>
+                    <span style={{ display: 'inline-flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        style={ui.button}
+                        disabled={idx === 0}
+                        onClick={() =>
+                          setWidgetOrder((ord) => {
+                            if (idx === 0) return ord
+                            const next = [...ord]
+                            ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+                            return next
+                          })
+                        }
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        style={ui.button}
+                        disabled={idx === widgetOrder.length - 1}
+                        onClick={() =>
+                          setWidgetOrder((ord) => {
+                            if (idx >= ord.length - 1) return ord
+                            const next = [...ord]
+                            ;[next[idx + 1], next[idx]] = [next[idx], next[idx + 1]]
+                            return next
+                          })
+                        }
+                      >
+                        ↓
+                      </button>
+                    </span>
+                  </div>
+                )
+              })}
+              <span style={{ fontSize: 12, color: '#64748b' }}>Choices persist locally in your browser.</span>
             </div>
           )}
         </section>
@@ -1032,8 +989,8 @@ function AegisDashboardBody() {
               key={widget.id}
               icon={widget.icon}
               title={widget.title}
-              value={widgetValue(widget.id, model, data)}
-              detail={widgetDetail(widget.id, model, data)}
+              value={widgetValue(widget.id, model, data, health)}
+              detail={widgetDetail(widget.id, model, data, health)}
             />
           ))}
         </section>
@@ -1076,12 +1033,8 @@ function AegisDashboardBody() {
                     <InventoryPanel embedded deviceFilter={inventoryDeviceFilter} />
                   </div>
                 )}
-      </main>
-        </div>
-      </div>
-        </div>
-      </div>
-    </div>
+              </main>
+    </ConsoleShell>
   )
 }
 
@@ -1245,22 +1198,42 @@ function uniqueEvents(events: EventRecord[]) {
   )
 }
 
-function widgetValue(id: string, model: ReturnType<typeof buildDashboardModel>, data: VisibilityData) {
-  if (id === 'evidence') return model.eventCount
-  if (id === 'browser') return model.extensionCount
-  if (id === 'sase') return model.saseCount
-  if (id === 'budget') return model.maxCpuPercent === null ? 'n/a' : `${model.maxCpuPercent.toFixed(1)}%`
+function widgetValue(
+  id: string,
+  model: ReturnType<typeof buildDashboardModel>,
+  data: VisibilityData,
+  health: { label: string; text: string },
+) {
+  if (id === 'platform_status') return health.label
+  if (id === 'endpoint_freshness') return `${model.onlineDevices}/${Math.max(model.totalDevices, 1)}`
+  if (id === 'ai_activity') return model.aiSignals
+  if (id === 'detection_pack_coverage') return model.healthyCollectorPairs
+  if (id === 'agent_performance_budget') return model.maxCpuPercent === null ? 'n/a' : `${model.maxCpuPercent.toFixed(1)}%`
+  if (id === 'enterprise_control_inventory') return model.saseCount
   return data.events.length
 }
 
-function widgetDetail(id: string, model: ReturnType<typeof buildDashboardModel>, data: VisibilityData) {
-  if (id === 'evidence') return `${data.processes.length} process, ${data.flows.length} flow, ${data.dns.length} DNS records`
-  if (id === 'budget') {
-    const avg = model.avgCpuPercent === null ? 'n/a' : `${model.avgCpuPercent.toFixed(1)}% avg CPU`
+function widgetDetail(
+  id: string,
+  model: ReturnType<typeof buildDashboardModel>,
+  data: VisibilityData,
+  health: { label: string; text: string },
+) {
+  const reg = dashboardRegistryMap().get(id)
+  const base = reg?.description || ''
+  if (id === 'platform_status') return `${health.text}. ${base}`
+  if (id === 'endpoint_freshness')
+    return `${model.offlineDevices} stale of ${model.totalDevices}. ${base}`
+  if (id === 'ai_activity') return `${model.aiSignals} AI-shaped findings in window · ${base}`
+  if (id === 'detection_pack_coverage')
+    return `${model.healthyCollectorPairs} healthy collector pairs (rollout readiness proxy). ${base}`
+  if (id === 'agent_performance_budget') {
+    const avg = model.avgCpuPercent === null ? 'n/a avg' : `${model.avgCpuPercent.toFixed(1)}% avg CPU`
     const memory = model.maxMemoryRssMb === null ? 'n/a RSS' : `${model.maxMemoryRssMb.toFixed(1)} MB max RSS`
-    return `${avg}, ${memory}`
+    return `${avg} · ${memory}. ${base}`
   }
-  return widgetCatalog.find((widget) => widget.id === id)?.detail || ''
+  if (id === 'enterprise_control_inventory') return `${model.sase.length} SSE/SASE rows sampled. ${base}`
+  return base
 }
 
 function AgentList({

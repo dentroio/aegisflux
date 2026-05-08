@@ -9,13 +9,18 @@ import (
 )
 
 type Server struct {
-	mux   *http.ServeMux
-	store *Store
-	nc    *nats.Conn
+	mux      *http.ServeMux
+	store    *Store
+	nc       *nats.Conn
+	platform *PlatformData
 }
 
 func NewServer() *Server {
-	s := &Server{mux: http.NewServeMux(), store: NewStore()}
+	s := &Server{
+		mux:      http.NewServeMux(),
+		store:    NewStore(),
+		platform: newPlatformData(),
+	}
 
 	// Connect to NATS for WebSocket Gateway integration
 	natsURL := os.Getenv("NATS_URL")
@@ -34,8 +39,11 @@ func NewServer() *Server {
 	s.routes()
 	return s
 }
+
 func (s *Server) routes() {
 	s.mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
+
+	s.registerPlatformRoutes()
 
 	// Agent registration endpoints
 	s.mux.HandleFunc("/agents/register/init", s.postRegisterInit)
