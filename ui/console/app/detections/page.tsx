@@ -1,18 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import type React from 'react'
+import { useRouter } from 'next/navigation'
 import {
   AlertTriangle,
-  ArrowLeft,
-  CheckCircle,
-  Clock,
-  FileCheck2,
-  Fingerprint,
   RefreshCw,
-  ShieldCheck,
-  ShieldQuestion,
-  XCircle
 } from 'lucide-react'
 import {
   BoundedTable,
@@ -23,6 +15,9 @@ import {
   SummaryStrip,
   WorkbenchHeader,
 } from '@/components/workbench/primitives'
+import { ConsoleShell } from '@/components/shell/ConsoleShell'
+import type { HealthTone } from '@/components/shell/ConsoleShell'
+import { readLabAuthenticated } from '@/shared/labAuth'
 import { formatHash, formatRelativeAge } from '@/shared/formatting'
 
 type CandidateStatus =
@@ -182,6 +177,8 @@ function rolloutBadge(state?: string, stale?: boolean) {
 }
 
 export default function DetectionPacksPage() {
+  const router = useRouter()
+  const [gate, setGate] = useState(false)
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [signedPacks, setSignedPacks] = useState<SignedPack[]>([])
   const [signerInfo, setSignerInfo] = useState<SignerInfo | null>(null)
@@ -238,10 +235,19 @@ export default function DetectionPacksPage() {
   }
 
   useEffect(() => {
+    if (!readLabAuthenticated()) {
+      router.replace('/')
+      return
+    }
+    setGate(true)
+  }, [router])
+
+  useEffect(() => {
+    if (!gate) return undefined
     refresh()
     const interval = setInterval(refresh, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [gate])
 
   const runAction = async (candidate: Candidate, action: 'validate' | 'approve' | 'reject' | 'sign') => {
     try {
@@ -300,32 +306,30 @@ export default function DetectionPacksPage() {
     return flattened.filter((row) => !needle || JSON.stringify(row).toLowerCase().includes(needle))
   }, [rollouts, query])
 
+  function onLogout() {
+    window.localStorage.removeItem('aegisflux.labAuth')
+    router.replace('/')
+  }
+
+  const health = { label: 'Detections', tone: 'slate' as HealthTone, text: 'Detection pack workflow' }
+
+  if (!gate) {
+    return <div className="flex min-h-screen items-center justify-center text-sm text-gray-600">Loading...</div>
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-6">
+    <ConsoleShell activeNavId="detections" breadcrumbs={[{ label: 'Detection Packs' }]} health={health} onLogout={onLogout}>
+      <main className="mx-auto max-w-7xl px-4 py-6">
             <WorkbenchHeader
               title="Detection Packs"
               subtitle="Primary task: work the candidate queue, then verify signed and rollout state."
               actions={
-                <>
-                  <a href="/" className="btn btn-secondary h-9 px-3">
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Dashboard
-                  </a>
-                  <button onClick={refresh} disabled={refreshing} className="btn btn-secondary h-9 px-3">
-                    <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                    Refresh
-                  </button>
-                </>
+                <button onClick={refresh} disabled={refreshing} className="btn btn-secondary h-9 px-3">
+                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
               }
             />
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
           <div className="mb-6 rounded-md border border-danger-200 bg-danger-50 p-4">
             <div className="flex gap-3">
@@ -453,7 +457,7 @@ export default function DetectionPacksPage() {
           setRawMode(false)
         }}
       />
-    </div>
+    </ConsoleShell>
   )
 }
 

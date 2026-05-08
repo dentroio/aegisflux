@@ -22,7 +22,6 @@ import {
   Bot,
   Chrome,
   Cpu,
-  Globe2,
   LockKeyhole,
   RefreshCw,
   Search,
@@ -660,7 +659,6 @@ function AegisDashboardBody() {
   const [loginPassword, setLoginPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [devices, setDevices] = useState<DeviceRecord[]>([])
-  const [selectedDeviceId, setSelectedDeviceId] = useState('')
   const [query, setQuery] = useState('')
   const [data, setData] = useState<VisibilityData>({ events: [], processes: [], flows: [], dns: [], findings: [] })
   const [loading, setLoading] = useState(true)
@@ -749,7 +747,6 @@ function AegisDashboardBody() {
 
       const nextDevices = deviceResponse.devices || []
       setDevices(nextDevices)
-      setSelectedDeviceId((current) => current || nextDevices[0]?.device_id || '')
       setData({
         events: uniqueEvents([
           ...(events.events || []),
@@ -787,12 +784,10 @@ function AegisDashboardBody() {
     window.localStorage.removeItem('aegisflux.labAuth')
     setAuthenticated(false)
     setDevices([])
-    setSelectedDeviceId('')
     setData({ events: [], processes: [], flows: [], dns: [], findings: [] })
   }
 
   const model = useMemo(() => buildDashboardModel(data, devices), [data, devices])
-  const selectedDevice = devices.find((device) => device.device_id === selectedDeviceId) || devices[0]
   const filteredDevices = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) return devices
@@ -851,242 +846,26 @@ function AegisDashboardBody() {
                 style={ui.main}
               >
                 {mainPanel === 'dashboard' ? (
-                  <>
-                <WorkbenchHeader
-                  title="Dashboard"
-                  subtitle="Adaptive security and real-time protection across the AegisFlux fleet."
-                  actions={
-                    <>
-                      <div className="text-sm text-slate-500" style={ui.mutedText}>
-                        {lastRefresh ? `Last updated ${lastRefresh.toLocaleTimeString()}` : 'Waiting for refresh'}
-                      </div>
-                      <button
-                        onClick={fetchDashboard}
-                        className="inline-flex h-9 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-gray-50"
-                        style={ui.button}
-                      >
-                        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                        Refresh
-                      </button>
-                    </>
-                  }
-                />
-                <div className="mb-3">
-                  <StatusChip tone={health.tone} label={health.text} />
-                </div>
-
-                {error && (
-                  <div className="mb-4 flex items-center gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                    <AlertTriangle className="h-4 w-4" />
-                    {error}
-                  </div>
-                )}
-
-        <section className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]" style={ui.heroGrid}>
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" style={ui.card}>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between" style={ui.heroContent}>
-              <div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700" style={ui.sectionKicker}>
-                  <Activity className="h-4 w-4 text-emerald-600" />
-                  Platform status
-                </div>
-                <div className="mt-3 text-4xl font-bold tracking-tight text-slate-950" style={ui.heroStatus}>{health.label}</div>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600" style={ui.heroText}>{health.text}. Observe endpoint evidence, adapt detections continuously, and enforce only when controls are proven.</p>
-              </div>
-              <div className="sm:min-w-[360px]">
-                <SummaryStrip>
-                  <KpiTile label="Endpoints" value={model.totalDevices} />
-                  <KpiTile label="Fresh" value={model.onlineDevices} />
-                  <KpiTile label="Collectors" value={model.healthyCollectorPairs} />
-                  <KpiTile label="Max Risk" value={model.maxRisk} />
-                </SummaryStrip>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-slate-950 p-5 text-white shadow-sm" style={ui.darkCard}>
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-200" style={ui.darkKicker}>
-              <Sparkles className="h-4 w-4 text-cyan-300" />
-              Signal focus
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-3" style={ui.darkStatGrid}>
-              <DarkStat icon={Bot} label="AI" value={model.aiSignals} />
-              <DarkStat icon={Chrome} label="Ext" value={model.extensionCount} />
-              <DarkStat icon={LockKeyhole} label="SASE" value={model.saseCount} />
-            </div>
-            <p className="mt-4 text-sm leading-6 text-slate-300" style={ui.darkText}>
-              The next product leap is turning these signals into an Agent Bill of Materials per endpoint.
-            </p>
-          </div>
-        </section>
-
-        <section>
-          <div style={ui.widgetHeader}>
-            <h2 style={ui.widgetTitle}>Dashboard widgets</h2>
-            <button style={ui.button} onClick={() => setCustomizeOpen((value) => !value)}>
-              <SlidersHorizontal className="h-4 w-4" />
-              Customize
-            </button>
-          </div>
-          {customizeOpen && (
-            <FilterBar>
-              {widgetOrder.map((wid, idx) => {
-                const widget = regMap.get(wid)
-                if (!widget) return null
-                return (
-                  <div key={wid} style={{ ...ui.widgetToggle, flexWrap: 'wrap' }}>
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        type="checkbox"
-                        checked={!hiddenWidgets.includes(wid)}
-                        onChange={() =>
-                          setHiddenWidgets((current) =>
-                            current.includes(wid)
-                              ? current.filter((hid) => hid !== wid)
-                              : [...current, wid],
-                          )
-                        }
-                      />
-                      <span>{widget.title}</span>
-                    </label>
-                    <span style={{ display: 'inline-flex', gap: 6 }}>
-                      <button
-                        type="button"
-                        style={ui.button}
-                        disabled={idx === 0}
-                        onClick={() =>
-                          setWidgetOrder((ord) => {
-                            if (idx === 0) return ord
-                            const next = [...ord]
-                            ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
-                            return next
-                          })
-                        }
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        style={ui.button}
-                        disabled={idx === widgetOrder.length - 1}
-                        onClick={() =>
-                          setWidgetOrder((ord) => {
-                            if (idx >= ord.length - 1) return ord
-                            const next = [...ord]
-                            ;[next[idx + 1], next[idx]] = [next[idx], next[idx + 1]]
-                            return next
-                          })
-                        }
-                      >
-                        ↓
-                      </button>
-                    </span>
-                  </div>
-                )
-              })}
-              <span style={{ fontSize: 12, color: '#64748b' }}>Choices persist locally in your browser.</span>
-            </FilterBar>
-          )}
-        </section>
-
-        <section className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" style={ui.widgetGrid}>
-          {visibleWidgets.map((widget) => (
-            <Widget
-              key={widget.id}
-              icon={widget.icon}
-              title={widget.title}
-              value={widgetValue(widget.id, model, data, health)}
-              detail={widgetDetail(widget.id, model, data, health)}
-            />
-          ))}
-        </section>
-
-        {(model.offlineDevices > 0 || model.maxRisk > 70 || model.aiSignals > 0) && (
-          <section className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <div className="flex items-start gap-2 font-semibold">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              Attention required
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2 text-xs">
-              {model.offlineDevices > 0 ? <span className="rounded-full bg-white/70 px-2 py-1">{model.offlineDevices} stale endpoint(s)</span> : null}
-              {model.maxRisk > 70 ? <span className="rounded-full bg-white/70 px-2 py-1">High-risk finding score detected</span> : null}
-              {model.aiSignals > 0 ? <span className="rounded-full bg-white/70 px-2 py-1">{model.aiSignals} AI-shaped signals in current window</span> : null}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold">
-              <a href="/agents" className="text-amber-900 underline decoration-amber-400 underline-offset-2">Open Agents workbench</a>
-              <a href="/detections" className="text-amber-900 underline decoration-amber-400 underline-offset-2">Open Detections</a>
-              <a href="/operate/events" className="text-amber-900 underline decoration-amber-400 underline-offset-2">Open Event feed</a>
-            </div>
-          </section>
-        )}
-
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm" style={ui.cardNoPad}>
-            <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between" style={ui.panelHeader}>
-              <div>
-                <h2 className="text-base font-semibold text-slate-950" style={ui.panelTitle}>Endpoint scan list</h2>
-                <p className="mt-1 text-sm text-slate-500" style={ui.mutedText}>Compact view only. Use agent detail route for deep investigation.</p>
-              </div>
-              <div className="relative lg:w-80" style={ui.searchWrap}>
-                <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-slate-600"
-                  style={ui.searchInput}
-                  placeholder="Search endpoint id, OS, or sensor"
-                />
-              </div>
-            </div>
-            <div className="divide-y divide-slate-100" style={ui.agentList}>
-              {filteredDevices.length === 0 ? (
-                <div className="p-4">
-                  <EmptyState title="No endpoints found" message="Try a broader query or open Agents for advanced filters." />
-                </div>
-              ) : (
-                filteredDevices.slice(0, 12).map((device) => {
-                  const active = Date.now() - device.last_seen_ms < 5 * 60 * 1000
-                  const findings = Number(device.event_type_count?.['aegis.risk_finding.created'] || 0)
-                  return (
-                    <a
-                      key={device.device_id}
-                      href={`/agents/${encodeURIComponent(device.device_id)}`}
-                      className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-3 hover:bg-slate-50"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <FreshDot active={active} />
-                          <FormattedValue value={formatAgentId(device.device_id)} fullValue={device.device_id} />
-                          <CopyValueButton value={device.device_id} label="Copy endpoint id" />
-                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{platformName(device.source || device.device_id)}</span>
-                        </div>
-                        <p className="mt-1 truncate text-xs text-slate-500">{device.sensor_version} · last seen {ageFromMs(device.last_seen_ms)}</p>
-                      </div>
-                      <div className="self-center">
-                        <CountPill label="Find" value={findings} tone={findings ? 'amber' : 'slate'} />
-                      </div>
-                    </a>
-                  )
-                })
-              )}
-            </div>
-            <div className="border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
-              Showing up to 12 endpoints. <a href="/agents" className="font-semibold text-blue-700 hover:text-blue-900">Open Agents workbench for full list and actions.</a>
-            </div>
-          </div>
-
-          <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" style={ui.card}>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Next best actions</h3>
-            <div className="mt-3 space-y-2 text-sm text-slate-700">
-              <a href="/agents" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Review stale endpoints and collector health</a>
-              <a href="/inventory" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Inspect AI tool and extension inventory</a>
-              <a href="/detections" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Check detection-pack coverage and rollout</a>
-              <a href="/control/controls" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Draft observe-only controls from evidence</a>
-              <a href="/operate/events" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Audit operational events and changes</a>
-            </div>
-          </aside>
-        </section>
-                  </>
+                  <DashboardScanSurface
+                    data={data}
+                    error={error}
+                    filteredDevices={filteredDevices}
+                    health={health}
+                    hiddenWidgets={hiddenWidgets}
+                    lastRefresh={lastRefresh}
+                    loading={loading}
+                    model={model}
+                    query={query}
+                    regMap={regMap}
+                    setCustomizeOpen={setCustomizeOpen}
+                    setHiddenWidgets={setHiddenWidgets}
+                    setQuery={setQuery}
+                    setWidgetOrder={setWidgetOrder}
+                    visibleWidgets={visibleWidgets}
+                    widgetOrder={widgetOrder}
+                    customizeOpen={customizeOpen}
+                    onRefresh={fetchDashboard}
+                  />
                 ) : mainPanel === 'agents' ? (
                   <div className="min-w-0 w-full">
                     <AgentsManagementPanel embedded />
@@ -1115,6 +894,346 @@ export default function AegisDashboard() {
     >
       <AegisDashboardBody />
     </Suspense>
+  )
+}
+
+function DashboardScanSurface({
+  customizeOpen,
+  data,
+  error,
+  filteredDevices,
+  health,
+  hiddenWidgets,
+  lastRefresh,
+  loading,
+  model,
+  query,
+  regMap,
+  setCustomizeOpen,
+  setHiddenWidgets,
+  setQuery,
+  setWidgetOrder,
+  visibleWidgets,
+  widgetOrder,
+  onRefresh,
+}: {
+  customizeOpen: boolean
+  data: VisibilityData
+  error: string | null
+  filteredDevices: DeviceRecord[]
+  health: { label: string; tone: 'emerald' | 'amber' | 'slate'; text: string }
+  hiddenWidgets: string[]
+  lastRefresh: Date | null
+  loading: boolean
+  model: ReturnType<typeof buildDashboardModel>
+  query: string
+  regMap: Map<string, DashboardWidgetDef>
+  setCustomizeOpen: (updater: (value: boolean) => boolean) => void
+  setHiddenWidgets: (updater: (current: string[]) => string[]) => void
+  setQuery: (value: string) => void
+  setWidgetOrder: (updater: (current: string[]) => string[]) => void
+  visibleWidgets: DashboardWidgetDef[]
+  widgetOrder: string[]
+  onRefresh: () => void
+}) {
+  return (
+    <>
+      <WorkbenchHeader
+        title="Dashboard"
+        subtitle="Adaptive security and real-time protection across the AegisFlux fleet."
+        actions={
+          <>
+            <div className="text-sm text-slate-500" style={ui.mutedText}>
+              {lastRefresh ? `Last updated ${lastRefresh.toLocaleTimeString()}` : 'Waiting for refresh'}
+            </div>
+            <button
+              onClick={onRefresh}
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-gray-50"
+              style={ui.button}
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </>
+        }
+      />
+      <div className="mb-3">
+        <StatusChip tone={health.tone} label={health.text} />
+      </div>
+
+      {error && (
+        <div className="mb-4 flex items-center gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <AlertTriangle className="h-4 w-4" />
+          {error}
+        </div>
+      )}
+
+      <DashboardReadinessBand health={health} model={model} />
+      <DashboardWidgetControls
+        customizeOpen={customizeOpen}
+        hiddenWidgets={hiddenWidgets}
+        regMap={regMap}
+        setCustomizeOpen={setCustomizeOpen}
+        setHiddenWidgets={setHiddenWidgets}
+        setWidgetOrder={setWidgetOrder}
+        widgetOrder={widgetOrder}
+      />
+
+      <section className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" style={ui.widgetGrid}>
+        {visibleWidgets.map((widget) => (
+          <Widget
+            key={widget.id}
+            icon={widget.icon}
+            title={widget.title}
+            value={widgetValue(widget.id, model, data, health)}
+            detail={widgetDetail(widget.id, model, data, health)}
+          />
+        ))}
+      </section>
+
+      <DashboardAttentionBand model={model} />
+      <DashboardEndpointScan devices={filteredDevices} query={query} setQuery={setQuery} />
+    </>
+  )
+}
+
+function DashboardReadinessBand({
+  health,
+  model,
+}: {
+  health: { label: string; text: string }
+  model: ReturnType<typeof buildDashboardModel>
+}) {
+  return (
+    <section className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]" style={ui.heroGrid}>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" style={ui.card}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between" style={ui.heroContent}>
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700" style={ui.sectionKicker}>
+              <Activity className="h-4 w-4 text-emerald-600" />
+              Platform status
+            </div>
+            <div className="mt-3 text-4xl font-bold tracking-tight text-slate-950" style={ui.heroStatus}>{health.label}</div>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600" style={ui.heroText}>
+              {health.text}. Observe endpoint evidence, adapt detections continuously, and enforce only when controls are proven.
+            </p>
+          </div>
+          <div className="sm:min-w-[360px]">
+            <SummaryStrip>
+              <KpiTile label="Endpoints" value={model.totalDevices} />
+              <KpiTile label="Fresh" value={model.onlineDevices} />
+              <KpiTile label="Collectors" value={model.healthyCollectorPairs} />
+              <KpiTile label="Max Risk" value={model.maxRisk} />
+            </SummaryStrip>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-slate-950 p-5 text-white shadow-sm" style={ui.darkCard}>
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-200" style={ui.darkKicker}>
+          <Sparkles className="h-4 w-4 text-cyan-300" />
+          Signal focus
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-3" style={ui.darkStatGrid}>
+          <DarkStat icon={Bot} label="AI" value={model.aiSignals} />
+          <DarkStat icon={Chrome} label="Ext" value={model.extensionCount} />
+          <DarkStat icon={LockKeyhole} label="SASE" value={model.saseCount} />
+        </div>
+        <p className="mt-4 text-sm leading-6 text-slate-300" style={ui.darkText}>
+          The next product leap is turning these signals into an Agent Bill of Materials per endpoint.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+function DashboardWidgetControls({
+  customizeOpen,
+  hiddenWidgets,
+  regMap,
+  setCustomizeOpen,
+  setHiddenWidgets,
+  setWidgetOrder,
+  widgetOrder,
+}: {
+  customizeOpen: boolean
+  hiddenWidgets: string[]
+  regMap: Map<string, DashboardWidgetDef>
+  setCustomizeOpen: (updater: (value: boolean) => boolean) => void
+  setHiddenWidgets: (updater: (current: string[]) => string[]) => void
+  setWidgetOrder: (updater: (current: string[]) => string[]) => void
+  widgetOrder: string[]
+}) {
+  return (
+    <section>
+      <div style={ui.widgetHeader}>
+        <h2 style={ui.widgetTitle}>Dashboard widgets</h2>
+        <button style={ui.button} onClick={() => setCustomizeOpen((value) => !value)}>
+          <SlidersHorizontal className="h-4 w-4" />
+          Customize
+        </button>
+      </div>
+      {customizeOpen && (
+        <FilterBar>
+          {widgetOrder.map((wid, idx) => {
+            const widget = regMap.get(wid)
+            if (!widget) return null
+            return (
+              <div key={wid} style={{ ...ui.widgetToggle, flexWrap: 'wrap' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={!hiddenWidgets.includes(wid)}
+                    onChange={() =>
+                      setHiddenWidgets((current) =>
+                        current.includes(wid)
+                          ? current.filter((hid) => hid !== wid)
+                          : [...current, wid],
+                      )
+                    }
+                  />
+                  <span>{widget.title}</span>
+                </label>
+                <span style={{ display: 'inline-flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    style={ui.button}
+                    disabled={idx === 0}
+                    onClick={() =>
+                      setWidgetOrder((ord) => {
+                        if (idx === 0) return ord
+                        const next = [...ord]
+                        ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+                        return next
+                      })
+                    }
+                  >
+                    Up
+                  </button>
+                  <button
+                    type="button"
+                    style={ui.button}
+                    disabled={idx === widgetOrder.length - 1}
+                    onClick={() =>
+                      setWidgetOrder((ord) => {
+                        if (idx >= ord.length - 1) return ord
+                        const next = [...ord]
+                        ;[next[idx + 1], next[idx]] = [next[idx], next[idx + 1]]
+                        return next
+                      })
+                    }
+                  >
+                    Down
+                  </button>
+                </span>
+              </div>
+            )
+          })}
+          <span style={{ fontSize: 12, color: '#64748b' }}>Choices persist locally in your browser.</span>
+        </FilterBar>
+      )}
+    </section>
+  )
+}
+
+function DashboardAttentionBand({ model }: { model: ReturnType<typeof buildDashboardModel> }) {
+  if (model.offlineDevices === 0 && model.maxRisk <= 70 && model.aiSignals === 0) return null
+  return (
+    <section className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      <div className="flex items-start gap-2 font-semibold">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        Attention required
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+        {model.offlineDevices > 0 ? <span className="rounded-full bg-white/70 px-2 py-1">{model.offlineDevices} stale endpoint(s)</span> : null}
+        {model.maxRisk > 70 ? <span className="rounded-full bg-white/70 px-2 py-1">High-risk finding score detected</span> : null}
+        {model.aiSignals > 0 ? <span className="rounded-full bg-white/70 px-2 py-1">{model.aiSignals} AI-shaped signals in current window</span> : null}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold">
+        <a href="/agents" className="text-amber-900 underline decoration-amber-400 underline-offset-2">Open Agents workbench</a>
+        <a href="/detections" className="text-amber-900 underline decoration-amber-400 underline-offset-2">Open Detections</a>
+        <a href="/operate/events" className="text-amber-900 underline decoration-amber-400 underline-offset-2">Open Event feed</a>
+      </div>
+    </section>
+  )
+}
+
+function DashboardEndpointScan({
+  devices,
+  query,
+  setQuery,
+}: {
+  devices: DeviceRecord[]
+  query: string
+  setQuery: (value: string) => void
+}) {
+  return (
+    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm" style={ui.cardNoPad}>
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between" style={ui.panelHeader}>
+          <div>
+            <h2 className="text-base font-semibold text-slate-950" style={ui.panelTitle}>Endpoint scan list</h2>
+            <p className="mt-1 text-sm text-slate-500" style={ui.mutedText}>Compact view only. Use agent detail route for deep investigation.</p>
+          </div>
+          <div className="relative lg:w-80" style={ui.searchWrap}>
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-slate-600"
+              style={ui.searchInput}
+              placeholder="Search endpoint id, OS, or sensor"
+            />
+          </div>
+        </div>
+        <div className="divide-y divide-slate-100" style={ui.agentList}>
+          {devices.length === 0 ? (
+            <div className="p-4">
+              <EmptyState title="No endpoints found" message="Try a broader query or open Agents for advanced filters." />
+            </div>
+          ) : (
+            devices.slice(0, 12).map((device) => {
+              const active = Date.now() - device.last_seen_ms < 5 * 60 * 1000
+              const findings = Number(device.event_type_count?.['aegis.risk_finding.created'] || 0)
+              return (
+                <a
+                  key={device.device_id}
+                  href={`/agents/${encodeURIComponent(device.device_id)}`}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-3 hover:bg-slate-50"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <FreshDot active={active} />
+                      <FormattedValue value={formatAgentId(device.device_id)} fullValue={device.device_id} />
+                      <CopyValueButton value={device.device_id} label="Copy endpoint id" />
+                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{platformName(device.source || device.device_id)}</span>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-slate-500">{device.sensor_version} · last seen {ageFromMs(device.last_seen_ms)}</p>
+                  </div>
+                  <div className="self-center">
+                    <CountPill label="Find" value={findings} tone={findings ? 'amber' : 'slate'} />
+                  </div>
+                </a>
+              )
+            })
+          )}
+        </div>
+        <div className="border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
+          Showing up to 12 endpoints. <a href="/agents" className="font-semibold text-blue-700 hover:text-blue-900">Open Agents workbench for full list and actions.</a>
+        </div>
+      </div>
+
+      <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" style={ui.card}>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Next best actions</h3>
+        <div className="mt-3 space-y-2 text-sm text-slate-700">
+          <a href="/agents" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Review stale endpoints and collector health</a>
+          <a href="/inventory" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Inspect AI tool and extension inventory</a>
+          <a href="/detections" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Check detection-pack coverage and rollout</a>
+          <a href="/control/controls" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Draft observe-only controls from evidence</a>
+          <a href="/operate/events" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Audit operational events and changes</a>
+        </div>
+      </aside>
+    </section>
   )
 }
 
@@ -1238,21 +1357,6 @@ function buildDashboardModel(data: VisibilityData, devices: DeviceRecord[]) {
   }
 }
 
-function buildDeviceDetail(device: DeviceRecord, data: VisibilityData, model: ReturnType<typeof buildDashboardModel>) {
-  const deviceId = device.device_id
-  return {
-    device,
-    processes: data.processes.filter((record) => record.device_id === deviceId),
-    flows: data.flows.filter((record) => record.device_id === deviceId),
-    dns: data.dns.filter((record) => record.device_id === deviceId),
-    findings: data.findings.filter((record) => record.device_id === deviceId),
-    extensions: model.extensions.filter((record) => record.device_id === deviceId),
-    sase: model.sase.filter((record) => record.device_id === deviceId),
-    collectors: model.collectorStatuses.filter((record) => record.device_id === deviceId),
-    performance: model.performance.filter((record) => record.device_id === deviceId),
-  }
-}
-
 function uniqueEvents(events: EventRecord[]) {
   const byId = new Map<string, EventRecord>()
   for (const event of events) byId.set(event.event_id, event)
@@ -1299,152 +1403,6 @@ function widgetDetail(
   return base
 }
 
-function AgentList({
-  devices,
-  selectedDeviceId,
-  model,
-  onSelect,
-}: {
-  devices: DeviceRecord[]
-  selectedDeviceId: string
-  model: ReturnType<typeof buildDashboardModel>
-  onSelect: (deviceId: string) => void
-}) {
-  return (
-    <div className="divide-y divide-slate-100" style={ui.agentList}>
-      {devices.length === 0 ? (
-        <div className="px-4 py-12 text-center text-sm text-slate-500">No agents match this filter.</div>
-      ) : devices.map((device) => {
-        const active = Date.now() - device.last_seen_ms < 5 * 60 * 1000
-        const findings = Number(device.event_type_count?.['aegis.risk_finding.created'] || 0)
-        const extensions = model.extensions.filter((record) => record.device_id === device.device_id).length
-        return (
-          <button
-            key={device.device_id}
-            onClick={() => onSelect(device.device_id)}
-            className={`grid w-full grid-cols-[minmax(0,1fr)_auto] gap-4 px-4 py-3 text-left transition-colors hover:bg-slate-50 ${
-              selectedDeviceId === device.device_id ? 'bg-blue-50/60' : ''
-            }`}
-            style={{
-              ...ui.agentRow,
-              ...(selectedDeviceId === device.device_id ? ui.agentRowActive : null),
-            }}
-          >
-            <div className="min-w-0" style={ui.minWidth0}>
-              <div className="flex items-center gap-2" style={ui.inlineRow}>
-                <FreshDot active={active} />
-                <div className="truncate text-sm font-semibold text-slate-950" style={ui.agentName}>{device.device_id}</div>
-                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600" style={ui.smallPill}>{platformName(device.source || device.device_id)}</span>
-              </div>
-              <div className="mt-1 truncate text-xs text-slate-500" style={ui.agentMeta}>
-                {device.sensor_version} · last seen {ageFromMs(device.last_seen_ms)}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-xs" style={ui.rowPills}>
-              <CountPill label="Find" value={findings} tone={findings ? 'amber' : 'slate'} />
-              <CountPill label="Ext" value={extensions} tone="blue" />
-            </div>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-function AgentDetailPanel({ detail }: { detail: ReturnType<typeof buildDeviceDetail> | null }) {
-  if (!detail) {
-    return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500" style={ui.emptyPanel}>
-        Select an agent to view detail.
-      </div>
-    )
-  }
-  const { device } = detail
-  const active = Date.now() - device.last_seen_ms < 5 * 60 * 1000
-
-  return (
-    <aside className="rounded-xl border border-slate-200 bg-white shadow-sm" style={ui.cardNoPad}>
-      <div className="border-b border-slate-200 p-4" style={ui.panelHeader}>
-        <div className="flex items-start justify-between gap-3" style={ui.spaceBetween}>
-          <div className="min-w-0" style={ui.minWidth0}>
-            <div className="flex items-center gap-2" style={ui.inlineRow}>
-              <FreshDot active={active} />
-              <h2 className="truncate text-base font-semibold text-slate-950" style={ui.panelTitle}>{device.device_id}</h2>
-            </div>
-            <p className="mt-1 text-sm text-slate-500" style={ui.mutedText}>{platformName(device.source)} · {device.sensor_version}</p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <StatusChip tone={active ? 'emerald' : 'amber'} label={active ? 'Fresh' : 'Stale'} />
-            <a href={`/agents/${encodeURIComponent(device.device_id)}`} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
-              Open detail
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-4 p-4" style={ui.detailBody}>
-        <div className="grid grid-cols-2 gap-3" style={ui.miniGrid}>
-          <MiniStat label="Processes" value={detail.processes.length} />
-          <MiniStat label="Flows" value={detail.flows.length} />
-          <MiniStat label="DNS" value={detail.dns.length} />
-          <MiniStat label="Findings" value={detail.findings.length} />
-        </div>
-
-        <DetailSection icon={Activity} title="Collector health">
-          {detail.collectors.length === 0 ? (
-            <EmptyLine text="No collector status in current window." />
-          ) : detail.collectors.slice(0, 6).map((collector) => (
-            <div key={`${collector.collector}-${collector.received_at_ms}`} className="rounded-md border border-slate-200 px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-slate-800">{collector.collector}</span>
-                <StatusChip tone={collector.status === 'healthy' ? 'emerald' : 'amber'} label={collector.status} />
-              </div>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{collector.message}</p>
-            </div>
-          ))}
-        </DetailSection>
-
-        <DetailSection icon={Cpu} title="Agent budget">
-          {detail.performance.length === 0 ? (
-            <EmptyLine text="No performance telemetry in current window." />
-          ) : detail.performance.slice(0, 4).map((record) => (
-            <CompactRow
-              key={`${record.collector_name}-${record.received_at_ms}`}
-              title={record.collector_name || 'collector'}
-              subtitle={`${record.collector_runtime_ms ?? 0} ms · queue ${record.event_queue_depth ?? 'n/a'} · spool ${formatBytes(record.spool_bytes)}`}
-            />
-          ))}
-        </DetailSection>
-
-        <DetailSection icon={Chrome} title="Browser inventory">
-          {detail.extensions.length === 0 ? (
-            <EmptyLine text="No extensions observed in current window." />
-          ) : detail.extensions.slice(0, 5).map((extension) => (
-            <CompactRow key={`${extension.extension_id}-${extension.profile}`} title={extension.name} subtitle={`${extension.browser} · ${extension.profile}`} />
-          ))}
-        </DetailSection>
-
-        <DetailSection icon={LockKeyhole} title="SSE/SASE">
-          {detail.sase.length === 0 ? (
-            <EmptyLine text="No SSE/SASE component detected." />
-          ) : detail.sase.slice(0, 5).map((component) => (
-            <CompactRow key={`${component.component_type}-${component.name}`} title={`${component.vendor} · ${component.name}`} subtitle={component.product} />
-          ))}
-        </DetailSection>
-
-        <DetailSection icon={Globe2} title="Recent AI destinations">
-          {detail.dns.filter((record) => /chatgpt|openai|anthropic|claude|gemini|copilot|mistral/i.test(record.query)).slice(0, 5).map((record) => (
-            <CompactRow key={record.query} title={record.query} subtitle={record.correlation_method || 'DNS/browser evidence'} />
-          ))}
-          {detail.dns.filter((record) => /chatgpt|openai|anthropic|claude|gemini|copilot|mistral/i.test(record.query)).length === 0 && (
-            <EmptyLine text="No AI destination in current DNS window." />
-          )}
-        </DetailSection>
-      </div>
-    </aside>
-  )
-}
-
 function Widget({ icon: Icon, title, value, detail }: { icon: typeof Activity; title: string; value: string | number; detail: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" style={ui.widget}>
@@ -1460,15 +1418,6 @@ function Widget({ icon: Icon, title, value, detail }: { icon: typeof Activity; t
   )
 }
 
-function MiniStat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3" style={ui.miniStat}>
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500" style={ui.kpiLabel}>{label}</div>
-      <div className="mt-1 text-xl font-semibold text-slate-950" style={ui.miniValue}>{value}</div>
-    </div>
-  )
-}
-
 function DarkStat({ icon: Icon, label, value }: { icon: typeof Activity; label: string; value: number }) {
   return (
     <div className="rounded-lg bg-white/10 p-3" style={ui.darkStat}>
@@ -1477,31 +1426,6 @@ function DarkStat({ icon: Icon, label, value }: { icon: typeof Activity; label: 
       <div className="text-xs uppercase tracking-wide text-slate-300" style={ui.darkLabel}>{label}</div>
     </div>
   )
-}
-
-function DetailSection({ icon: Icon, title, children }: { icon: typeof Activity; title: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500" style={ui.detailTitle}>
-        <Icon className="h-4 w-4" />
-        {title}
-      </div>
-      <div className="space-y-2" style={ui.stackSmall}>{children}</div>
-    </section>
-  )
-}
-
-function CompactRow({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <div className="rounded-md border border-slate-200 px-3 py-2" style={ui.compactRow}>
-      <div className="truncate text-sm font-medium text-slate-800" style={ui.compactTitle}>{title}</div>
-      <div className="mt-1 truncate text-xs text-slate-500" style={ui.compactSub}>{subtitle}</div>
-    </div>
-  )
-}
-
-function EmptyLine({ text }: { text: string }) {
-  return <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-500" style={ui.emptyLine}>{text}</div>
 }
 
 function CountPill({ label, value, tone }: { label: string; value: number; tone: 'slate' | 'blue' | 'amber' }) {
@@ -1541,11 +1465,4 @@ function ageFromMs(ms?: number) {
   const minutes = Math.round(seconds / 60)
   if (minutes < 60) return `${minutes}m ago`
   return `${Math.round(minutes / 60)}h ago`
-}
-
-function formatBytes(value?: number | null) {
-  if (typeof value !== 'number') return 'n/a'
-  if (value < 1024) return `${value} B`
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`
 }
