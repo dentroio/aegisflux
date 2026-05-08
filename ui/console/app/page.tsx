@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { AgentsManagementPanel } from '@/components/AgentsManagementPanel'
 import { InventoryPanel } from '@/components/InventoryPanel'
 import { ConsoleShell } from '@/components/shell/ConsoleShell'
@@ -648,8 +648,11 @@ function dashboardRegistryMap(): Map<string, DashboardWidgetDef> {
 }
 
 function AegisDashboardBody() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const panelParam = searchParams.get('panel')
+  const nextParam = searchParams.get('next')
+  const nextTarget = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : ''
   const mainPanel = panelParam === 'agents' || panelParam === 'inventory' ? panelParam : 'dashboard'
   const inventoryDeviceFilter = (searchParams.get('device') || '').trim()
 
@@ -772,6 +775,7 @@ function AegisDashboardBody() {
       setAuthenticated(true)
       setLoginError('')
       setLoginPassword('')
+      if (nextTarget) router.replace(nextTarget)
       return
     }
     setLoginError('Invalid lab credentials. Use admin/admin.')

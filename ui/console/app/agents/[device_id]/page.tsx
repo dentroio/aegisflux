@@ -191,7 +191,8 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
 
   useEffect(() => {
     if (!readLabAuthenticated()) {
-      router.replace('/')
+      const next = `${window.location.pathname}${window.location.search}`
+      window.location.replace(`/?next=${encodeURIComponent(next)}`)
       return
     }
     setAuthGate(true)
@@ -291,7 +292,7 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
   if (!authGate) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 text-sm text-gray-600">
-        Checking session…
+        Checking session… If this does not continue, <a className="ml-1 font-semibold text-primary-700 underline" href="/">open the console login</a>.
       </div>
     )
   }
