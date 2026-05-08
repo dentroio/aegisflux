@@ -1,6 +1,6 @@
 # WO-UX-003: Agents Workbench Simplification
 
-**Status:** Draft  
+**Status:** Implemented  
 **Phase:** Product Platform UX  
 **Primary owner:** UI  
 
@@ -64,3 +64,20 @@ The current Agents surface includes filters, rollout telemetry, an agent list, s
 - Do not remove the agent detail route.
 - Do not add enforcement controls.
 - Do not change backend agent schemas unless a display-critical summary is impossible without a tiny read-only addition.
+
+## Implementation Notes
+
+### 2026-05-08 Implementation Update
+
+- Reworked `ui/console/components/AgentsManagementPanel.tsx` into a focused workbench layout:
+  - concise summary strip (total, stale, pack issues, budget pressure)
+  - compact filter/search controls
+  - single primary bounded table surface
+- Removed permanent selected-agent right-side detail column and long stacked detail cards from the workbench.
+- Added deliberate surface switch between:
+  - `Agents` primary scan table
+  - `Rollout` compact detection-pack table
+- Kept detail behavior deliberate by routing to `/agents/[device_id]` via `Open detail` actions.
+- Retained trust metadata access through bounded `DetailModal` (temporary surface only).
+- Applied shared formatting primitives from WO-UX-002 for long ids and hostnames.
+- Verification completed with `npm run build` in `ui/console` (pass).

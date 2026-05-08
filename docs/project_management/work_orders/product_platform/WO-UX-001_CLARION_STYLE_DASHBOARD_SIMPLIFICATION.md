@@ -1,6 +1,6 @@
 # WO-UX-001: Clarion-Style Dashboard Simplification
 
-**Status:** Draft  
+**Status:** Implemented  
 **Phase:** Product Platform UX  
 **Primary owner:** UI  
 
@@ -68,3 +68,15 @@ The current dashboard mixes platform health, widgets, agents, selected agent det
 Prefer small components under `ui/console/components/dashboard/` or `ui/console/components/workbench/` over growing `ui/console/app/page.tsx`.
 
 Dashboard widget content should stay compact. If a widget needs more than a small table, short list, or chart, link to a workbench page.
+
+### 2026-05-07 Implementation Update
+
+- Reworked dashboard `/` into clearer scan bands:
+  - Readiness: platform health hero and compact readiness stats.
+  - Attention: conditional warning strip shown only when actionable signals exist.
+  - Insights: bounded widget grid with local visibility controls retained.
+- Removed dashboard's permanent right-side selected-agent detail column.
+- Replaced deep inline detail behavior with deliberate navigation links to workbench routes (Agents, Inventory, Detections, Controls, Operate).
+- Kept left navigation and shell behavior intact.
+- Preserved compact list behavior and constrained row rendering to avoid long-string layout stretch.
+- Verification completed with `npm run build` in `ui/console` (pass).

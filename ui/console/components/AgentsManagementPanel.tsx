@@ -4,19 +4,23 @@ import { useEffect, useMemo, useState } from 'react'
 import { 
   ArrowLeft, 
   Users, 
-  Server, 
-  Activity, 
-  Settings,
   AlertTriangle,
-  CheckCircle,
-  Clock,
   RefreshCw,
-  Tag,
-  Edit,
-  Trash2,
   ShieldCheck,
-  Link
+  Search,
 } from 'lucide-react'
+import {
+  BoundedTable,
+  CopyValueButton,
+  DetailModal,
+  EmptyState,
+  FilterBar,
+  FormattedValue,
+  KpiTile,
+  SummaryStrip,
+  WorkbenchHeader,
+} from '@/components/workbench/primitives'
+import { formatAgentId, formatDateTime, formatHash, formatHostname, formatRelativeAge } from '@/shared/formatting'
 
 interface Agent {
   agent_uid: string
@@ -99,9 +103,7 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
-  const [editingLabels, setEditingLabels] = useState<string>('')
-  const [editingNote, setEditingNote] = useState<string>('')
+  const [view, setView] = useState<'agents' | 'rollout'>('agents')
   const [embeddedFilter, setEmbeddedFilter] = useState<
     'all' | 'online' | 'offline' | 'windows' | 'linux' | 'pack_issue' | 'budget'
   >(() => {
@@ -116,6 +118,8 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
       ? saved
       : 'all'
   })
+  const [query, setQuery] = useState('')
+  const [detailModal, setDetailModal] = useState<{ title: string; payload: unknown } | null>(null)
 
   useEffect(() => {
     window.localStorage.setItem('aegis.agents.workbench.filter', embeddedFilter)
@@ -185,10 +189,6 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
           new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime()
         )
         setAgents(sortedAgents)
-        setSelectedAgent((current) => {
-          if (!current) return current
-          return sortedAgents.find((agent: Agent) => agent.agent_uid === current.agent_uid) || current
-        })
       } else {
         setError('Failed to fetch agents')
       }
@@ -201,18 +201,8 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'online':
-        return <CheckCircle className="h-4 w-4 text-success-500" />
-      case 'offline':
-        return <AlertTriangle className="h-4 w-4 text-danger-500" />
-      default:
-        return <Clock className="h-4 w-4 text-warning-500" />
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, stale: boolean) => {
+    if (stale) return <span className="badge badge-warning">Stale</span>
     switch (status) {
       case 'online':
         return <span className="badge badge-success">Online</span>
@@ -244,9 +234,7 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString()
-  }
+  const formatDate = (dateString: string) => formatDateTime(dateString)
 
   const isPackStatusStale = (status?: DetectionPackStatus | null) => {
     if (!status) return false
@@ -265,13 +253,13 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
     return value ? formatDate(new Date(value).toISOString()) : 'n/a'
   }
 
-  const rolloutRows = agents
+  const rolloutRows = useMemo(() => agents
     .filter((agent) => agent.detection_pack_status)
     .map((agent) => ({
       agent,
       status: agent.detection_pack_status as DetectionPackStatus,
       stale: isPackStatusStale(agent.detection_pack_status)
-    }))
+    })), [agents])
 
   const rolloutCounts = rolloutRows.reduce<Record<string, number>>((counts, row) => {
     const key = row.stale ? 'stale' : (row.status.rollout_state || 'not_checked')
@@ -290,7 +278,7 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
   }
 
   const workbenchAgents = useMemo(() => {
-    return agents.filter((agent) => {
+    const byFilter = agents.filter((agent) => {
       switch (embeddedFilter) {
         case 'all':
           return true
@@ -311,7 +299,12 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
           return true
       }
     })
-  }, [agents, embeddedFilter])
+    const needle = query.trim().toLowerCase()
+    if (!needle) return byFilter
+    return byFilter.filter((agent) =>
+      `${agent.hostname} ${agent.host_id} ${agent.agent_uid} ${agent.platform.os} ${agent.platform.primary_ip}`.toLowerCase().includes(needle),
+    )
+  }, [agents, embeddedFilter, query])
 
   const filterCounts = useMemo(() => {
     const c = (fn: (a: Agent) => boolean) => agents.filter(fn).length
@@ -333,106 +326,33 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
     }
   }, [agents])
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
-
-  const updateAgentLabels = async (agentUid: string, labels: string[]) => {
-    try {
-      const response = await fetch(`/api/actions/agents/${agentUid}/labels`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          add: labels.filter(label => !agents.find(a => a.agent_uid === agentUid)?.labels.includes(label)),
-          remove: agents.find(a => a.agent_uid === agentUid)?.labels.filter(label => !labels.includes(label)) || []
-        })
-      })
-
-      if (response.ok) {
-        await fetchAgents()
-        setEditingLabels('')
-      }
-    } catch (err) {
-      console.error('Failed to update labels:', err)
-    }
-  }
-
-  const updateAgentNote = async (agentUid: string, note: string) => {
-    try {
-      const response = await fetch(`/api/actions/agents/${agentUid}/note`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ note })
-      })
-
-      if (response.ok) {
-        await fetchAgents()
-        setEditingNote('')
-      }
-    } catch (err) {
-      console.error('Failed to update note:', err)
-    }
-  }
+  const staleAgents = agents.filter((agent) => Date.now() - new Date(agent.last_seen).getTime() > 5 * 60 * 1000).length
+  const packIssueAgents = filterCounts.pack_issue
+  const budgetPressureAgents = filterCounts.budget
 
   return (
     <div className={embedded ? 'bg-gray-50' : 'min-h-screen bg-gray-50'}>
-      {!embedded ? (
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
-            <div className="flex items-center space-x-4">
-              <a href="/" className="flex items-center text-gray-600 hover:text-gray-900">
-                <ArrowLeft className="h-5 w-5 mr-2" />
-                Back to Dashboard
-              </a>
-              <div className="h-6 w-px bg-gray-300" />
-              <div className="flex items-center space-x-3">
-                <Users className="h-8 w-8 text-primary-600" />
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Agent Management</h1>
-                  <p className="text-sm text-gray-500">Monitor and manage registered agents</p>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={fetchAgents}
-              disabled={refreshing}
-              className="btn btn-secondary px-4 py-2"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+      {!embedded && (
+        <header className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <WorkbenchHeader
+              title="Agents Workbench"
+              subtitle="Find agents needing attention and route to deliberate detail."
+              actions={
+                <>
+                  <a href="/" className="btn btn-secondary h-9 px-3">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Dashboard
+                  </a>
+                  <button onClick={fetchAgents} disabled={refreshing} className="btn btn-secondary h-9 px-3">
+                    <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </button>
+                </>
+              }
+            />
           </div>
-        </div>
-      </header>
-      ) : (
-        <div className="border-b border-gray-200 bg-white px-0 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Users className="h-7 w-7 text-primary-600" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Agent Management</h1>
-                <p className="text-sm text-gray-500">Registered agents and detection-pack rollout</p>
-              </div>
-            </div>
-            <button
-              onClick={fetchAgents}
-              disabled={refreshing}
-              className="btn btn-secondary h-9 px-3"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
-        </div>
+        </header>
       )}
 
       <div className={embedded ? 'max-w-[1500px] mx-auto px-0 py-4' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}>
@@ -447,446 +367,166 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
           </div>
         )}
 
-        {embedded ? (
-          <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Workbench filters</div>
-            <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  ['all', filterCounts.all],
-                  ['online', filterCounts.online],
-                  ['offline', filterCounts.offline],
-                  ['windows', filterCounts.windows],
-                  ['linux', filterCounts.linux],
-                  ['pack_issue', filterCounts.pack_issue],
-                  ['budget', filterCounts.budget],
-                ] as const
-              ).map(([id, count]) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setEmbeddedFilter(id)}
-                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                    embeddedFilter === id
-                      ? 'border-primary-600 bg-primary-600 text-white'
-                      : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  {id.replace('_', ' ')} ({count})
-                </button>
-              ))}
-            </div>
+        <SummaryStrip>
+          <KpiTile label="Total agents" value={agents.length} />
+          <KpiTile label="Stale" value={staleAgents} />
+          <KpiTile label="Pack issues" value={packIssueAgents} />
+          <KpiTile label="Budget pressure" value={budgetPressureAgents} />
+        </SummaryStrip>
+
+        <FilterBar>
+          {(
+            [
+              ['all', filterCounts.all],
+              ['online', filterCounts.online],
+              ['offline', filterCounts.offline],
+              ['windows', filterCounts.windows],
+              ['linux', filterCounts.linux],
+              ['pack_issue', filterCounts.pack_issue],
+              ['budget', filterCounts.budget],
+            ] as const
+          ).map(([id, count]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setEmbeddedFilter(id)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                embeddedFilter === id
+                  ? 'border-primary-600 bg-primary-600 text-white'
+                  : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              {id.replace('_', ' ')} ({count})
+            </button>
+          ))}
+          <label className="relative min-w-[220px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="input h-9 pl-9"
+              placeholder="Search host, id, OS, IP"
+            />
+          </label>
+          <div className="ml-auto inline-flex rounded-md border border-gray-200 bg-white p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setView('agents')}
+              className={`rounded px-2 py-1 font-semibold ${view === 'agents' ? 'bg-primary-600 text-white' : 'text-gray-700'}`}
+            >
+              Agents
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('rollout')}
+              className={`rounded px-2 py-1 font-semibold ${view === 'rollout' ? 'bg-primary-600 text-white' : 'text-gray-700'}`}
+            >
+              Rollout
+            </button>
           </div>
-        ) : null}
+        </FilterBar>
 
-        <section id="detection-pack-rollout" className="mb-8 card">
-	          <div className="px-6 py-4 border-b border-gray-200">
-	            <div className="flex items-center justify-between">
-	              <div className="flex items-center space-x-3">
-	                <ShieldCheck className="h-6 w-6 text-primary-600" />
-	                <div>
-	                  <h2 className="text-lg font-semibold text-gray-900">Detection Pack Rollout</h2>
-	                  <p className="text-sm text-gray-500">Observe-only pack health across reporting agents</p>
-	                </div>
-	              </div>
-	              <span className="badge badge-info">{rolloutRows.length} reporting</span>
-	            </div>
-	          </div>
-	          <div className="p-6">
-	            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
-	              <div className="rounded-md border border-gray-200 p-3">
-	                <p className="text-xs text-gray-500">Active Packs</p>
-	                <p className="text-xl font-semibold text-gray-900">{activePackCount}</p>
-	              </div>
-	              {['applied', 'rejected', 'incompatible', 'expired', 'stale'].map((state) => (
-	                <div key={state} className="rounded-md border border-gray-200 p-3">
-	                  <p className="text-xs text-gray-500 capitalize">{state}</p>
-	                  <p className="text-xl font-semibold text-gray-900">{rolloutCounts[state] || 0}</p>
-	                </div>
-	              ))}
-	            </div>
-
-	            {rolloutRows.length === 0 ? (
-	              <p className="text-sm text-gray-500">No detection-pack rollout telemetry is available.</p>
-	            ) : (
-	              <div className="overflow-x-auto">
-	                <table className="min-w-full divide-y divide-gray-200 text-sm">
-	                  <thead>
-	                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-	                      <th className="py-2 pr-4">Agent</th>
-	                      <th className="py-2 pr-4">State</th>
-	                      <th className="py-2 pr-4">Active Pack</th>
-	                      <th className="py-2 pr-4">Trust</th>
-	                      <th className="py-2 pr-4">Last Check</th>
-	                    </tr>
-	                  </thead>
-	                  <tbody className="divide-y divide-gray-100">
-	                    {rolloutRows.map(({ agent, status }) => (
-	                      <tr key={agent.agent_uid}>
-	                        <td className="py-3 pr-4">
-	                          <button
-	                            onClick={() => setSelectedAgent(agent)}
-	                            className="text-left font-medium text-primary-700 hover:text-primary-900"
-	                          >
-	                            {agent.hostname || agent.agent_uid}
-	                          </button>
-	                          <p className="text-xs text-gray-500">{agent.platform.os} • {agent.agent_version}</p>
-	                        </td>
-	                        <td className="py-3 pr-4">{getPackHealthBadge(status)}</td>
-	                        <td className="py-3 pr-4 font-mono text-xs">
-	                          {status.active_pack_id || 'none'}
-	                          {status.active_pack_version ? ` @ ${status.active_pack_version}` : ''}
-	                        </td>
-	                        <td className="py-3 pr-4 text-xs text-gray-600">
-	                          sig={status.signature_status || 'unknown'} · hash={status.hash_status || 'unknown'} · schema={status.schema_status || 'unknown'}
-	                        </td>
-	                        <td className="py-3 pr-4 text-xs text-gray-600">{formatTimeMS(status.last_check_at_ms)}</td>
-	                      </tr>
-	                    ))}
-	                  </tbody>
-	                </table>
-	              </div>
-	            )}
-	          </div>
-        </section>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Agents List */}
-          <div className="lg:col-span-2">
-            <div className="card">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Registered Agents ({workbenchAgents.length}
-                  {embeddedFilter !== 'all' ? ` / ${agents.length} total` : ''})
-                </h2>
-              </div>
-              <div className="divide-y divide-gray-200">
-                {loading ? (
-                  <div className="p-6 text-center text-gray-500">
-                    Loading agents...
-                  </div>
-                ) : workbenchAgents.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500">
-                    {agents.length === 0 ? 'No agents registered' : 'No agents match this workbench filter.'}
-                  </div>
-                ) : (
-                  workbenchAgents.map((agent) => (
-                    <div
-                      key={agent.agent_uid}
-                      className={`p-6 hover:bg-gray-50 cursor-pointer transition-colors ${
-                        selectedAgent?.agent_uid === agent.agent_uid ? 'bg-primary-50 border-r-4 border-primary-500' : ''
-                      }`}
-                      onClick={() => setSelectedAgent(agent)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-4">
-                          <div className="flex-shrink-0">
-                            <div className="h-12 w-12 rounded-full bg-primary-100 flex items-center justify-center">
-                              <Server className="h-6 w-6 text-primary-600" />
-                            </div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-2">
-                              <h3 className="text-lg font-medium text-gray-900 truncate">
-                                {agent.hostname}
-                              </h3>
-                              {getStatusIcon(agent.status)}
-                              {getStatusBadge(agent.status)}
-                            </div>
-                            <p className="text-sm text-gray-500">
-                              {agent.platform.primary_ip} • {agent.agent_version}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {agent.platform.os} • {agent.platform.architecture}
-                            </p>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              {getPackHealthBadge(agent.detection_pack_status)}
-                              <span className="text-xs text-gray-500">
-                                Events: {agent.visibility?.event_count || 0}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                Findings: {eventTypeCount(agent, 'aegis.risk_finding.created')}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                Extensions: {eventTypeCount(agent, 'aegis.browser_extension.observed')}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                Collectors: {eventTypeCount(agent, 'aegis.collector.status')}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                Pack: {agent.detection_pack_status?.active_pack_id || 'none'}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                Version: {agent.detection_pack_status?.active_pack_version || 'none'}
-                              </span>
-                              <a
-                                href={`/agents/${encodeURIComponent(agent.host_id || agent.agent_uid)}`}
-                                className="text-xs font-medium text-primary-700 hover:text-primary-900"
-                                onClick={(event) => event.stopPropagation()}
-                              >
-                                Open detail
-                              </a>
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {agent.labels.map((label) => (
-                                <span key={label} className="badge badge-info">
-                                  {label}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right text-sm text-gray-500">
-                          <p>Last seen: {formatDate(agent.last_seen)}</p>
-                          <p>Created: {formatDate(agent.created)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Agent Details */}
-          <div className="lg:col-span-1">
-            {selectedAgent ? (
-              <div className="space-y-6">
-                {/* Basic Info */}
-                <div className="card p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Agent Details</h3>
-                  <dl className="space-y-3">
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Host ID</dt>
-                      <dd className="text-sm text-gray-900 font-mono">{selectedAgent.host_id}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Agent UID</dt>
-                      <dd className="text-sm text-gray-900 font-mono break-all">{selectedAgent.agent_uid}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Organization</dt>
-                      <dd className="text-sm text-gray-900">{selectedAgent.org_id}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">FQDN</dt>
-                      <dd className="text-sm text-gray-900">{selectedAgent.platform.fqdn}</dd>
-                    </div>
-                  </dl>
-                </div>
-
-                {/* System Info */}
-                <div className="card p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">System Information</h3>
-                  <dl className="space-y-3">
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">CPU</dt>
-                      <dd className="text-sm text-gray-900">{selectedAgent.platform.cpu_model}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Memory</dt>
-                      <dd className="text-sm text-gray-900">{selectedAgent.platform.memory_gb} GB</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Disk</dt>
-                      <dd className="text-sm text-gray-900">{selectedAgent.platform.disk_gb} GB</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Kernel</dt>
-                      <dd className="text-sm text-gray-900">{selectedAgent.platform.kernel_version}</dd>
-                    </div>
-                  </dl>
-                </div>
-
-                {/* Network Info */}
-                <div className="card p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Network Configuration</h3>
-                  <dl className="space-y-3">
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Primary IP</dt>
-                      <dd className="text-sm text-gray-900">{selectedAgent.network.primary_ip}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">MAC Address</dt>
-                      <dd className="text-sm text-gray-900 font-mono">{selectedAgent.network.mac_address}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Subnet</dt>
-                      <dd className="text-sm text-gray-900">{selectedAgent.network.subnet}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Gateway</dt>
-                      <dd className="text-sm text-gray-900">{selectedAgent.network.gateway}</dd>
-                    </div>
-                  </dl>
-                </div>
-
-                {/* Capabilities */}
-                <div className="card p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">eBPF Capabilities</h3>
-                  <dl className="space-y-3">
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Max Programs</dt>
-                      <dd className="text-sm text-gray-900">{selectedAgent.capabilities.max_programs}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Max Maps</dt>
-                      <dd className="text-sm text-gray-900">{selectedAgent.capabilities.max_maps}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Supported Hooks</dt>
-                      <dd className="text-sm text-gray-900">
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {selectedAgent.capabilities.supported_hooks.map((hook) => (
-                            <span key={hook} className="badge badge-info">
-                              {hook}
-                            </span>
-                          ))}
-                        </div>
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-
-                {/* Labels Management */}
-                <div className="card p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Labels</h3>
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap gap-1">
-                      {selectedAgent.labels.map((label) => (
-                        <span key={label} className="badge badge-info">
-                          {label}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        value={editingLabels}
-                        onChange={(e) => setEditingLabels(e.target.value)}
-                        placeholder="Add label (comma-separated)"
-                        className="input flex-1"
-                      />
-                      <button
-                        onClick={() => {
-                          const newLabels = editingLabels.split(',').map(l => l.trim()).filter(l => l)
-                          updateAgentLabels(selectedAgent.agent_uid, [...selectedAgent.labels, ...newLabels])
-                        }}
-                        className="btn btn-primary px-3 py-2"
-                      >
-                        <Tag className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Notes */}
-                <div className="card p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Notes</h3>
-                  <div className="space-y-3">
-                    <p className="text-sm text-gray-900">{selectedAgent.note || 'No notes'}</p>
-                    <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        value={editingNote}
-                        onChange={(e) => setEditingNote(e.target.value)}
-                        placeholder="Add or update note"
-                        className="input flex-1"
-                      />
-                      <button
-                        onClick={() => updateAgentNote(selectedAgent.agent_uid, editingNote)}
-                        className="btn btn-primary px-3 py-2"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Detection Pack Status */}
-                <div className="card p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Detection Pack Status</h3>
-                  <p className="text-xs text-gray-500 mb-4">Observe-only visibility for rollout health.</p>
-                  {selectedAgent.detection_pack_status ? (
-                    <dl className="space-y-3">
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Rollout State</dt>
-                        <dd className="text-sm text-gray-900">{getPackHealthBadge(selectedAgent.detection_pack_status)}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Active Pack</dt>
-                        <dd className="text-sm text-gray-900 font-mono">
-                          {selectedAgent.detection_pack_status.active_pack_id || 'none'}
-                          {selectedAgent.detection_pack_status.active_pack_version
-                            ? ` @ ${selectedAgent.detection_pack_status.active_pack_version}`
-                            : ''}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Previous Pack</dt>
-                        <dd className="text-sm text-gray-900 font-mono">
-                          {selectedAgent.detection_pack_status.previous_pack_id || 'none'}
-                          {selectedAgent.detection_pack_status.previous_pack_version
-                            ? ` @ ${selectedAgent.detection_pack_status.previous_pack_version}`
-                            : ''}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Trust and Compatibility</dt>
-                        <dd className="text-sm text-gray-900">
-                          sig={selectedAgent.detection_pack_status.signature_status || 'unknown'} | hash={selectedAgent.detection_pack_status.hash_status || 'unknown'} | schema={selectedAgent.detection_pack_status.schema_status || 'unknown'} | compat={selectedAgent.detection_pack_status.compatibility_status || 'unknown'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Last Applied</dt>
-                        <dd className="text-sm text-gray-900">
-                          {formatTimeMS(selectedAgent.detection_pack_status.last_applied_at_ms)}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Last Check</dt>
-                        <dd className="text-sm text-gray-900">
-                          {formatTimeMS(selectedAgent.detection_pack_status.last_check_at_ms)}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Telemetry Freshness</dt>
-                        <dd className="text-sm text-gray-900">
-                          {isPackStatusStale(selectedAgent.detection_pack_status) ? 'stale' : 'fresh'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Last Rejection</dt>
-                        <dd className="text-sm text-gray-900">
-                          {selectedAgent.detection_pack_status.last_rejected_reason || selectedAgent.detection_pack_status.reason_detail || 'none'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Rollout View</dt>
-                        <dd className="text-sm">
-                          <a href="#detection-pack-rollout" className="inline-flex items-center text-primary-700 hover:text-primary-900">
-                            <Link className="h-3 w-3 mr-1" />
-                            Pack rollout status
-                          </a>
-                        </dd>
-                      </div>
-                    </dl>
-                  ) : (
-                    <p className="text-sm text-gray-500">No detection-pack telemetry reported for this agent.</p>
-                  )}
-                </div>
-              </div>
+        <section className="card p-5">
+          {loading ? (
+            <EmptyState title="Loading agents" message="Collecting agent and rollout telemetry." />
+          ) : view === 'agents' ? (
+            workbenchAgents.length === 0 ? (
+              <EmptyState title="No matching agents" message="Try adjusting the filter or search query." />
             ) : (
-              <div className="card p-6">
-                <div className="text-center text-gray-500">
-                  <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p>Select an agent to view details</p>
-                </div>
+              <BoundedTable
+                headers={['Identity', 'Status', 'Platform', 'Pack health', 'Signals', 'Action']}
+                rows={workbenchAgents.map((agent) => {
+                  const stale = Date.now() - new Date(agent.last_seen).getTime() > 5 * 60 * 1000
+                  return [
+                    <div key={`${agent.agent_uid}-id`} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <FormattedValue value={formatHostname(agent.hostname || agent.host_id)} fullValue={agent.hostname || agent.host_id} mono={false} />
+                        <CopyValueButton value={agent.hostname || agent.host_id} label="Copy hostname" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FormattedValue value={formatAgentId(agent.agent_uid)} fullValue={agent.agent_uid} />
+                        <CopyValueButton value={agent.agent_uid} label="Copy agent id" />
+                      </div>
+                    </div>,
+                    <div key={`${agent.agent_uid}-status`} className="space-y-1">
+                      {getStatusBadge(agent.status, stale)}
+                      <p className="text-xs text-slate-500" title={formatDate(agent.last_seen)}>
+                        Last seen {formatRelativeAge(agent.last_seen)}
+                      </p>
+                    </div>,
+                    <div key={`${agent.agent_uid}-platform`} className="text-xs text-slate-600">
+                      <p>{agent.platform.os || 'unknown'} · {agent.platform.architecture || 'unknown'}</p>
+                      <p className="truncate">{agent.platform.primary_ip || 'n/a'}</p>
+                    </div>,
+                    <div key={`${agent.agent_uid}-pack`}>{getPackHealthBadge(agent.detection_pack_status)}</div>,
+                    <div key={`${agent.agent_uid}-signals`} className="text-xs text-slate-600">
+                      <p>Findings: {eventTypeCount(agent, 'aegis.risk_finding.created')}</p>
+                      <p>Collectors: {eventTypeCount(agent, 'aegis.collector.status')}</p>
+                      <p>Budget events: {eventTypeCount(agent, 'aegis.agent.performance')}</p>
+                    </div>,
+                    <a
+                      key={`${agent.agent_uid}-action`}
+                      href={`/agents/${encodeURIComponent(agent.host_id || agent.agent_uid)}`}
+                      className="text-xs font-semibold text-primary-700 hover:text-primary-900"
+                    >
+                      Open detail
+                    </a>,
+                  ]
+                })}
+              />
+            )
+          ) : rolloutRows.length === 0 ? (
+            <EmptyState title="No rollout telemetry" message="No detection-pack rollout telemetry is available." />
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <ShieldCheck className="h-4 w-4 text-primary-600" />
+                Detection pack rollout
               </div>
-            )}
-          </div>
-        </div>
+              <BoundedTable
+                headers={['Agent', 'State', 'Active pack', 'Trust', 'Last check', 'Action']}
+                rows={rolloutRows.map(({ agent, status }) => ([
+                  <div key={`agent-${agent.agent_uid}`}>
+                    <p className="text-sm font-medium text-slate-900">{formatHostname(agent.hostname || agent.host_id)}</p>
+                    <p className="text-xs text-gray-500">{agent.platform.os} • {agent.agent_version}</p>
+                  </div>,
+                  <div key={`state-${agent.agent_uid}`}>{getPackHealthBadge(status)}</div>,
+                  <div key={`pack-${agent.agent_uid}`} className="flex items-center gap-2">
+                    <FormattedValue
+                      value={formatHash(`${status.active_pack_id || 'none'}@${status.active_pack_version || 'none'}`)}
+                      fullValue={`${status.active_pack_id || 'none'} @ ${status.active_pack_version || 'none'}`}
+                    />
+                    <CopyValueButton value={`${status.active_pack_id || 'none'} @ ${status.active_pack_version || 'none'}`} />
+                  </div>,
+                  <button
+                    key={`trust-${agent.agent_uid}`}
+                    className="text-xs text-primary-700 underline underline-offset-2"
+                    onClick={() => setDetailModal({ title: `Trust detail: ${agent.hostname || formatAgentId(agent.agent_uid)}`, payload: status })}
+                  >
+                    View trust detail
+                  </button>,
+                  <span key={`check-${agent.agent_uid}`} className="text-xs text-gray-600" title={formatTimeMS(status.last_check_at_ms)}>
+                    {status.last_check_at_ms ? formatRelativeAge(status.last_check_at_ms) : 'n/a'}
+                  </span>,
+                  <a
+                    key={`action-${agent.agent_uid}`}
+                    href={`/agents/${encodeURIComponent(agent.host_id || agent.agent_uid)}`}
+                    className="text-xs font-semibold text-primary-700 hover:text-primary-900"
+                  >
+                    Open detail
+                  </a>,
+                ]))}
+              />
+            </div>
+          )}
+        </section>
       </div>
+      <DetailModal
+        open={Boolean(detailModal)}
+        title={detailModal?.title || 'Detail'}
+        detail={detailModal?.payload || {}}
+        onClose={() => setDetailModal(null)}
+      />
     </div>
   )
 }

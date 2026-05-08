@@ -7,6 +7,16 @@ import { AgentsManagementPanel } from '@/components/AgentsManagementPanel'
 import { InventoryPanel } from '@/components/InventoryPanel'
 import { ConsoleShell } from '@/components/shell/ConsoleShell'
 import {
+  CopyValueButton,
+  EmptyState,
+  FilterBar,
+  FormattedValue,
+  KpiTile,
+  SummaryStrip,
+  WorkbenchHeader,
+} from '@/components/workbench/primitives'
+import { formatAgentId } from '@/shared/formatting'
+import {
   Activity,
   AlertTriangle,
   Bot,
@@ -783,10 +793,6 @@ function AegisDashboardBody() {
 
   const model = useMemo(() => buildDashboardModel(data, devices), [data, devices])
   const selectedDevice = devices.find((device) => device.device_id === selectedDeviceId) || devices[0]
-  const selectedDetail = useMemo(
-    () => selectedDevice ? buildDeviceDetail(selectedDevice, data, model) : null,
-    [selectedDevice, data, model],
-  )
   const filteredDevices = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) return devices
@@ -846,29 +852,27 @@ function AegisDashboardBody() {
               >
                 {mainPanel === 'dashboard' ? (
                   <>
-                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between" style={ui.titleRow}>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2" style={ui.titleLine}>
-                      <h1 className="text-2xl font-bold text-slate-950" style={ui.pageTitle}>Dashboard</h1>
-                      <StatusChip tone={health.tone} label={health.text} />
-                    </div>
-                    <p className="mt-2 text-sm text-slate-500" style={ui.subtitle}>
-                      Adaptive security and real-time protection across the AegisFlux fleet.
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <div className="text-sm text-slate-500" style={ui.mutedText}>
-                      {lastRefresh ? `Last updated ${lastRefresh.toLocaleTimeString()}` : 'Waiting for refresh'}
-                    </div>
-                    <button
-                      onClick={fetchDashboard}
-                      className="inline-flex h-9 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-gray-50"
-                      style={ui.button}
-                    >
-                      <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                      Refresh
-                    </button>
-                  </div>
+                <WorkbenchHeader
+                  title="Dashboard"
+                  subtitle="Adaptive security and real-time protection across the AegisFlux fleet."
+                  actions={
+                    <>
+                      <div className="text-sm text-slate-500" style={ui.mutedText}>
+                        {lastRefresh ? `Last updated ${lastRefresh.toLocaleTimeString()}` : 'Waiting for refresh'}
+                      </div>
+                      <button
+                        onClick={fetchDashboard}
+                        className="inline-flex h-9 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-gray-50"
+                        style={ui.button}
+                      >
+                        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </button>
+                    </>
+                  }
+                />
+                <div className="mb-3">
+                  <StatusChip tone={health.tone} label={health.text} />
                 </div>
 
                 {error && (
@@ -889,11 +893,13 @@ function AegisDashboardBody() {
                 <div className="mt-3 text-4xl font-bold tracking-tight text-slate-950" style={ui.heroStatus}>{health.label}</div>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600" style={ui.heroText}>{health.text}. Observe endpoint evidence, adapt detections continuously, and enforce only when controls are proven.</p>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]" style={ui.miniGrid}>
-                <MiniStat label="Endpoints" value={model.totalDevices} />
-                <MiniStat label="Fresh" value={model.onlineDevices} />
-                <MiniStat label="Collectors" value={model.healthyCollectorPairs} />
-                <MiniStat label="Max Risk" value={model.maxRisk} />
+              <div className="sm:min-w-[360px]">
+                <SummaryStrip>
+                  <KpiTile label="Endpoints" value={model.totalDevices} />
+                  <KpiTile label="Fresh" value={model.onlineDevices} />
+                  <KpiTile label="Collectors" value={model.healthyCollectorPairs} />
+                  <KpiTile label="Max Risk" value={model.maxRisk} />
+                </SummaryStrip>
               </div>
             </div>
           </div>
@@ -923,7 +929,7 @@ function AegisDashboardBody() {
             </button>
           </div>
           {customizeOpen && (
-            <div style={ui.customizePanel}>
+            <FilterBar>
               {widgetOrder.map((wid, idx) => {
                 const widget = regMap.get(wid)
                 if (!widget) return null
@@ -979,7 +985,7 @@ function AegisDashboardBody() {
                 )
               })}
               <span style={{ fontSize: 12, color: '#64748b' }}>Choices persist locally in your browser.</span>
-            </div>
+            </FilterBar>
           )}
         </section>
 
@@ -995,12 +1001,31 @@ function AegisDashboardBody() {
           ))}
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_430px]" style={ui.contentGrid}>
+        {(model.offlineDevices > 0 || model.maxRisk > 70 || model.aiSignals > 0) && (
+          <section className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <div className="flex items-start gap-2 font-semibold">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              Attention required
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              {model.offlineDevices > 0 ? <span className="rounded-full bg-white/70 px-2 py-1">{model.offlineDevices} stale endpoint(s)</span> : null}
+              {model.maxRisk > 70 ? <span className="rounded-full bg-white/70 px-2 py-1">High-risk finding score detected</span> : null}
+              {model.aiSignals > 0 ? <span className="rounded-full bg-white/70 px-2 py-1">{model.aiSignals} AI-shaped signals in current window</span> : null}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold">
+              <a href="/agents" className="text-amber-900 underline decoration-amber-400 underline-offset-2">Open Agents workbench</a>
+              <a href="/detections" className="text-amber-900 underline decoration-amber-400 underline-offset-2">Open Detections</a>
+              <a href="/operate/events" className="text-amber-900 underline decoration-amber-400 underline-offset-2">Open Event feed</a>
+            </div>
+          </section>
+        )}
+
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm" style={ui.cardNoPad}>
             <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between" style={ui.panelHeader}>
               <div>
-                <h2 className="text-base font-semibold text-slate-950" style={ui.panelTitle}>Agents</h2>
-                <p className="mt-1 text-sm text-slate-500" style={ui.mutedText}>Select an endpoint to dig into coverage, evidence, and inventory.</p>
+                <h2 className="text-base font-semibold text-slate-950" style={ui.panelTitle}>Endpoint scan list</h2>
+                <p className="mt-1 text-sm text-slate-500" style={ui.mutedText}>Compact view only. Use agent detail route for deep investigation.</p>
               </div>
               <div className="relative lg:w-80" style={ui.searchWrap}>
                 <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -1009,19 +1034,57 @@ function AegisDashboardBody() {
                   onChange={(event) => setQuery(event.target.value)}
                   className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-slate-600"
                   style={ui.searchInput}
-                  placeholder="Search agents"
+                  placeholder="Search endpoint id, OS, or sensor"
                 />
               </div>
             </div>
-            <AgentList
-              devices={filteredDevices}
-              selectedDeviceId={selectedDevice?.device_id || ''}
-              model={model}
-              onSelect={setSelectedDeviceId}
-            />
+            <div className="divide-y divide-slate-100" style={ui.agentList}>
+              {filteredDevices.length === 0 ? (
+                <div className="p-4">
+                  <EmptyState title="No endpoints found" message="Try a broader query or open Agents for advanced filters." />
+                </div>
+              ) : (
+                filteredDevices.slice(0, 12).map((device) => {
+                  const active = Date.now() - device.last_seen_ms < 5 * 60 * 1000
+                  const findings = Number(device.event_type_count?.['aegis.risk_finding.created'] || 0)
+                  return (
+                    <a
+                      key={device.device_id}
+                      href={`/agents/${encodeURIComponent(device.device_id)}`}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-3 hover:bg-slate-50"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <FreshDot active={active} />
+                          <FormattedValue value={formatAgentId(device.device_id)} fullValue={device.device_id} />
+                          <CopyValueButton value={device.device_id} label="Copy endpoint id" />
+                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{platformName(device.source || device.device_id)}</span>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-slate-500">{device.sensor_version} · last seen {ageFromMs(device.last_seen_ms)}</p>
+                      </div>
+                      <div className="self-center">
+                        <CountPill label="Find" value={findings} tone={findings ? 'amber' : 'slate'} />
+                      </div>
+                    </a>
+                  )
+                })
+              )}
+            </div>
+            <div className="border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
+              Showing up to 12 endpoints. <a href="/agents" className="font-semibold text-blue-700 hover:text-blue-900">Open Agents workbench for full list and actions.</a>
+            </div>
           </div>
 
-          <AgentDetailPanel detail={selectedDetail} />
+          <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" style={ui.card}>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Next best actions</h3>
+            <div className="mt-3 space-y-2 text-sm text-slate-700">
+              <a href="/agents" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Review stale endpoints and collector health</a>
+              <a href="/inventory" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Inspect AI tool and extension inventory</a>
+              <a href="/detections" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Check detection-pack coverage and rollout</a>
+              <a href="/control/controls" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Draft observe-only controls from evidence</a>
+              <a href="/operate/events" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Audit operational events and changes</a>
+            </div>
+          </aside>
         </section>
                   </>
                 ) : mainPanel === 'agents' ? (

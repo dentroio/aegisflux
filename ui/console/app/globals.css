@@ -60,4 +60,16 @@
   .badge-info {
     @apply bg-primary-100 text-primary-800;
   }
+
+  .ux-table-cell {
+    @apply max-w-0 truncate whitespace-nowrap;
+  }
+
+  .ux-detail-scroll {
+    @apply max-h-[80vh] overflow-auto;
+  }
+
+  .ux-mono-compact {
+    @apply font-mono text-xs tracking-tight;
+  }
 }

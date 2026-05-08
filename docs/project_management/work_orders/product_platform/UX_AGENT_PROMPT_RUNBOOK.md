@@ -10,6 +10,14 @@
 4. WO-UX-004: Inventory Workbench Simplification
 5. WO-UX-005: Detections, Control, and Operate UX Simplification
 
+## How to Use This Runbook
+
+1. Run one work order at a time and in order.
+2. Paste the selected prompt into a fresh agent/chat.
+3. Require the agent to return the final report format from this runbook.
+4. Review changed files and UI behavior before approving merge.
+5. Do not combine multiple WO scopes in one commit.
+
 ## Common Rules
 
 - Start with `git status -sb`.
@@ -23,6 +31,62 @@
 - Update the work order status and implementation notes.
 - Stage only files touched for the work order.
 - Commit and push at the end.
+
+## Delivery Contract (Required In Final Response)
+
+Every agent run must end with:
+
+- Changed files list (paths only, grouped by feature area if possible).
+- Verification commands actually run, with pass/fail result.
+- Build result for `ui/console` (`npm run build`).
+- UX rule confirmation (explicitly state no permanent right-side long-scroll column was introduced).
+- Commit hash.
+- Push result.
+- Outstanding risks or follow-ups.
+
+## Standard Final Response Template
+
+```text
+Work order: <WO-ID>
+
+Changed files:
+- <path>
+- <path>
+
+Verification:
+- npm run build (ui/console): PASS|FAIL
+- <other command>: PASS|FAIL
+
+UX guardrail check:
+- No permanent right-side long-scroll detail column introduced: YES|NO
+- Notes: <short note>
+
+Git:
+- Commit: <hash>
+- Push: SUCCESS|FAILED (<reason if failed>)
+
+Follow-ups:
+- <none or itemized list>
+```
+
+## Escalation Rules
+
+- If the work order conflicts with current code structure, prefer extracting small reusable components over broad rewrites.
+- If build fails for pre-existing reasons unrelated to the WO, report exact failing command output summary and continue with scoped UX validation.
+- If required Clarion references are unavailable, proceed with nearest equivalent patterns and document substitutions.
+- If scope creep appears, stop at the work-order boundary and log deferred items in implementation notes.
+
+## Optional Operator Prompt Wrapper
+
+Use this when you want stricter execution discipline around any WO prompt:
+
+```text
+Execute this work order exactly as scoped. Do not expand scope.
+Follow all Common Rules and Hard UX rules from the runbook.
+Before edits, summarize intended file touch list in 4-8 bullets.
+After edits, run required verification and provide the Standard Final Response Template exactly.
+If blocked, report blocker, attempted mitigation, and smallest unblocking action.
+```
 
 ## WO-UX-001 Prompt
 
@@ -68,6 +132,13 @@ At the end:
 - Final response must include changed files, verification commands, commit hash, and push result.
 ```
 
+### WO-UX-001 Acceptance Checks
+
+- `/` reads as a scan surface with compact, quickly scannable sections.
+- No click path creates a persistent right-side long-scroll detail pane.
+- Long values in cards/tables are truncated, wrapped, or summarized intentionally.
+- Deeper analysis routes users to the correct workbench page.
+
 ## WO-UX-002 Prompt
 
 ```text
@@ -106,6 +177,13 @@ At the end:
 - Push with: git push
 - Final response must include changed files, verification commands, commit hash, and push result.
 ```
+
+### WO-UX-002 Acceptance Checks
+
+- Shared formatting helpers exist and are used by at least one real page flow.
+- Compact vs detail string presentation is visibly distinct and intentional.
+- Table layout remains bounded when extremely long values are present.
+- Raw/full values are still accessible through deliberate interaction.
 
 ## WO-UX-003 Prompt
 
@@ -149,6 +227,13 @@ At the end:
 - Final response must include changed files, verification commands, commit hash, and push result.
 ```
 
+### WO-UX-003 Acceptance Checks
+
+- Agents page prioritizes "who needs attention now" over deep detail by default.
+- Agent selection does not create a persistent long-scroll right detail column.
+- Device detail opens via route or bounded temporary surface.
+- High-noise identifiers render safely in compact contexts.
+
 ## WO-UX-004 Prompt
 
 ```text
@@ -188,6 +273,13 @@ At the end:
 - Final response must include changed files, verification commands, commit hash, and push result.
 ```
 
+### WO-UX-004 Acceptance Checks
+
+- Inventory has clear category-driven navigation and fast filtering/search.
+- Selected item detail uses bounded modal/drawer/inline/route patterns only.
+- High-noise values (ids/paths/vendors/commands) do not break layout.
+- Unknown signals remain visible and operationally triaged.
+
 ## WO-UX-005 Prompt
 
 ```text
@@ -226,3 +318,10 @@ At the end:
 - Push with: git push
 - Final response must include changed files, verification commands, commit hash, and push result.
 ```
+
+### WO-UX-005 Acceptance Checks
+
+- Detections, Control, and Operate each present one primary task clearly.
+- Selected candidates/packs/drafts/events do not create persistent long-scroll side columns.
+- Raw payloads remain gated behind deliberate "Raw" interaction.
+- Long ids/hashes/versions/event values are compact by default and fully accessible on demand.

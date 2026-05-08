@@ -1,6 +1,6 @@
 # WO-UX-002: Interaction and String Formatting System
 
-**Status:** Draft  
+**Status:** Implemented  
 **Phase:** Product Platform UX  
 **Primary owner:** UI  
 
@@ -69,3 +69,16 @@ Multiple pages display agent ids, paths, command lines, hashes, pack ids, event 
 ## Implementation Notes
 
 The key behavior is restraint: compact views show what matters, detail views reveal more only when asked, and raw values never break the layout.
+
+### 2026-05-07 Implementation Update
+
+- Added shared formatting helpers in `ui/console/shared/formatting.ts`:
+  - agent ids, hostnames, IP/CIDR, MAC, hashes, paths, command lines, JSON/raw payload, date/time, and relative age helpers.
+- Added shared workbench primitives in `ui/console/components/workbench/primitives.tsx`:
+  - `SummaryStrip`, `KpiTile`, `WorkbenchHeader`, `FilterBar`, `BoundedTable`, `DetailModal`, `FormattedValue`, `CopyValueButton`, and `EmptyState`.
+- Added reusable CSS overflow conventions in `ui/console/app/globals.css`:
+  - `.ux-table-cell`, `.ux-detail-scroll`, and `.ux-mono-compact`.
+- Adopted primitives in dashboard (`/`) and agents workbench:
+  - Dashboard now uses `WorkbenchHeader`, `SummaryStrip`/`KpiTile`, `FilterBar`, `FormattedValue`, `CopyValueButton`, `EmptyState`.
+  - Detection pack rollout in `AgentsManagementPanel` now uses bounded table rendering and deliberate detail modal for trust payload instead of inline data dumps.
+- Verification completed with `npm run build` in `ui/console` (pass).
