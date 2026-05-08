@@ -1,6 +1,6 @@
 # WO-DET-002: Dynamic AI Detection Candidate Pipeline
 
-**Status:** Backend complete; UI page pending
+**Status:** Complete
 **Phase:** Product Platform  
 **Primary owner:** Backend / AI Platform  
 
@@ -58,13 +58,15 @@ Create the backend workflow for research-to-detection: research item -> candidat
 - **Routes:** research item create/list, candidate create/list/detail, validation, approval, rejection, signing, signed-pack fetch, and signer-info are implemented under `/v1/detection/...`.
 - **Validation:** candidate rules are evaluated against stored ingest telemetry and move through `validating`, `validation_failed`, `ready_for_review`, `approved`, `rejected`, and `signed`.
 - **Signing:** approved candidates can produce signed `detection_pack.v1` artifacts with Ed25519 signatures.
+- **Console:** `/detections` lists candidates, selected-candidate validations, signer info, signed artifacts, and lifecycle actions for validate, approve, reject, and sign.
 
 ## Remaining Work
 
-- Dedicated console page under Analyze > Detection Packs for candidate lifecycle and validations.
-- Product polish for reviewer workflows; API is available, but the primary UI is not complete.
+- Product polish for reviewer workflows can continue, but the required candidate lifecycle UI is now available.
 
 ## Verification
 
 - `go test ./...` in `backend/detection-pipeline`
 - `./scripts/lab/smoke-detection-rollout.sh`
+- `npm run build` in `ui/console`
+- `curl -fsS http://127.0.0.1:3030/api/detection/candidates`

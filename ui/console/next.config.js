@@ -8,6 +8,7 @@ const nextConfig = {
     ORCHESTRATOR_URL: process.env.ORCHESTRATOR_URL || 'http://localhost:8084',
     DECISION_API_URL: process.env.DECISION_API_URL || 'http://localhost:8087',
     INGEST_API_URL: process.env.INGEST_API_URL || 'http://localhost:9091',
+    DETECTION_PIPELINE_URL: process.env.DETECTION_PIPELINE_URL || 'http://localhost:8089',
   },
   async rewrites() {
     return [
@@ -30,6 +31,14 @@ const nextConfig = {
       {
         source: '/api/visibility/:path*',
         destination: `${process.env.INGEST_API_URL || 'http://localhost:9091'}/v1/visibility/:path*`,
+      },
+      {
+        source: '/api/detection/:path*',
+        destination: `${process.env.DETECTION_PIPELINE_URL || 'http://localhost:8089'}/v1/detection/:path*`,
+      },
+      {
+        source: '/api/detection-packs/:path*',
+        destination: `${process.env.DETECTION_PIPELINE_URL || 'http://localhost:8089'}/v1/detection-packs/:path*`,
       },
     ]
   },

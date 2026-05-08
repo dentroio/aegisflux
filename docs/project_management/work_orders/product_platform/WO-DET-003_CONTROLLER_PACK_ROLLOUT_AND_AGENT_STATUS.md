@@ -1,6 +1,6 @@
 # WO-DET-003: Detection Pack Controller Rollout and Agent Status
 
-**Status:** Controller complete; Analyze UI pending
+**Status:** Complete
 **Phase:** Product Platform  
 **Primary owner:** Backend / Agent / UI  
 
@@ -103,13 +103,15 @@ This work order connects the output of `WO-DET-002` to the endpoint agents, but 
 - Artifact responses include content hash and signature headers.
 - `aegis.detection_pack.status` visibility schema exists and can be emitted by the controller.
 - Agent list and device drill-in expose detection-pack rollout/status telemetry through the existing console surfaces.
+- Dedicated `/detections` console page exposes signed packs, rollout counts, per-agent active pack/version, stale/rejected/incompatible/expired states, and trust fields.
 
 ## Remaining Work
 
-- Dedicated Analyze > Detection Packs rollout page is still pending.
 - Current controller path is lab-only and intentionally observe-only.
 
 ## Verification
 
 - `go test ./...` in `backend/detection-pipeline`
 - `./scripts/lab/smoke-detection-rollout.sh`
+- `npm run build` in `ui/console`
+- `curl -fsS http://127.0.0.1:3030/api/detection-packs/aegis.research.mcp_tool_bridge/rollout-status`
