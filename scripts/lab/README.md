@@ -48,7 +48,27 @@ The smoke prints a `next:` command that reruns both one-shot agents with the
 current signer key and controller URL. Use that command directly, then rerun
 the smoke.
 
+## Direct Mac Lab Address
+
+The current lab agents post directly to the developer Mac at:
+
+```text
+192.168.1.180
+```
+
+Default lab agent endpoints are:
+
+- Ingest: `http://192.168.1.180:9091`
+- Actions API: `http://192.168.1.180:8083`
+- Detection pipeline: `http://192.168.1.180:8089`
+
+If the Mac receives a new LAN address, update the lab agent script defaults and
+reinstall/rebuild the Linux and Windows lab agents before running health checks.
+
 ## Windows Reverse Tunnel on macOS
+
+The reverse tunnel remains available as a fallback for networks where direct
+Mac access is blocked.
 
 The Windows lab scheduled task posts to `http://127.0.0.1:9091` on the Windows
 host. In the current lab topology, that address is provided by a reverse SSH
@@ -110,7 +130,7 @@ Both lab tunnels expose the same service map on each remote lab machine:
 | `8083` | `8083` | Actions API (`/agents`, `/agents/heartbeat`) |
 | `8089` | `8089` | Detection pipeline (`/healthz`, pack endpoints) |
 
-This means each remote host uses local loopback URLs:
+When reverse tunnels are enabled, each remote host uses local loopback URLs:
 
 - Ingest: `http://127.0.0.1:9091`
 - Actions API: `http://127.0.0.1:8083`
@@ -187,7 +207,7 @@ AEGIS_LINUX_HOST=192.168.101.31 \
 
 ## Linux Reverse Tunnel on macOS
 
-The Linux lab systemd timer also posts to `http://127.0.0.1:9091` on the Linux
+The Linux reverse-tunnel fallback exposes `http://127.0.0.1:9091` on the Linux
 host. Install the Linux tunnel as a macOS user `launchd` job:
 
 ```bash

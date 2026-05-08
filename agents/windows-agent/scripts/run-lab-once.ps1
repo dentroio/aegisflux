@@ -1,11 +1,11 @@
 param(
     [string]$AgentPath = "C:\AegisLab\aegisflux\agents\windows-agent\target\release\aegis-windows-agent.exe",
-    [string]$BackendUrl = "http://127.0.0.1:9091",
+    [string]$BackendUrl = "http://192.168.1.180:9091",
     [string]$AgentId = "windows-dev-agent-01",
     [string]$DeviceId = "windows-dev-agent-01",
     [string]$SpoolPath = "C:\ProgramData\Aegis\Agent\spool\events.jsonl",
     [string]$LogPath = "C:\ProgramData\Aegis\Agent\logs\scheduled-task.log",
-    [string]$ActionsHeartbeatUrl = "http://127.0.0.1:8083/agents/heartbeat",
+    [string]$ActionsHeartbeatUrl = "http://192.168.1.180:8083/agents/heartbeat",
     [string]$ControllerUrl = "",
     [string]$DetectionPackCache = "",
     [string]$DetectionPackPublicKey = "",

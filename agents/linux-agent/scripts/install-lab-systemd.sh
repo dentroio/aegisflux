@@ -5,7 +5,7 @@ REPO_AGENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_BIN="${SOURCE_BIN:-${REPO_AGENT_DIR}/target/release/aegis-linux-agent}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/aegis/linux-agent}"
 SERVICE_NAME="${SERVICE_NAME:-aegis-linux-agent-lab}"
-BACKEND_URL="${AEGIS_BACKEND_URL:-http://127.0.0.1:9091}"
+BACKEND_URL="${AEGIS_BACKEND_URL:-http://192.168.1.180:9091}"
 AGENT_ID="${AEGIS_AGENT_ID:-linux-dev-agent-01}"
 DEVICE_ID="${AEGIS_DEVICE_ID:-linux-dev-agent-01}"
 

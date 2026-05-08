@@ -8,11 +8,11 @@ mkdir -p "$(dirname "${LOG_PATH}")" "$(dirname "${AEGIS_EVENT_SPOOL:-/var/lib/ae
 
 export AEGIS_AGENT_ID="${AEGIS_AGENT_ID:-linux-dev-agent-01}"
 export AEGIS_DEVICE_ID="${AEGIS_DEVICE_ID:-linux-dev-agent-01}"
-export AEGIS_BACKEND_URL="${AEGIS_BACKEND_URL:-http://127.0.0.1:9091}"
+export AEGIS_BACKEND_URL="${AEGIS_BACKEND_URL:-http://192.168.1.180:9091}"
 export AEGIS_COLLECT_COMMAND_LINE="${AEGIS_COLLECT_COMMAND_LINE:-true}"
 export AEGIS_EVENT_SPOOL="${AEGIS_EVENT_SPOOL:-/var/lib/aegis/linux-agent/events.jsonl}"
 export AEGIS_DETECTION_PACKS_ENABLED="${AEGIS_DETECTION_PACKS_ENABLED:-false}"
-export ACTIONS_HEARTBEAT_URL="${ACTIONS_HEARTBEAT_URL:-http://127.0.0.1:8083/agents/heartbeat}"
+export ACTIONS_HEARTBEAT_URL="${ACTIONS_HEARTBEAT_URL:-http://192.168.1.180:8083/agents/heartbeat}"
 
 post_actions_heartbeat() {
   if command -v python3 >/dev/null 2>&1; then
@@ -64,7 +64,7 @@ payload = {
 }
 body = json.dumps(payload).encode("utf-8")
 req = request.Request(
-    os.environ.get("ACTIONS_HEARTBEAT_URL", "http://127.0.0.1:8083/agents/heartbeat"),
+    os.environ.get("ACTIONS_HEARTBEAT_URL", "http://192.168.1.180:8083/agents/heartbeat"),
     data=body,
     headers={"Content-Type": "application/json"},
     method="POST",
