@@ -269,10 +269,19 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
                 </p>
               </div>
             </div>
-            <button onClick={loadDevice} disabled={refreshing} className="btn btn-secondary h-9 px-3">
-              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href={`/?panel=inventory&device=${encodeURIComponent(deviceId)}`}
+                className="btn btn-secondary h-9 px-3 text-primary-700"
+              >
+                <Database className="mr-2 h-4 w-4" />
+                Fleet inventory
+              </a>
+              <button onClick={loadDevice} disabled={refreshing} className="btn btn-secondary h-9 px-3">
+                <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
           </div>
         </div>
       </header>

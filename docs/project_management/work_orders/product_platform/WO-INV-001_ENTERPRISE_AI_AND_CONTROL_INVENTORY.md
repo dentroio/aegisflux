@@ -1,8 +1,10 @@
 # WO-INV-001: Enterprise AI and Control Inventory
 
-**Status:** Draft  
+**Status:** Done  
 **Phase:** Product Platform  
 **Primary owner:** Backend / UI / Agent  
+
+**Notes (2026-05-07):** Shipped console route `/inventory` (Discover → Inventory) with fleet KPIs and aggregated tables for browser extensions, enterprise browsers (from extension telemetry), SASE/SSE components, and AI-related DNS destinations, plus observe-only placeholders for IDE/CLI/local MCP/EDR categories. Uses existing `/api/visibility/*` proxies only. Device drill-in links to `/agents/[device_id]`; device header links to filtered fleet inventory (`?device=`).
 
 ## Goal
 

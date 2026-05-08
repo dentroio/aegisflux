@@ -1,7 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { AgentsManagementPanel } from '@/components/AgentsManagementPanel'
+import { InventoryPanel } from '@/components/InventoryPanel'
 import {
   Activity,
   AlertTriangle,
@@ -303,8 +306,8 @@ const ui: Record<string, CSSProperties> = {
   countPill: { borderRadius: 6, padding: '4px 8px', fontSize: 12, fontWeight: 700 },
   statusChip: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, border: '1px solid', padding: '4px 10px', fontSize: 12, fontWeight: 700 },
   freshDot: { display: 'inline-block', width: 10, height: 10, borderRadius: 999, flexShrink: 0 },
-  appShell: { display: 'flex', minHeight: '100vh', flexDirection: 'column' },
-  bodyShell: { display: 'flex', minHeight: 0, flex: 1 },
+  appShell: { display: 'flex', height: '100vh', flexDirection: 'column', overflow: 'hidden' },
+  bodyShell: { display: 'flex', minHeight: 0, flex: 1, overflow: 'hidden' },
   sidebar: {
     width: 264,
     flexShrink: 0,
@@ -584,9 +587,7 @@ const statusStyles: Record<'emerald' | 'amber' | 'slate', CSSProperties> = {
 const navGroups = [
   {
     label: 'Overview',
-    items: [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, active: true },
-    ],
+    items: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }],
   },
   {
     label: 'Discover',
@@ -634,7 +635,13 @@ const widgetCatalog = [
   { id: 'budget', icon: Cpu, title: 'Agent Budget', detail: 'near-zero idle, bounded collectors' },
 ] as const
 
-export default function AegisDashboard() {
+function AegisDashboardBody() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const panelParam = searchParams.get('panel')
+  const mainPanel = panelParam === 'agents' || panelParam === 'inventory' ? panelParam : 'dashboard'
+  const inventoryDeviceFilter = (searchParams.get('device') || '').trim()
+
   const [authChecked, setAuthChecked] = useState(false)
   const [authenticated, setAuthenticated] = useState(false)
   const [loginUser, setLoginUser] = useState('admin')
@@ -829,14 +836,65 @@ export default function AegisDashboard() {
                   <div style={ui.sideGroupLabel}>{group.label}</div>
                   {group.items.map((item) => {
                     const Icon = item.icon
-                    const active = 'active' in item && item.active
+                    const navActive =
+                      (item.id === 'dashboard' && mainPanel === 'dashboard') ||
+                      (item.id === 'agents' && mainPanel === 'agents') ||
+                      (item.id === 'inventory' && mainPanel === 'inventory')
+                    if (item.id === 'dashboard') {
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => router.replace('/', { scroll: false })}
+                          style={{
+                            ...ui.sideButton,
+                            ...(navActive ? ui.sideButtonActive : ui.sideButtonMuted),
+                          }}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {item.label}
+                        </button>
+                      )
+                    }
+                    if (item.id === 'agents') {
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => router.replace('/?panel=agents', { scroll: false })}
+                          style={{
+                            ...ui.sideButton,
+                            ...(navActive ? ui.sideButtonActive : ui.sideButtonMuted),
+                          }}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {item.label}
+                        </button>
+                      )
+                    }
+                    if (item.id === 'inventory') {
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => router.replace('/?panel=inventory', { scroll: false })}
+                          style={{
+                            ...ui.sideButton,
+                            ...(navActive ? ui.sideButtonActive : ui.sideButtonMuted),
+                          }}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {item.label}
+                        </button>
+                      )
+                    }
                     return (
                       <button
                         key={item.id}
                         type="button"
                         style={{
                           ...ui.sideButton,
-                          ...(active ? ui.sideButtonActive : ui.sideButtonMuted),
+                          ...(navActive ? ui.sideButtonActive : ui.sideButtonMuted),
                         }}
                       >
                         <Icon className="h-4 w-4" />
@@ -861,10 +919,14 @@ export default function AegisDashboard() {
             <div style={ui.breadcrumb}>
               <span>AegisFlux</span>
               <span>/</span>
-              <span style={{ color: '#0f172a', fontWeight: 650 }}>Dashboard</span>
+              <span style={{ color: '#0f172a', fontWeight: 650 }}>
+                {mainPanel === 'dashboard' ? 'Dashboard' : mainPanel === 'agents' ? 'Agents' : 'Inventory'}
+              </span>
             </div>
             <div style={ui.scrollArea}>
               <main className="mx-auto max-w-[1500px] px-5 py-6" style={ui.main}>
+                {mainPanel === 'dashboard' ? (
+                  <>
                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between" style={ui.titleRow}>
                   <div>
                     <div className="flex flex-wrap items-center gap-2" style={ui.titleLine}>
@@ -1001,12 +1063,35 @@ export default function AegisDashboard() {
 
           <AgentDetailPanel detail={selectedDetail} />
         </section>
+                  </>
+                ) : mainPanel === 'agents' ? (
+                  <AgentsManagementPanel embedded />
+                ) : (
+                  <InventoryPanel embedded deviceFilter={inventoryDeviceFilter} />
+                )}
       </main>
         </div>
       </div>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function AegisDashboard() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="flex min-h-screen items-center justify-center bg-slate-50 text-sm font-semibold text-slate-600"
+          style={ui.page}
+        >
+          Loading console…
+        </div>
+      }
+    >
+      <AegisDashboardBody />
+    </Suspense>
   )
 }
 
