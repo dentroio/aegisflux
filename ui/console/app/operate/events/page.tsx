@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ConsoleShell } from '@/components/shell/ConsoleShell'
-import { readLabAuthenticated } from '@/lib/labAuth'
+import { readLabAuthenticated } from '@/shared/labAuth'
 import type { HealthTone } from '@/components/shell/ConsoleShell'
 import { useRouter } from 'next/navigation'
 

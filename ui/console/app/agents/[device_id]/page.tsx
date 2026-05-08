@@ -19,7 +19,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { ConsoleShell } from '@/components/shell/ConsoleShell'
-import { readLabAuthenticated } from '@/lib/labAuth'
+import { readLabAuthenticated } from '@/shared/labAuth'
 
 type DeviceRecord = {
   device_id: string

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ConsoleShell } from '@/components/shell/ConsoleShell'
 import type { HealthTone } from '@/components/shell/ConsoleShell'
-import { readLabAuthenticated } from '@/lib/labAuth'
+import { readLabAuthenticated } from '@/shared/labAuth'
 
 export default function ConnectorsHubPage() {
   const router = useRouter()

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ConsoleShell } from '@/components/shell/ConsoleShell'
 import type { HealthTone } from '@/components/shell/ConsoleShell'
-import { readLabAuthenticated } from '@/lib/labAuth'
+import { readLabAuthenticated } from '@/shared/labAuth'
 
 type Privacy = Record<string, boolean>
 

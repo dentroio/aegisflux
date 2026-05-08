@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ConsoleShell } from '@/components/shell/ConsoleShell'
 import type { HealthTone } from '@/components/shell/ConsoleShell'
-import { readLabAuthenticated } from '@/lib/labAuth'
+import { readLabAuthenticated } from '@/shared/labAuth'
 
 type ShellHeroProps = {
   title: string
