@@ -34,6 +34,7 @@ These documents are the baseline for this program:
 - [Agent Performance Architecture](../../../AEGIS_AGENT_PERFORMANCE_ARCHITECTURE.md)
 - [UI Clarion Alignment](../../../AEGIS_UI_CLARION_ALIGNMENT.md)
 - [Clarion UI Patterns to Adopt](../../../AEGIS_CLARION_UI_PATTERNS_TO_ADOPT.md)
+- [AegisFlux UI Simplification Guide](../../../AEGIS_UI_SIMPLIFICATION_GUIDE.md)
 - [AegisFlux and Clarion Integration Contract](../../plans/AEGIS_CLARION_INTEGRATION_CONTRACT.md)
 
 ## Product Workflow Target
@@ -76,6 +77,11 @@ The AegisFlux UI should follow the Clarion shell pattern:
 | WO-CTRL-001 | Observe-Only Draft Controls and Simulation | Finding -> draft control -> historical match simulation | WO-PLAT-002, WO-DET-001 |
 | WO-PLAT-006 | Operational Event Feed | Auditable platform event feed for rollout, approval, AI, controls, and integration activity | WO-PLAT-001, WO-DET-002, WO-DET-003 |
 | WO-INT-001 | Clarion Integration API Slice | AegisFlux evidence export and Clarion import contract implementation | WO-PLAT-002, WO-INV-001 |
+| WO-UX-001 | Clarion-Style Dashboard Simplification | Dashboard scan surface with bounded widgets and deliberate click-throughs | WO-PLAT-001, WO-PLAT-003 |
+| WO-UX-002 | Interaction and String Formatting System | Shared bounded-detail and long-string formatting primitives | WO-UX-001 |
+| WO-UX-003 | Agents Workbench Simplification | Focused agents table/list without permanent long-scroll detail column | WO-UX-002, WO-PLAT-005 |
+| WO-UX-004 | Inventory Workbench Simplification | Searchable category-driven inventory workbench | WO-UX-002, WO-INV-001 |
+| WO-UX-005 | Detections, Control, and Operate UX Simplification | Bounded candidate/draft/event workflows | WO-UX-002, WO-DET-002, WO-CTRL-001, WO-PLAT-006 |
 
 ## Parallelization Guidance
 
@@ -93,6 +99,9 @@ These can run in parallel with low conflict:
 - WO-PLAT-005 should happen before AI-heavy endpoint work so the detail surface has the right Clarion-style structure.
 - WO-PLAT-006 can start once at least detection candidate/rollout events are available; it can add producers incrementally as AI, controls, and Clarion export work land.
 - WO-INT-001 should wait until the AegisFlux evidence model is not churning daily.
+- WO-UX-001 should run before adding new UI capability because the dashboard is currently carrying too much detail.
+- WO-UX-002 should follow WO-UX-001 so the later workbench pages share detail and string-formatting behavior.
+- WO-UX-003, WO-UX-004, and WO-UX-005 can run after WO-UX-002; keep their page ownership separate to avoid conflicts.
 
 ## Phase Exit Criteria
 
