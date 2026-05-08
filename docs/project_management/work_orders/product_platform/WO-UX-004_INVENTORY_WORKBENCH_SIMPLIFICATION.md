@@ -1,6 +1,6 @@
 # WO-UX-004: Inventory Workbench Simplification
 
-**Status:** Draft  
+**Status:** Implemented  
 **Phase:** Product Platform UX  
 **Primary owner:** UI  
 
@@ -56,3 +56,23 @@ Inventory data can easily become a long scroll of cards and raw fields. The oper
 - No new inventory collectors.
 - No enforcement action.
 - No broad backend schema redesign.
+
+## Implementation Notes
+
+### 2026-05-08 Implementation Update
+
+- Reworked `ui/console/components/InventoryPanel.tsx` into a category-driven workbench:
+  - summary strip by category
+  - segmented category controls
+  - shared search/filter bar
+  - one primary bounded table/list surface
+- Added inventory categories with operational scan focus:
+  - browser extensions
+  - AI IDE/CLI tools (process and DNS signal view)
+  - local model runtimes
+  - SASE/SSE control components
+  - unknown/unclassified signals
+- Added bounded item detail via shared `DetailModal` and removed stacked long-scroll category report behavior.
+- Applied shared formatting helpers for noisy values (ids, hostnames, paths, command lines, relative time).
+- Preserved deep-link behavior for `?device=` filter and agent route links.
+- Verification completed with `npm run build` in `ui/console` (pass).

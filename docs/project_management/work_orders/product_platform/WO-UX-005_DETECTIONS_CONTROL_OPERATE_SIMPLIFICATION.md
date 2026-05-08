@@ -1,6 +1,6 @@
 # WO-UX-005: Detections, Control, and Operate UX Simplification
 
-**Status:** Draft  
+**Status:** Implemented  
 **Phase:** Product Platform UX  
 **Primary owner:** UI  
 
@@ -56,3 +56,23 @@ These pages contain important operational data, but candidates, rollout status, 
 - Do not alter detection-pack lifecycle semantics.
 - Do not add enforcement.
 - Do not redesign the entire console shell.
+
+## Implementation Notes
+
+### 2026-05-08 Implementation Update
+
+- Detection Packs (`ui/console/app/detections/page.tsx`)
+  - Reshaped into segmented views: `Candidates`, `Signed packs`, and `Rollout`.
+  - Kept candidate queue as primary work surface with compact action controls.
+  - Replaced permanent selected-candidate side detail with bounded `DetailModal`.
+  - Added explicit `Show raw` toggle for modal payload detail.
+- Draft Controls (`ui/console/app/control/controls/page.tsx`)
+  - Focused on draft queue + simulation workflow with bounded table/list.
+  - Moved create/edit workflow into a compact modal form.
+  - Added bounded detail modal with explicit `Show raw` toggle.
+- Operational Events (`ui/console/app/operate/events/page.tsx`)
+  - Converted to filterable bounded table with status chips/filters.
+  - Added bounded event detail modal.
+  - Raw payload now hidden behind explicit `Show raw` toggle.
+- Applied shared formatting helpers for ids and time displays.
+- Verification completed with `npm run build` in `ui/console` (pass).

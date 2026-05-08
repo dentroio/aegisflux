@@ -6,6 +6,8 @@ import { ConsoleShell } from '@/components/shell/ConsoleShell'
 import { readLabAuthenticated } from '@/shared/labAuth'
 import type { HealthTone } from '@/components/shell/ConsoleShell'
 import { useRouter } from 'next/navigation'
+import { BoundedTable, DetailModal, EmptyState, FilterBar, KpiTile, SummaryStrip } from '@/components/workbench/primitives'
+import { formatHash, formatRelativeAge } from '@/shared/formatting'
 
 type OpEvent = {
   id: string
@@ -23,6 +25,9 @@ export default function OperationalEventFeedPage() {
   const [gate, setGate] = useState(false)
   const [events, setEvents] = useState<OpEvent[]>([])
   const [filter, setFilter] = useState('')
+  const [selectedStatus, setSelectedStatus] = useState<'all' | 'ok' | 'error' | 'other'>('all')
+  const [detailModal, setDetailModal] = useState<{ title: string; payload: unknown } | null>(null)
+  const [showRaw, setShowRaw] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
@@ -49,9 +54,16 @@ export default function OperationalEventFeedPage() {
 
   const health = { label: 'Operate', tone: 'slate' as HealthTone, text: 'Operational events' }
   const needle = filter.trim().toLowerCase()
-  const visible = needle
-    ? events.filter((ev) => JSON.stringify(ev).toLowerCase().includes(needle))
-    : events
+  const visible = events.filter((ev) => {
+    if (needle && !JSON.stringify(ev).toLowerCase().includes(needle)) return false
+    if (selectedStatus === 'all') return true
+    const st = (ev.status || '').toLowerCase()
+    if (selectedStatus === 'ok') return st === 'ok' || st === 'success'
+    if (selectedStatus === 'error') return st === 'error' || st === 'failed'
+    return st !== 'ok' && st !== 'success' && st !== 'error' && st !== 'failed'
+  })
+  const okCount = events.filter((ev) => ['ok', 'success'].includes((ev.status || '').toLowerCase())).length
+  const errCount = events.filter((ev) => ['error', 'failed'].includes((ev.status || '').toLowerCase())).length
 
   if (!gate) {
     return <div className="flex min-h-screen items-center justify-center text-sm text-gray-600">Loading…</div>
@@ -69,38 +81,99 @@ export default function OperationalEventFeedPage() {
             Dashboard
           </Link>
         </div>
-        <input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="mb-4 w-full max-w-md rounded border border-gray-300 px-3 py-2 text-sm"
-          placeholder="Filter type, subject, device…"
-        />
+        <SummaryStrip>
+          <KpiTile label="Total events" value={events.length} />
+          <KpiTile label="Success" value={okCount} />
+          <KpiTile label="Errors" value={errCount} />
+          <KpiTile label="Visible" value={visible.length} />
+        </SummaryStrip>
+        <FilterBar>
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="input h-9 min-w-[220px] max-w-md"
+            placeholder="Filter type, subject, device..."
+          />
+          {([
+            ['all', 'All'],
+            ['ok', 'Success'],
+            ['error', 'Errors'],
+            ['other', 'Other'],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSelectedStatus(id)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                selectedStatus === id ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-700'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </FilterBar>
         {err && <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{err}</div>}
         {visible.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-sm text-gray-600">
-            {events.length === 0 ? 'No operational events recorded yet.' : 'No events match this filter.'}
-          </div>
+          <EmptyState title="No events" message={events.length === 0 ? 'No operational events recorded yet.' : 'No events match this filter.'} />
         ) : (
-          <ul className="space-y-2">
-            {visible.map((ev) => (
-              <li key={ev.id} className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                  <span className="font-mono">{new Date(ev.created_at_ms).toLocaleString()}</span>
-                  <span className="rounded bg-slate-100 px-2 py-0.5 font-semibold text-slate-800">{ev.event_type}</span>
-                  {ev.status ? <span className="rounded bg-blue-50 px-2 py-0.5 text-blue-900">{ev.status}</span> : null}
-                </div>
-                <p className="mt-2 text-gray-900">{ev.description}</p>
-                {(ev.subject || ev.device_id) && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    {ev.subject && <span className="mr-3">Subject: {ev.subject}</span>}
-                    {ev.device_id && <span>Device: {ev.device_id}</span>}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
+          <BoundedTable
+            headers={['Time', 'Type', 'Status', 'Description', 'Subject/Device', 'Detail']}
+            rows={visible.map((ev) => ([
+              <span key={`${ev.id}-time`} className="text-xs text-gray-600" title={new Date(ev.created_at_ms).toLocaleString()}>
+                {formatRelativeAge(ev.created_at_ms)}
+              </span>,
+              <span key={`${ev.id}-type`} className="text-xs font-semibold text-slate-800">{ev.event_type}</span>,
+              <span key={`${ev.id}-status`} className="text-xs text-gray-600">{ev.status || 'n/a'}</span>,
+              <span key={`${ev.id}-desc`} className="text-sm text-gray-900">{ev.description}</span>,
+              <span key={`${ev.id}-subject`} className="text-xs text-gray-600">
+                {ev.subject ? `subject:${formatHash(ev.subject)}` : ''} {ev.device_id ? `device:${formatHash(ev.device_id)}` : ''}
+              </span>,
+              <button
+                key={`${ev.id}-detail`}
+                type="button"
+                className="text-xs font-semibold text-primary-700"
+                onClick={() => {
+                  setShowRaw(false)
+                  setDetailModal({ title: `${ev.event_type} (${ev.id})`, payload: ev })
+                }}
+              >
+                View detail
+              </button>,
+            ]))}
+          />
         )}
       </main>
+      <DetailModal
+        open={Boolean(detailModal)}
+        title={detailModal?.title || 'Event detail'}
+        detail={showRaw ? detailModal?.payload || {} : summarizeEvent(detailModal?.payload)}
+        onClose={() => {
+          setDetailModal(null)
+          setShowRaw(false)
+        }}
+      />
+      {detailModal ? (
+        <div className="fixed bottom-4 right-4 z-10">
+          <button type="button" className="btn btn-secondary h-8 px-2 text-xs" onClick={() => setShowRaw((v) => !v)}>
+            {showRaw ? 'Show summary' : 'Show raw'}
+          </button>
+        </div>
+      ) : null}
     </ConsoleShell>
   )
+}
+
+function summarizeEvent(payload: unknown) {
+  if (!payload || typeof payload !== 'object') return payload
+  const ev = payload as OpEvent
+  return {
+    id: ev.id,
+    created_at: new Date(ev.created_at_ms).toLocaleString(),
+    event_type: ev.event_type,
+    status: ev.status || 'n/a',
+    description: ev.description,
+    subject: ev.subject || 'n/a',
+    device_id: ev.device_id || 'n/a',
+    agent_uid: ev.agent_uid || 'n/a',
+  }
 }

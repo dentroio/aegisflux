@@ -12,7 +12,18 @@ import {
   Shield,
   Terminal,
   Wrench,
+  Search,
 } from 'lucide-react'
+import {
+  BoundedTable,
+  DetailModal,
+  EmptyState,
+  FilterBar,
+  KpiTile,
+  SummaryStrip,
+  WorkbenchHeader,
+} from '@/components/workbench/primitives'
+import { formatCommandLine, formatHash, formatHostname, formatPath, formatRelativeAge } from '@/shared/formatting'
 
 type EventRecord = {
   event_id: string
@@ -78,6 +89,9 @@ export function InventoryPanel({
   const [dns, setDns] = useState<DnsRecord[]>([])
   const [processes, setProcesses] = useState<ProcessRecord[]>([])
   const [findings, setFindings] = useState<FindingRecord[]>([])
+  const [category, setCategory] = useState<'extensions' | 'ai_tools' | 'local_models' | 'sase' | 'unknown'>('extensions')
+  const [query, setQuery] = useState('')
+  const [detailModal, setDetailModal] = useState<{ title: string; payload: unknown } | null>(null)
 
   const load = useCallback(async () => {
     setRefreshing(true)
@@ -125,6 +139,58 @@ export function InventoryPanel({
   }, [model.saseAggregates])
 
   const clearFilterHref = embedded ? '/?panel=inventory' : '/inventory'
+  const queryNeedle = query.trim().toLowerCase()
+
+  const aiToolRows = useMemo(() => {
+    const processRows = processes
+      .filter((row) => AI_PATTERN.test(`${row.name || ''} ${row.path || ''} ${row.command_line || ''}`))
+      .map((row) => ({
+        type: 'process',
+        name: row.name || 'unknown-process',
+        descriptor: row.path || row.command_line || 'n/a',
+        device_id: row.device_id || 'unknown',
+      }))
+    const dnsRows = model.aiDnsAggregates.map((row) => ({
+      type: 'dns',
+      name: row.query,
+      descriptor: `${row.device_ids.length} endpoint(s)`,
+      device_id: row.device_ids[0] || 'unknown',
+    }))
+    return [...processRows, ...dnsRows]
+  }, [processes, model.aiDnsAggregates])
+
+  const localRuntimeRows = useMemo(
+    () =>
+      processes
+        .filter((row) => /ollama|vllm|llama|mistral|litellm|localai/i.test(`${row.name || ''} ${row.path || ''} ${row.command_line || ''}`))
+        .map((row) => ({
+          name: row.name || 'runtime',
+          command: row.command_line || row.path || 'n/a',
+          device_id: row.device_id || 'unknown',
+        })),
+    [processes],
+  )
+
+  const unknownRows = useMemo(
+    () =>
+      findings
+        .filter((row) => !AI_PATTERN.test(`${row.title || ''} ${row.classification || ''} ${(row.detected_patterns || []).join(' ')}`))
+        .map((row) => ({
+          title: row.title || 'unknown finding',
+          classification: row.classification || 'unclassified',
+          device_id: row.device_id || 'unknown',
+          patterns: (row.detected_patterns || []).join(', ') || 'n/a',
+        })),
+    [findings],
+  )
+
+  const categoryCounts = {
+    extensions: model.extensionAggregates.length,
+    ai_tools: aiToolRows.length,
+    local_models: localRuntimeRows.length,
+    sase: model.saseAggregates.length,
+    unknown: unknownRows.length,
+  }
 
   return (
     <div className={embedded ? 'bg-gray-50' : 'min-h-screen bg-gray-50'}>
@@ -182,253 +248,183 @@ export function InventoryPanel({
         </div>
 
         {loading ? (
-          <p className="text-center text-gray-500">Loading visibility inventory…</p>
+          <EmptyState title="Loading inventory" message="Collecting extension, DNS, process, and control telemetry." />
         ) : (
           <>
-            <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <FleetCard icon={Server} label="Fleet endpoints" value={devices.length} detail="From visibility devices API" />
-              <FleetCard
-                icon={Chrome}
-                label="Browsers observed"
-                value={model.uniqueBrowsers}
-                detail="Distinct browser products in extension telemetry"
-              />
-              <FleetCard
-                icon={Database}
-                label="Extension SKUs"
-                value={model.extensionAggregates.length}
-                detail={`Across ${fleetDevicesWithExtensions} endpoint${fleetDevicesWithExtensions === 1 ? '' : 's'}`}
-              />
-              <FleetCard
-                icon={LockKeyhole}
-                label="SASE / SSE components"
-                value={model.saseAggregates.length}
-                detail={`Across ${fleetDevicesWithSase} endpoint${fleetDevicesWithSase === 1 ? '' : 's'}`}
-              />
-              <FleetCard
-                icon={Bot}
-                label="AI DNS destinations"
-                value={model.aiDnsAggregates.length}
-                detail="Distinct AI-related queries in DNS window"
-              />
-              <FleetCard
-                icon={Terminal}
-                label="AI process signals"
-                value={model.aiProcessCount}
-                detail="Processes matching AI/tooling heuristics"
-              />
-              <FleetCard
-                icon={Shield}
-                label="AI-related findings"
-                value={model.aiFindingCount}
-                detail="Findings matching AI heuristics"
-              />
-              <FleetCard
-                icon={Monitor}
-                label="Raw extension events"
-                value={extensionEvents.length}
-                detail="Ingest window for this view"
-              />
+            <WorkbenchHeader
+              title="Inventory Workbench"
+              subtitle="Category-driven inventory with deliberate bounded details."
+              actions={
+                <button type="button" onClick={() => void load()} disabled={refreshing} className="btn btn-secondary h-9 px-3">
+                  <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              }
+            />
+
+            <SummaryStrip>
+              <KpiTile label="Fleet endpoints" value={devices.length} />
+              <KpiTile label="Browser extensions" value={model.extensionAggregates.length} />
+              <KpiTile label="AI IDE/CLI tools" value={aiToolRows.length} />
+              <KpiTile label="Local runtimes" value={localRuntimeRows.length} />
+              <KpiTile label="SASE/SSE controls" value={model.saseAggregates.length} />
+              <KpiTile label="Unknown signals" value={unknownRows.length} />
+            </SummaryStrip>
+
+            <FilterBar>
+              {([
+                ['extensions', 'Browser extensions'],
+                ['ai_tools', 'AI IDE/CLI tools'],
+                ['local_models', 'Local model runtimes'],
+                ['sase', 'SASE/SSE controls'],
+                ['unknown', 'Unknown signals'],
+              ] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setCategory(id)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                    category === id ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  {label} ({categoryCounts[id]})
+                </button>
+              ))}
+              <label className="relative min-w-[220px] flex-1">
+                <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  className="input h-9 pl-9"
+                  placeholder="Search inventory values"
+                />
+              </label>
+            </FilterBar>
+
+            <section className="card p-5">
+              {category === 'extensions' && (
+                model.extensionAggregates.length === 0 ? (
+                  <EmptyState title="No browser extensions" message="Extension telemetry will populate this category when observed." />
+                ) : (
+                  <BoundedTable
+                    headers={['Name', 'Extension id', 'Version', 'Source', 'Evidence', 'Last seen', 'Devices', 'Action']}
+                    rows={model.extensionAggregates
+                      .filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle))
+                      .map((row) => ([
+                        <span key={`${row.extension_id}-name`} className="text-sm font-medium text-gray-900">{formatHostname(row.name)}</span>,
+                        <span key={`${row.extension_id}-id`} className="font-mono text-xs" title={row.extension_id}>{formatHash(row.extension_id)}</span>,
+                        <span key={`${row.extension_id}-version`} className="text-xs text-gray-600">{row.version || 'n/a'}</span>,
+                        <span key={`${row.extension_id}-source`} className="text-xs text-gray-600">{row.source || 'telemetry'}</span>,
+                        <span key={`${row.extension_id}-evidence`} className="text-xs text-gray-600" title={row.evidenceSummary}>{formatCommandLine(row.evidenceSummary)}</span>,
+                        <span key={`${row.extension_id}-seen`} className="text-xs text-gray-600" title={formatMs(row.last_seen_ms)}>{formatRelativeAge(row.last_seen_ms)}</span>,
+                        <DeviceLinks key={`${row.extension_id}-devices`} deviceIds={row.device_ids} />,
+                        <button
+                          key={`${row.extension_id}-action`}
+                          className="text-xs font-semibold text-primary-700 hover:text-primary-900"
+                          onClick={() => setDetailModal({ title: `Extension: ${row.name}`, payload: row })}
+                        >
+                          View detail
+                        </button>,
+                      ]))}
+                  />
+                )
+              )}
+
+              {category === 'ai_tools' && (
+                aiToolRows.filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle)).length === 0 ? (
+                  <EmptyState title="No AI IDE/CLI signals" message="AI tool process or DNS signals are not present in this window." />
+                ) : (
+                  <BoundedTable
+                    headers={['Type', 'Signal', 'Descriptor', 'Device', 'Action']}
+                    rows={aiToolRows
+                      .filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle))
+                      .map((row, idx) => ([
+                        <span key={`type-${idx}`} className="text-xs text-gray-600">{row.type}</span>,
+                        <span key={`name-${idx}`} className="text-sm font-medium text-gray-900">{formatHostname(row.name)}</span>,
+                        <span key={`desc-${idx}`} className="text-xs text-gray-600" title={row.descriptor}>{formatCommandLine(row.descriptor)}</span>,
+                        <span key={`dev-${idx}`} className="font-mono text-xs">{formatHash(row.device_id)}</span>,
+                        <button key={`action-${idx}`} className="text-xs font-semibold text-primary-700" onClick={() => setDetailModal({ title: `AI tool signal: ${row.name}`, payload: row })}>
+                          View detail
+                        </button>,
+                      ]))}
+                  />
+                )
+              )}
+
+              {category === 'local_models' && (
+                localRuntimeRows.filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle)).length === 0 ? (
+                  <EmptyState title="No local model runtimes" message="No Ollama/vLLM/local runtime signals observed in this window." />
+                ) : (
+                  <BoundedTable
+                    headers={['Runtime', 'Command', 'Device', 'Action']}
+                    rows={localRuntimeRows
+                      .filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle))
+                      .map((row, idx) => ([
+                        <span key={`name-${idx}`} className="text-sm font-medium text-gray-900">{row.name}</span>,
+                        <span key={`cmd-${idx}`} className="text-xs text-gray-600" title={row.command}>{formatPath(row.command)}</span>,
+                        <span key={`dev-${idx}`} className="font-mono text-xs">{formatHash(row.device_id)}</span>,
+                        <button key={`action-${idx}`} className="text-xs font-semibold text-primary-700" onClick={() => setDetailModal({ title: `Local runtime: ${row.name}`, payload: row })}>
+                          View detail
+                        </button>,
+                      ]))}
+                  />
+                )
+              )}
+
+              {category === 'sase' && (
+                model.saseAggregates.filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle)).length === 0 ? (
+                  <EmptyState title="No SASE/SSE controls" message="Control component telemetry appears here when observed." />
+                ) : (
+                  <BoundedTable
+                    headers={['Vendor', 'Product', 'Name', 'Type', 'Status', 'Last seen', 'Devices', 'Action']}
+                    rows={model.saseAggregates
+                      .filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle))
+                      .map((row) => ([
+                        <span key={`${row.key}-vendor`} className="text-sm font-medium text-gray-900">{formatHostname(row.vendor)}</span>,
+                        <span key={`${row.key}-product`} className="text-xs text-gray-600">{formatHostname(row.product)}</span>,
+                        <span key={`${row.key}-name`} className="text-xs text-gray-600">{formatHostname(row.name)}</span>,
+                        <span key={`${row.key}-type`} className="text-xs text-gray-600">{row.component_type || 'n/a'}</span>,
+                        <span key={`${row.key}-status`} className="text-xs text-gray-600">{row.status || 'n/a'}</span>,
+                        <span key={`${row.key}-seen`} className="text-xs text-gray-600" title={formatMs(row.last_seen_ms)}>{formatRelativeAge(row.last_seen_ms)}</span>,
+                        <DeviceLinks key={`${row.key}-devices`} deviceIds={row.device_ids} />,
+                        <button key={`${row.key}-action`} className="text-xs font-semibold text-primary-700" onClick={() => setDetailModal({ title: `SASE/SSE: ${row.vendor} ${row.product}`, payload: row })}>
+                          View detail
+                        </button>,
+                      ]))}
+                  />
+                )
+              )}
+
+              {category === 'unknown' && (
+                unknownRows.filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle)).length === 0 ? (
+                  <EmptyState title="No unknown signals" message="Unclassified inventory-like findings will appear here." />
+                ) : (
+                  <BoundedTable
+                    headers={['Title', 'Classification', 'Patterns', 'Device', 'Action']}
+                    rows={unknownRows
+                      .filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle))
+                      .map((row, idx) => ([
+                        <span key={`title-${idx}`} className="text-sm font-medium text-gray-900">{formatHostname(row.title)}</span>,
+                        <span key={`class-${idx}`} className="text-xs text-gray-600">{row.classification}</span>,
+                        <span key={`patterns-${idx}`} className="text-xs text-gray-600" title={row.patterns}>{formatCommandLine(row.patterns)}</span>,
+                        <span key={`dev-${idx}`} className="font-mono text-xs">{formatHash(row.device_id)}</span>,
+                        <button key={`action-${idx}`} className="text-xs font-semibold text-primary-700" onClick={() => setDetailModal({ title: `Unknown signal: ${row.title}`, payload: row })}>
+                          View detail
+                        </button>,
+                      ]))}
+                  />
+                )
+              )}
             </section>
-
-            <InventorySection
-              id="browser-extensions"
-              title="Browser extensions"
-              subtitle="From aegis.browser_extension.observed"
-              icon={Chrome}
-              rows={model.extensionAggregates.length}
-            >
-              {model.extensionAggregates.length === 0 ? (
-                <EmptyCategory message="Deploy the Windows agent lab profile and browse with extensions enabled to populate this category." />
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead>
-                      <tr className="text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                        <th className="py-2 pr-4">Name</th>
-                        <th className="py-2 pr-4">Extension ID</th>
-                        <th className="py-2 pr-4">Version</th>
-                        <th className="py-2 pr-4">Source</th>
-                        <th className="py-2 pr-4">Evidence</th>
-                        <th className="py-2 pr-4">First / last seen</th>
-                        <th className="py-2 pr-4">Devices</th>
-                        <th className="py-2 pr-4">Confidence</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {model.extensionAggregates.map((row) => (
-                        <tr key={row.extension_id}>
-                          <td className="py-3 pr-4 font-medium text-gray-900">{row.name}</td>
-                          <td className="max-w-[140px] truncate py-3 pr-4 font-mono text-xs text-gray-700">{row.extension_id}</td>
-                          <td className="py-3 pr-4 text-gray-700">{row.version}</td>
-                          <td className="py-3 pr-4 text-gray-600">{row.source}</td>
-                          <td className="max-w-xs py-3 pr-4 text-xs text-gray-600" title={row.evidenceSummary}>
-                            {truncate(row.evidenceSummary, 80)}
-                          </td>
-                          <td className="whitespace-nowrap py-3 pr-4 text-xs text-gray-600">
-                            {formatMs(row.first_seen_ms)} → {formatMs(row.last_seen_ms)}
-                          </td>
-                          <td className="py-3 pr-4">
-                            <DeviceLinks deviceIds={row.device_ids} />
-                          </td>
-                          <td className="py-3 pr-4 text-xs text-gray-600">{row.confidence}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </InventorySection>
-
-            <InventorySection
-              id="enterprise-browsers"
-              title="Enterprise browsers"
-              subtitle="Distinct browser hosts from extension telemetry"
-              icon={Monitor}
-              rows={model.browserAggregates.length}
-            >
-              {model.browserAggregates.length === 0 ? (
-                <EmptyCategory message="Browser family is inferred from extension observations only." />
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead>
-                      <tr className="text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                        <th className="py-2 pr-4">Browser</th>
-                        <th className="py-2 pr-4">Endpoints</th>
-                        <th className="py-2 pr-4">Devices</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {model.browserAggregates.map((row) => (
-                        <tr key={row.browser}>
-                          <td className="py-3 pr-4 font-medium text-gray-900">{row.browser}</td>
-                          <td className="py-3 pr-4 text-gray-700">{row.device_ids.length}</td>
-                          <td className="py-3 pr-4">
-                            <DeviceLinks deviceIds={row.device_ids} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </InventorySection>
-
-            <InventorySection
-              id="sase-sse"
-              title="SASE / SSE components"
-              subtitle="From aegis.sase_component.observed (Palo Alto, Zscaler, Cisco, …)"
-              icon={LockKeyhole}
-              rows={model.saseAggregates.length}
-            >
-              {model.saseAggregates.length === 0 ? (
-                <EmptyCategory message="When endpoint agents observe Zscaler, GlobalProtect, or similar components, they appear here." />
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead>
-                      <tr className="text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                        <th className="py-2 pr-4">Vendor</th>
-                        <th className="py-2 pr-4">Product</th>
-                        <th className="py-2 pr-4">Name</th>
-                        <th className="py-2 pr-4">Type</th>
-                        <th className="py-2 pr-4">Version</th>
-                        <th className="py-2 pr-4">Status</th>
-                        <th className="py-2 pr-4">Evidence</th>
-                        <th className="py-2 pr-4">First / last seen</th>
-                        <th className="py-2 pr-4">Devices</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {model.saseAggregates.map((row) => (
-                        <tr key={row.key}>
-                          <td className="py-3 pr-4 font-medium text-gray-900">{row.vendor}</td>
-                          <td className="py-3 pr-4 text-gray-700">{row.product}</td>
-                          <td className="py-3 pr-4 text-gray-800">{row.name}</td>
-                          <td className="py-3 pr-4 text-gray-600">{row.component_type}</td>
-                          <td className="py-3 pr-4 text-gray-600">{row.version || 'n/a'}</td>
-                          <td className="py-3 pr-4 text-gray-600">{row.status || 'n/a'}</td>
-                          <td className="max-w-xs py-3 pr-4 text-xs text-gray-600">{truncate(row.evidence.join('; '), 96)}</td>
-                          <td className="whitespace-nowrap py-3 pr-4 text-xs text-gray-600">
-                            {formatMs(row.first_seen_ms)} → {formatMs(row.last_seen_ms)}
-                          </td>
-                          <td className="py-3 pr-4">
-                            <DeviceLinks deviceIds={row.device_ids} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </InventorySection>
-
-            <InventorySection
-              id="ai-destinations"
-              title="AI destinations (DNS)"
-              subtitle="Heuristic match on DNS queries in the visibility window"
-              icon={Bot}
-              rows={model.aiDnsAggregates.length}
-            >
-              {model.aiDnsAggregates.length === 0 ? (
-                <EmptyCategory message="DNS observations with vendor AI hostnames will roll up here for fleet context." />
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead>
-                      <tr className="text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                        <th className="py-2 pr-4">Query</th>
-                        <th className="py-2 pr-4">Endpoints</th>
-                        <th className="py-2 pr-4">Devices</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {model.aiDnsAggregates.map((row) => (
-                        <tr key={row.query}>
-                          <td className="py-3 pr-4 font-mono text-xs font-medium text-gray-900">{row.query}</td>
-                          <td className="py-3 pr-4 text-gray-700">{row.device_ids.length}</td>
-                          <td className="py-3 pr-4">
-                            <DeviceLinks deviceIds={row.device_ids} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </InventorySection>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <PlaceholderCategory
-                icon={Wrench}
-                title="IDE extensions"
-                body="No IDE extension telemetry is wired yet. This category will list VS Code / JetBrains style signals when collectors emit them."
-              />
-              <PlaceholderCategory
-                icon={Terminal}
-                title="CLI AI tools"
-                body="CLI inventory will roll up from process and shell evidence when dedicated events land."
-              />
-              <PlaceholderCategory
-                icon={Server}
-                title="Local model runtimes"
-                body="Ollama, vLLM, and similar local runtimes will appear here from process and network heuristics."
-              />
-              <PlaceholderCategory
-                icon={Bot}
-                title="MCP clients / servers"
-                body="Model Context Protocol endpoints will be classified when MCP-specific telemetry is available."
-              />
-              <PlaceholderCategory
-                icon={Shield}
-                title="EDR / MDM / security agents"
-                body="Third-party security agent inventory is out of scope for this slice; use agent and process views for raw evidence."
-              />
-            </div>
           </>
         )}
       </div>
+      <DetailModal
+        open={Boolean(detailModal)}
+        title={detailModal?.title || 'Inventory detail'}
+        detail={detailModal?.payload || {}}
+        onClose={() => setDetailModal(null)}
+      />
     </div>
   )
 }

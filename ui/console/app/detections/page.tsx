@@ -14,6 +14,16 @@ import {
   ShieldQuestion,
   XCircle
 } from 'lucide-react'
+import {
+  BoundedTable,
+  DetailModal,
+  EmptyState,
+  FilterBar,
+  KpiTile,
+  SummaryStrip,
+  WorkbenchHeader,
+} from '@/components/workbench/primitives'
+import { formatHash, formatRelativeAge } from '@/shared/formatting'
 
 type CandidateStatus =
   | 'draft'
@@ -176,17 +186,14 @@ export default function DetectionPacksPage() {
   const [signedPacks, setSignedPacks] = useState<SignedPack[]>([])
   const [signerInfo, setSignerInfo] = useState<SignerInfo | null>(null)
   const [rollouts, setRollouts] = useState<Record<string, RolloutStatus>>({})
-  const [selectedCandidateID, setSelectedCandidateID] = useState<string>('')
-  const [validations, setValidations] = useState<ValidationRun[]>([])
+  const [view, setView] = useState<'queue' | 'signed' | 'rollout'>('queue')
+  const [query, setQuery] = useState('')
+  const [detailModal, setDetailModal] = useState<{ title: string; payload: unknown } | null>(null)
+  const [rawMode, setRawMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [actingID, setActingID] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  const selectedCandidate = useMemo(
-    () => candidates.find((candidate) => candidate.id === selectedCandidateID) || candidates[0],
-    [candidates, selectedCandidateID]
-  )
 
   const refresh = async () => {
     try {
@@ -203,7 +210,6 @@ export default function DetectionPacksPage() {
       setCandidates(candidateItems)
       setSignedPacks(signedItems)
       setSignerInfo(signerData)
-      setSelectedCandidateID((current) => current || candidateItems[0]?.id || '')
 
       const packIDs = Array.from(new Set(signedItems.map((pack) => pack.pack_id).filter(Boolean))) as string[]
       const rolloutEntries = await Promise.all(
@@ -236,16 +242,6 @@ export default function DetectionPacksPage() {
     const interval = setInterval(refresh, 30000)
     return () => clearInterval(interval)
   }, [])
-
-  useEffect(() => {
-    if (!selectedCandidate?.id) {
-      setValidations([])
-      return
-    }
-    fetchJSON<{ items: ValidationRun[] }>(`/api/detection/candidates/${encodeURIComponent(selectedCandidate.id)}/validations`)
-      .then((data) => setValidations(data.items || []))
-      .catch(() => setValidations([]))
-  }, [selectedCandidate?.id])
 
   const runAction = async (candidate: Candidate, action: 'validate' | 'approve' | 'reject' | 'sign') => {
     try {
@@ -283,29 +279,48 @@ export default function DetectionPacksPage() {
     { agents: 0, applied: 0, rejected: 0, incompatible: 0, expired: 0, stale: 0 }
   )
 
+  const queueRows = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    const source = candidates.filter((candidate) =>
+      !needle || JSON.stringify(candidate).toLowerCase().includes(needle)
+    )
+    return source
+  }, [candidates, query])
+
+  const signedRows = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    return signedPacks.filter((pack) => !needle || JSON.stringify(pack).toLowerCase().includes(needle))
+  }, [signedPacks, query])
+
+  const rolloutRows = useMemo(() => {
+    const flattened = Object.entries(rollouts).flatMap(([packID, rollout]) =>
+      rollout.agents.map((agent) => ({ packID, rollout, agent }))
+    )
+    const needle = query.trim().toLowerCase()
+    return flattened.filter((row) => !needle || JSON.stringify(row).toLowerCase().includes(needle))
+  }, [rollouts, query])
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-4">
-              <a href="/" className="flex items-center text-gray-600 hover:text-gray-900">
-                <ArrowLeft className="h-5 w-5 mr-2" />
-                Back to Dashboard
-              </a>
-              <div className="hidden h-6 w-px bg-gray-300 md:block" />
-              <div className="flex items-center gap-3">
-                <ShieldCheck className="h-8 w-8 text-primary-600" />
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Detection Packs</h1>
-                  <p className="text-sm text-gray-500">Candidate review, signing, and lab rollout status</p>
-                </div>
-              </div>
-            </div>
-            <button onClick={refresh} disabled={refreshing} className="btn btn-secondary px-4 py-2">
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+          <div className="py-6">
+            <WorkbenchHeader
+              title="Detection Packs"
+              subtitle="Primary task: work the candidate queue, then verify signed and rollout state."
+              actions={
+                <>
+                  <a href="/" className="btn btn-secondary h-9 px-3">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Dashboard
+                  </a>
+                  <button onClick={refresh} disabled={refreshing} className="btn btn-secondary h-9 px-3">
+                    <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </button>
+                </>
+              }
+            />
           </div>
         </div>
       </header>
@@ -320,221 +335,124 @@ export default function DetectionPacksPage() {
           </div>
         )}
 
-        <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-6">
-          <Metric icon={<ShieldQuestion className="h-5 w-5" />} label="Candidates" value={candidates.length} />
-          <Metric icon={<Clock className="h-5 w-5" />} label="Review" value={counts.ready_for_review || 0} />
-          <Metric icon={<CheckCircle className="h-5 w-5" />} label="Signed" value={signedPacks.length} />
-          <Metric icon={<FileCheck2 className="h-5 w-5" />} label="Agents" value={rolloutTotals.agents} />
-          <Metric icon={<CheckCircle className="h-5 w-5" />} label="Applied" value={rolloutTotals.applied} />
-          <Metric icon={<XCircle className="h-5 w-5" />} label="Needs attention" value={rolloutTotals.rejected + rolloutTotals.incompatible + rolloutTotals.expired + rolloutTotals.stale} />
-        </div>
+        <SummaryStrip>
+          <KpiTile label="Candidates" value={candidates.length} />
+          <KpiTile label="Ready for review" value={counts.ready_for_review || 0} />
+          <KpiTile label="Signed packs" value={signedPacks.length} />
+          <KpiTile label="Agents reporting" value={rolloutTotals.agents} />
+          <KpiTile label="Applied" value={rolloutTotals.applied} />
+          <KpiTile label="Needs attention" value={rolloutTotals.rejected + rolloutTotals.incompatible + rolloutTotals.expired + rolloutTotals.stale} />
+        </SummaryStrip>
 
-        <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
-          <section className="card xl:col-span-2">
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">Candidate Pipeline</h2>
-              <p className="text-sm text-gray-500">Validate, approve, reject, and sign detection-pack candidates.</p>
-            </div>
-            <div className="divide-y divide-gray-200">
-              {loading ? (
-                <p className="p-6 text-sm text-gray-500">Loading candidates...</p>
-              ) : candidates.length === 0 ? (
-                <p className="p-6 text-sm text-gray-500">No detection candidates are available.</p>
-              ) : candidates.map((candidate) => (
-                <div
-                  key={candidate.id}
-                  onClick={() => setSelectedCandidateID(candidate.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      setSelectedCandidateID(candidate.id)
+        <FilterBar>
+          <button type="button" onClick={() => setView('queue')} className={`rounded-full border px-3 py-1 text-xs font-semibold ${view === 'queue' ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>Candidates</button>
+          <button type="button" onClick={() => setView('signed')} className={`rounded-full border px-3 py-1 text-xs font-semibold ${view === 'signed' ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>Signed packs</button>
+          <button type="button" onClick={() => setView('rollout')} className={`rounded-full border px-3 py-1 text-xs font-semibold ${view === 'rollout' ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>Rollout</button>
+          <input value={query} onChange={(e) => setQuery(e.target.value)} className="input h-9 min-w-[240px] max-w-md" placeholder="Filter id, pack, status, device..." />
+          <div className="ml-auto text-xs text-slate-500">Signer: {shortHash(signerInfo?.key_id)}</div>
+        </FilterBar>
+
+        <section className="card p-5">
+          {loading ? (
+            <EmptyState title="Loading detections" message="Collecting candidate, signed-pack, and rollout data." />
+          ) : view === 'queue' ? (
+            queueRows.length === 0 ? (
+              <EmptyState title="No candidates" message="No detection candidates match this filter." />
+            ) : (
+              <BoundedTable
+                headers={['Title', 'Status', 'Pack', 'Updated', 'Actions', 'Detail']}
+                rows={queueRows.map((candidate) => ([
+                  <div key={`${candidate.id}-title`}>
+                    <p className="text-sm font-semibold text-gray-900">{candidate.title}</p>
+                    <p className="text-xs text-gray-500">{candidate.description || 'No description'}</p>
+                  </div>,
+                  <div key={`${candidate.id}-status`}>{statusBadge(candidate.status)}</div>,
+                  <span key={`${candidate.id}-pack`} className="font-mono text-xs">{formatHash(candidate.pack_id)}@{candidate.pack_version}</span>,
+                  <span key={`${candidate.id}-updated`} className="text-xs text-gray-600" title={formatTime(candidate.updated_at_ms)}>{formatRelativeAge(candidate.updated_at_ms)}</span>,
+                  <div key={`${candidate.id}-actions`} className="flex flex-wrap gap-1">
+                    <ActionButton label="Validate" disabled={!['draft', 'validation_failed', 'ready_for_review'].includes(candidate.status)} busy={actingID === `${candidate.id}:validate`} onClick={() => runAction(candidate, 'validate')} />
+                    <ActionButton label="Approve" disabled={candidate.status !== 'ready_for_review'} busy={actingID === `${candidate.id}:approve`} onClick={() => runAction(candidate, 'approve')} />
+                    <ActionButton label="Sign" disabled={candidate.status !== 'approved'} busy={actingID === `${candidate.id}:sign`} onClick={() => runAction(candidate, 'sign')} />
+                    <ActionButton label="Reject" danger disabled={!['draft', 'validating', 'validation_failed', 'ready_for_review', 'approved'].includes(candidate.status)} busy={actingID === `${candidate.id}:reject`} onClick={() => runAction(candidate, 'reject')} />
+                  </div>,
+                  <button key={`${candidate.id}-detail`} className="text-xs font-semibold text-primary-700" onClick={async () => {
+                    let runs: ValidationRun[] = []
+                    try {
+                      const data = await fetchJSON<{ items: ValidationRun[] }>(`/api/detection/candidates/${encodeURIComponent(candidate.id)}/validations`)
+                      runs = data.items || []
+                    } catch {
+                      runs = []
                     }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  className={`block w-full cursor-pointer px-6 py-5 text-left transition-colors hover:bg-gray-50 ${selectedCandidate?.id === candidate.id ? 'bg-primary-50' : ''}`}
-                >
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold text-gray-900">{candidate.title}</h3>
-                        {statusBadge(candidate.status)}
-                      </div>
-                      <p className="mt-1 text-sm text-gray-500">{candidate.description || 'No description provided.'}</p>
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-500">
-                        <span className="font-mono">{candidate.pack_id}@{candidate.pack_version}</span>
-                        <span>min agent {candidate.min_agent_version}</span>
-                        <span>{candidate.supported_os.join(', ')}</span>
-                        <span>updated {formatTime(candidate.updated_at_ms)}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <ActionButton label="Validate" disabled={!['draft', 'validation_failed', 'ready_for_review'].includes(candidate.status)} busy={actingID === `${candidate.id}:validate`} onClick={(event) => { event.stopPropagation(); runAction(candidate, 'validate') }} />
-                      <ActionButton label="Approve" disabled={candidate.status !== 'ready_for_review'} busy={actingID === `${candidate.id}:approve`} onClick={(event) => { event.stopPropagation(); runAction(candidate, 'approve') }} />
-                      <ActionButton label="Sign" disabled={candidate.status !== 'approved'} busy={actingID === `${candidate.id}:sign`} onClick={(event) => { event.stopPropagation(); runAction(candidate, 'sign') }} />
-                      <ActionButton label="Reject" danger disabled={!['draft', 'validating', 'validation_failed', 'ready_for_review', 'approved'].includes(candidate.status)} busy={actingID === `${candidate.id}:reject`} onClick={(event) => { event.stopPropagation(); runAction(candidate, 'reject') }} />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <aside className="space-y-8">
-            <section className="card p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <Fingerprint className="h-5 w-5 text-primary-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Signer</h2>
-              </div>
-              <dl className="space-y-3 text-sm">
-                <InfoRow label="Algorithm" value={signerInfo?.algorithm || 'n/a'} />
-                <InfoRow label="Key ID" value={signerInfo?.key_id || 'n/a'} mono />
-                <InfoRow label="Public key" value={shortHash(signerInfo?.public_key_b64)} mono />
-              </dl>
-            </section>
-
-            <section className="card p-6">
-              <h2 className="mb-4 text-lg font-semibold text-gray-900">Selected Candidate</h2>
-              {selectedCandidate ? (
-                <div className="space-y-4">
-                  <div>
-                    <p className="font-medium text-gray-900">{selectedCandidate.title}</p>
-                    <p className="mt-1 font-mono text-xs text-gray-500">{selectedCandidate.id}</p>
-                  </div>
-                  <dl className="space-y-3 text-sm">
-                    <InfoRow label="Status" value={statusLabels[selectedCandidate.status]} />
-                    <InfoRow label="Pack" value={`${selectedCandidate.pack_id}@${selectedCandidate.pack_version}`} mono />
-                    <InfoRow label="Signed artifact" value={selectedCandidate.signed_pack_id || 'n/a'} mono />
-                    <InfoRow label="Rejected reason" value={selectedCandidate.reject_reason || 'n/a'} />
-                  </dl>
-                  <div>
-                    <h3 className="mb-2 text-sm font-semibold text-gray-900">Validations</h3>
-                    {validations.length === 0 ? (
-                      <p className="text-sm text-gray-500">No validation runs recorded.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {validations.map((run) => (
-                          <div key={run.id} className="rounded-md border border-gray-200 p-3">
-                            <div className="flex items-center justify-between gap-3">
-                              {run.success ? <span className="badge badge-success">Passed</span> : <span className="badge badge-danger">Failed</span>}
-                              <span className="text-xs text-gray-500">{formatTime(run.ended_at_ms || run.started_at_ms)}</span>
-                            </div>
-                            <p className="mt-2 text-xs text-gray-600">
-                              {run.events_fetched} events, {run.matched_rules} matched rules
-                            </p>
-                            {(run.details || run.errors) && (
-                              <p className="mt-1 break-words text-xs text-gray-500">{run.details || run.errors}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">No candidate selected.</p>
-              )}
-            </section>
-          </aside>
-        </div>
-
-        <section className="mt-8 card">
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">Signed Packs and Rollout</h2>
-            <p className="text-sm text-gray-500">Controller visibility for lab agents reporting pack health.</p>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {signedPacks.length === 0 ? (
-              <p className="p-6 text-sm text-gray-500">No signed detection packs are available.</p>
-            ) : signedPacks.map((pack) => {
-              const rollout = pack.pack_id ? rollouts[pack.pack_id] : undefined
-              return (
-                <div key={pack.id} className="p-6">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold text-gray-900">{pack.pack_id || pack.id}</h3>
-                        <span className="badge badge-info">{pack.pack_version || 'unversioned'}</span>
-                      </div>
-                      <p className="mt-2 font-mono text-xs text-gray-500">artifact {pack.id}</p>
-                      <p className="mt-1 font-mono text-xs text-gray-500">sha256 {shortHash(pack.sha256)}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
-                      <MiniStat label="Agents" value={rollout?.agents_reported || 0} />
-                      <MiniStat label="Applied" value={rollout?.count_applied || 0} />
-                      <MiniStat label="Rejected" value={rollout?.count_rejected || 0} />
-                      <MiniStat label="Incompatible" value={rollout?.count_incompatible || 0} />
-                      <MiniStat label="Expired" value={rollout?.count_expired || 0} />
-                    </div>
-                  </div>
-
-                  {rollout?.agents?.length ? (
-                    <div className="mt-5 overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead>
-                          <tr className="text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                            <th className="py-2 pr-4">Agent</th>
-                            <th className="py-2 pr-4">State</th>
-                            <th className="py-2 pr-4">Active Pack</th>
-                            <th className="py-2 pr-4">Trust</th>
-                            <th className="py-2 pr-4">Last Check</th>
-                            <th className="py-2 pr-4">Reason</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {rollout.agents.map((agent) => (
-                            <tr key={agent.agent_uid}>
-                              <td className="py-3 pr-4">
-                                <p className="font-medium text-gray-900">{agent.device_id || agent.agent_uid}</p>
-                                <p className="font-mono text-xs text-gray-500">{agent.agent_uid}</p>
-                              </td>
-                              <td className="py-3 pr-4">{rolloutBadge(agent.rollout_state, agent.computed_stale)}</td>
-                              <td className="py-3 pr-4 font-mono text-xs">{agent.active_pack_id || 'none'} {agent.active_pack_version ? `@ ${agent.active_pack_version}` : ''}</td>
-                              <td className="py-3 pr-4 text-xs text-gray-600">sig={agent.signature_status || 'n/a'} hash={agent.hash_status || 'n/a'} schema={agent.schema_status || 'n/a'}</td>
-                              <td className="py-3 pr-4 text-xs text-gray-600">{formatTime(agent.last_check_at_ms)}</td>
-                              <td className="py-3 pr-4 text-xs text-gray-600">{agent.reason_detail || agent.last_rejected_reason || 'n/a'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="mt-4 text-sm text-gray-500">No agents have reported this pack yet.</p>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+                    setRawMode(false)
+                    setDetailModal({ title: `Candidate: ${candidate.title}`, payload: { candidate, validations: runs } })
+                  }}>View detail</button>,
+                ]))}
+              />
+            )
+          ) : view === 'signed' ? (
+            signedRows.length === 0 ? (
+              <EmptyState title="No signed packs" message="No signed detection packs are available." />
+            ) : (
+              <BoundedTable
+                headers={['Pack', 'Artifact', 'Hash', 'Created', 'Detail']}
+                rows={signedRows.map((pack) => ([
+                  <div key={`${pack.id}-pack`}>
+                    <p className="text-sm font-semibold text-gray-900">{pack.pack_id || pack.id}</p>
+                    <p className="text-xs text-gray-500">{pack.pack_version || 'unversioned'}</p>
+                  </div>,
+                  <span key={`${pack.id}-artifact`} className="font-mono text-xs">{formatHash(pack.id)}</span>,
+                  <span key={`${pack.id}-hash`} className="font-mono text-xs">{shortHash(pack.sha256)}</span>,
+                  <span key={`${pack.id}-created`} className="text-xs text-gray-600" title={formatTime(pack.created_at_ms)}>{formatRelativeAge(pack.created_at_ms)}</span>,
+                  <button key={`${pack.id}-detail`} className="text-xs font-semibold text-primary-700" onClick={() => {
+                    setRawMode(false)
+                    setDetailModal({ title: `Signed pack: ${pack.pack_id || pack.id}`, payload: pack })
+                  }}>View detail</button>,
+                ]))}
+              />
+            )
+          ) : rolloutRows.length === 0 ? (
+            <EmptyState title="No rollout reports" message="No agents have reported signed pack rollout yet." />
+          ) : (
+            <BoundedTable
+              headers={['Pack', 'Agent', 'State', 'Trust', 'Last check', 'Detail']}
+              rows={rolloutRows.map(({ packID, agent }) => ([
+                <span key={`${packID}-${agent.agent_uid}-pack`} className="font-mono text-xs">{formatHash(packID)}</span>,
+                <div key={`${packID}-${agent.agent_uid}-agent`}>
+                  <p className="text-sm text-gray-900">{agent.device_id || agent.agent_uid}</p>
+                  <p className="font-mono text-xs text-gray-500">{formatHash(agent.agent_uid)}</p>
+                </div>,
+                <div key={`${packID}-${agent.agent_uid}-state`}>{rolloutBadge(agent.rollout_state, agent.computed_stale)}</div>,
+                <span key={`${packID}-${agent.agent_uid}-trust`} className="text-xs text-gray-600">sig={agent.signature_status || 'n/a'} hash={agent.hash_status || 'n/a'} schema={agent.schema_status || 'n/a'}</span>,
+                <span key={`${packID}-${agent.agent_uid}-check`} className="text-xs text-gray-600" title={formatTime(agent.last_check_at_ms)}>{agent.last_check_at_ms ? formatRelativeAge(agent.last_check_at_ms) : 'n/a'}</span>,
+                <button key={`${packID}-${agent.agent_uid}-detail`} className="text-xs font-semibold text-primary-700" onClick={() => {
+                  setRawMode(false)
+                  setDetailModal({ title: `Rollout: ${agent.device_id || agent.agent_uid}`, payload: { pack_id: packID, agent } })
+                }}>View detail</button>,
+              ]))}
+            />
+          )}
         </section>
       </main>
-    </div>
-  )
-}
-
-function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
-  return (
-    <div className="card p-4">
-      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-md bg-primary-50 text-primary-700">{icon}</div>
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-gray-900">{value}</p>
-    </div>
-  )
-}
-
-function MiniStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-md border border-gray-200 p-3">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-lg font-semibold text-gray-900">{value}</p>
-    </div>
-  )
-}
-
-function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</dt>
-      <dd className={`mt-1 break-words text-gray-900 ${mono ? 'font-mono text-xs' : ''}`}>{value}</dd>
+      <div className="fixed bottom-4 right-4 z-10">
+        {detailModal ? (
+          <button
+            type="button"
+            className="btn btn-secondary h-8 px-2 text-xs"
+            onClick={() => setRawMode((v) => !v)}
+          >
+            {rawMode ? 'Show summary' : 'Show raw'}
+          </button>
+        ) : null}
+      </div>
+      <DetailModal
+        open={Boolean(detailModal)}
+        title={detailModal?.title || 'Detail'}
+        detail={rawMode ? detailModal?.payload || {} : summarizeDetail(detailModal?.payload)}
+        onClose={() => {
+          setDetailModal(null)
+          setRawMode(false)
+        }}
+      />
     </div>
   )
 }
@@ -550,16 +468,51 @@ function ActionButton({
   disabled: boolean
   busy: boolean
   danger?: boolean
-  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+  onClick: () => void
 }) {
   return (
     <button
-      onClick={onClick}
+      onClick={(event) => {
+        event.stopPropagation()
+        onClick()
+      }}
       disabled={disabled || busy}
-      className={`btn px-3 py-2 ${danger ? 'btn-danger' : 'btn-secondary'}`}
+      className={`btn h-7 px-2 text-xs ${danger ? 'btn-danger' : 'btn-secondary'}`}
     >
       {busy ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
       {label}
     </button>
   )
+}
+
+function summarizeDetail(payload: unknown) {
+  if (!payload || typeof payload !== 'object') return payload
+  const data = payload as Record<string, any>
+  if (data.candidate) {
+    return {
+      candidate: {
+        id: data.candidate.id,
+        title: data.candidate.title,
+        status: data.candidate.status,
+        pack: `${data.candidate.pack_id}@${data.candidate.pack_version}`,
+        updated: formatTime(data.candidate.updated_at_ms),
+      },
+      validation_runs: Array.isArray(data.validations) ? data.validations.length : 0,
+    }
+  }
+  if (data.agent) {
+    return {
+      pack_id: data.pack_id,
+      agent_uid: data.agent.agent_uid,
+      device_id: data.agent.device_id,
+      state: data.agent.rollout_state,
+      trust: {
+        signature: data.agent.signature_status,
+        hash: data.agent.hash_status,
+        schema: data.agent.schema_status,
+      },
+      reason: data.agent.reason_detail || data.agent.last_rejected_reason || 'n/a',
+    }
+  }
+  return payload
 }
