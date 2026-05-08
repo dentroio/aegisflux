@@ -979,7 +979,7 @@ function DashboardScanSurface({
         widgetOrder={widgetOrder}
       />
 
-      <section className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" style={ui.widgetGrid}>
+      <section className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {visibleWidgets.map((widget) => (
           <Widget
             key={widget.id}
@@ -1005,7 +1005,7 @@ function DashboardReadinessBand({
   model: ReturnType<typeof buildDashboardModel>
 }) {
   return (
-    <section className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]" style={ui.heroGrid}>
+    <section className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" style={ui.card}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between" style={ui.heroContent}>
           <div>
