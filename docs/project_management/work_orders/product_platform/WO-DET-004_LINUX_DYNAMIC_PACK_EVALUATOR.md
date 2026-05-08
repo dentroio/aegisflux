@@ -1,6 +1,6 @@
 # WO-DET-004: Linux Dynamic Detection Pack Evaluator
 
-**Status:** Draft  
+**Status:** Complete
 **Phase:** Product Platform  
 **Primary owner:** Linux Agent  
 
@@ -74,3 +74,16 @@ This is observe-only evaluation. It must not enforce, block, redirect, quarantin
 - Never delete the previous verified pack until a new pack is fully verified and cached.
 - Include rejection reasons in status reports.
 
+## Implementation Notes
+
+- Linux agent supports `AEGIS_CONTROLLER_URL`, `AEGIS_DETECTION_PACKS_ENABLED`, `AEGIS_DETECTION_PACK_CACHE`, and `AEGIS_DETECTION_PACK_PUBLIC_KEY`.
+- Linux dynamic-pack pipeline discovers latest compatible packs, fetches artifacts, verifies hash/signature/schema/compatibility/mode/expiration, caches active and previous verified packs, evaluates rules locally, and reports controller status.
+- The evaluator emits observe-only `aegis.agent.detected` and `aegis.risk_finding.created` events with detection pack id/version/rule evidence.
+- Controller-unavailable path falls back to the last verified cached pack when available.
+- Lab deployment has verified Linux agent performance and dynamic-pack operation through the current controller path.
+
+## Verification
+
+- `cargo test` in `agents/linux-agent`
+- `./scripts/lab/smoke-detection-rollout.sh`
+- Linux lab agent online/fresh after rollout smoke

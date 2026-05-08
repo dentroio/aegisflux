@@ -1,6 +1,6 @@
 # WO-DET-001: Detection Pack Schema and Local Evaluator Contract
 
-**Status:** Draft  
+**Status:** Complete
 **Phase:** Product Platform  
 **Primary owner:** Backend / Agent  
 
@@ -57,3 +57,19 @@ Define how dynamic AI detections are shipped safely to endpoint agents without r
 - Detection packs are not scripts.
 - Packs must be signed before endpoint rollout.
 
+## Implementation Notes
+
+- Added `schemas/detection/detection-pack.v1.schema.json`.
+- Added a default AI marker example pack and WO-DET-002 fixtures.
+- Added schema validation tests in `backend/detectionpack-schema`.
+- Added data-only Linux and Windows evaluator modules aligned to the schema.
+- Added Ed25519 signing/verification contract using `aegis.detection_pack.v1\0 || sha256(unsigned_pack_json_bytes)`.
+- Agent schema checks reject unsigned, expired, unsupported-OS, unsupported-agent, and non-observe-only packs.
+- Dynamic detections include pack id, pack version, and rule id evidence.
+
+## Verification
+
+- `go test ./...` in `backend/detectionpack-schema`
+- `cargo test` in `agents/linux-agent`
+- `cargo test` in `agents/windows-agent`
+- `./scripts/lab/smoke-detection-rollout.sh`
