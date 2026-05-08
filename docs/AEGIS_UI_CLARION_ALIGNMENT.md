@@ -7,16 +7,24 @@ AegisFlux should evolve as a Clarion-compatible management experience. The UI ca
 Reference frontend:
 
 ```text
-/Users/stevengerhart/workspace/github/sgerhart/clarion/frontend
+/Users/sgerhart/workspace/github/sgerhart/clarion/frontend
 ```
+
+Detailed pattern notes are captured in [AegisFlux Clarion UI Patterns to Adopt](AEGIS_CLARION_UI_PATTERNS_TO_ADOPT.md).
 
 ## Clarion Patterns To Reuse
 
 - Workflow sidebar grouped by phases: dashboard, discover, analyze, secure, operate, configure.
+- Persistent app shell where the header/sidebar remain visible and only the main/right panel scrolls.
+- Clarion-style endpoint workbench pattern for AegisFlux Agents: KPI cards, quick filters, search, view toggle, column controls, and drill-in.
+- Strong detail pages with identity header, freshness row, context cards, tabs, and deterministic Next Best Action guidance.
+- Quick detail modal or side-panel inspection plus full detail page for deeper investigations.
+- Staleness banners wherever telemetry trust matters.
 - Compact KPI cards with clear operational labels and short health hints.
 - Dense tables and drill-ins for repeated investigation work.
 - Connector and settings sections for external systems and platform management.
 - Health/readiness status surfaces that explain missing telemetry.
+- Operational event feed for platform actions, detection rollout, approvals, AI activity, and integration exports.
 - Restrained Tailwind utility styling with light/dark support.
 - Lucide icons for navigation, actions, status, and compact controls.
 

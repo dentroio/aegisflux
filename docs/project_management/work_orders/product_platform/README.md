@@ -3,7 +3,7 @@
 **Program:** AegisFlux product platform and Clarion-aligned management experience  
 **Phase:** Phase 2 - Productization and AI-Agent Platform  
 **Status:** Draft  
-**Last updated:** May 5, 2026
+**Last updated:** May 8, 2026
 
 ## Objective
 
@@ -33,6 +33,7 @@ These documents are the baseline for this program:
 - [Sensor Fusion Architecture](../../../AEGIS_SENSOR_FUSION_ARCHITECTURE.md)
 - [Agent Performance Architecture](../../../AEGIS_AGENT_PERFORMANCE_ARCHITECTURE.md)
 - [UI Clarion Alignment](../../../AEGIS_UI_CLARION_ALIGNMENT.md)
+- [Clarion UI Patterns to Adopt](../../../AEGIS_CLARION_UI_PATTERNS_TO_ADOPT.md)
 - [AegisFlux and Clarion Integration Contract](../../plans/AEGIS_CLARION_INTEGRATION_CONTRACT.md)
 
 ## Product Workflow Target
@@ -71,7 +72,9 @@ The AegisFlux UI should follow the Clarion shell pattern:
 | WO-AGENT-001 | Agent Performance Budget Telemetry | CPU/memory/runtime collector budget events and UI | Windows/Linux agents reporting |
 | WO-INV-001 | Enterprise AI and Control Inventory | Browser, IDE, CLI, local model, SASE/SSE inventory pages | Visibility events and agents |
 | WO-PLAT-004 | Detection Pack Status Visibility | Pack rollout health in agent list, device detail, and rollout views | WO-PLAT-002, WO-DET-003, WO-DET-006 |
+| WO-PLAT-005 | Clarion-Style Agent Workbench and Detail Experience | Agent workbench, Clarion-style detail tabs, evidence confidence, next best action | WO-PLAT-001, WO-PLAT-002, WO-PLAT-004, WO-AGENT-001, WO-INV-001 |
 | WO-CTRL-001 | Observe-Only Draft Controls and Simulation | Finding -> draft control -> historical match simulation | WO-PLAT-002, WO-DET-001 |
+| WO-PLAT-006 | Operational Event Feed | Auditable platform event feed for rollout, approval, AI, controls, and integration activity | WO-PLAT-001, WO-DET-002, WO-DET-003 |
 | WO-INT-001 | Clarion Integration API Slice | AegisFlux evidence export and Clarion import contract implementation | WO-PLAT-002, WO-INV-001 |
 
 ## Parallelization Guidance
@@ -87,6 +90,8 @@ These can run in parallel with low conflict:
 - WO-DET-006 should follow WO-LAB-001 and become the regression check for the dynamic detection path.
 - WO-PLAT-004 can start once WO-PLAT-002 exists and the WO-DET-003 status contract is stable.
 - WO-CTRL-001 should wait until drill-in and detection-pack schema stabilize.
+- WO-PLAT-005 should happen before AI-heavy endpoint work so the detail surface has the right Clarion-style structure.
+- WO-PLAT-006 can start once at least detection candidate/rollout events are available; it can add producers incrementally as AI, controls, and Clarion export work land.
 - WO-INT-001 should wait until the AegisFlux evidence model is not churning daily.
 
 ## Phase Exit Criteria
