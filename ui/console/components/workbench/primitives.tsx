@@ -45,10 +45,15 @@ export function FilterBar({ children }: { children: ReactNode }) {
 export function BoundedTable({
   headers,
   rows,
+  maxRows = 120,
 }: {
   headers: string[]
   rows: ReactNode[][]
+  maxRows?: number
 }) {
+  const visibleRows = rows.slice(0, maxRows)
+  const hiddenCount = Math.max(rows.length - visibleRows.length, 0)
+
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200">
       <table className="w-full table-fixed text-sm">
@@ -62,7 +67,7 @@ export function BoundedTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 bg-white">
-          {rows.map((row, idx) => (
+          {visibleRows.map((row, idx) => (
             <tr key={idx}>
               {row.map((cell, cellIdx) => (
                 <td key={cellIdx} className="ux-table-cell px-3 py-2 align-top">{cell}</td>
@@ -70,6 +75,15 @@ export function BoundedTable({
             </tr>
           ))}
         </tbody>
+        {hiddenCount > 0 ? (
+          <tfoot className="bg-slate-50">
+            <tr>
+              <td colSpan={headers.length} className="px-3 py-2 text-xs text-slate-500">
+                Showing first {visibleRows.length} of {rows.length} rows. Use filters to narrow the list.
+              </td>
+            </tr>
+          </tfoot>
+        ) : null}
       </table>
     </div>
   )

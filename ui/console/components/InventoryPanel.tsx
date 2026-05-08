@@ -64,6 +64,10 @@ type DeviceRecord = {
 
 const AI_PATTERN = /chatgpt|openai|anthropic|claude|gemini|copilot|mistral|ollama|litellm|vllm|mcp|modelcontextprotocol/i
 
+function matchesInventoryQuery(row: unknown, needle: string) {
+  return !needle || JSON.stringify(row).toLowerCase().includes(needle)
+}
+
 async function fetchJson<T>(path: string, fallback: T): Promise<T> {
   try {
     const response = await fetch(path, { cache: 'no-store' })
@@ -96,18 +100,18 @@ export function InventoryPanel({
   const load = useCallback(async () => {
     setRefreshing(true)
     const [deviceRes, extRes, saseRes, dnsRes, procRes, findRes] = await Promise.all([
-      fetchJson<{ devices?: DeviceRecord[] }>('/api/visibility/devices?limit=300', {}),
+      fetchJson<{ devices?: DeviceRecord[] }>('/api/visibility/devices?limit=180', {}),
       fetchJson<{ events?: EventRecord[] }>(
-        '/api/visibility/events?event_type=aegis.browser_extension.observed&limit=400',
+        '/api/visibility/events?event_type=aegis.browser_extension.observed&limit=220',
         {},
       ),
       fetchJson<{ events?: EventRecord[] }>(
-        '/api/visibility/events?event_type=aegis.sase_component.observed&limit=400',
+        '/api/visibility/events?event_type=aegis.sase_component.observed&limit=220',
         {},
       ),
-      fetchJson<{ dns?: DnsRecord[]; observations?: DnsRecord[] }>('/api/visibility/dns?limit=400', {}),
-      fetchJson<{ processes?: ProcessRecord[] }>('/api/visibility/processes?limit=400', {}),
-      fetchJson<{ findings?: FindingRecord[] }>('/api/visibility/findings?limit=200', {}),
+      fetchJson<{ dns?: DnsRecord[]; observations?: DnsRecord[] }>('/api/visibility/dns?limit=220', {}),
+      fetchJson<{ processes?: ProcessRecord[] }>('/api/visibility/processes?limit=220', {}),
+      fetchJson<{ findings?: FindingRecord[] }>('/api/visibility/findings?limit=120', {}),
     ])
     setDevices(deviceRes.devices || [])
     setExtensionEvents(extRes.events || [])
@@ -191,6 +195,27 @@ export function InventoryPanel({
     sase: model.saseAggregates.length,
     unknown: unknownRows.length,
   }
+
+  const filteredExtensionRows = useMemo(
+    () => model.extensionAggregates.filter((row) => matchesInventoryQuery(row, queryNeedle)),
+    [model.extensionAggregates, queryNeedle],
+  )
+  const filteredAiToolRows = useMemo(
+    () => aiToolRows.filter((row) => matchesInventoryQuery(row, queryNeedle)),
+    [aiToolRows, queryNeedle],
+  )
+  const filteredLocalRuntimeRows = useMemo(
+    () => localRuntimeRows.filter((row) => matchesInventoryQuery(row, queryNeedle)),
+    [localRuntimeRows, queryNeedle],
+  )
+  const filteredSaseRows = useMemo(
+    () => model.saseAggregates.filter((row) => matchesInventoryQuery(row, queryNeedle)),
+    [model.saseAggregates, queryNeedle],
+  )
+  const filteredUnknownRows = useMemo(
+    () => unknownRows.filter((row) => matchesInventoryQuery(row, queryNeedle)),
+    [unknownRows, queryNeedle],
+  )
 
   return (
     <div className={embedded ? 'bg-gray-50' : 'min-h-screen bg-gray-50'}>
@@ -303,14 +328,12 @@ export function InventoryPanel({
 
             <section className="card p-5">
               {category === 'extensions' && (
-                model.extensionAggregates.length === 0 ? (
+                filteredExtensionRows.length === 0 ? (
                   <EmptyState title="No browser extensions" message="Extension telemetry will populate this category when observed." />
                 ) : (
                   <BoundedTable
                     headers={['Name', 'Extension id', 'Version', 'Source', 'Evidence', 'Last seen', 'Devices', 'Action']}
-                    rows={model.extensionAggregates
-                      .filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle))
-                      .map((row) => ([
+                    rows={filteredExtensionRows.map((row) => ([
                         <span key={`${row.extension_id}-name`} className="text-sm font-medium text-gray-900">{formatHostname(row.name)}</span>,
                         <span key={`${row.extension_id}-id`} className="font-mono text-xs" title={row.extension_id}>{formatHash(row.extension_id)}</span>,
                         <span key={`${row.extension_id}-version`} className="text-xs text-gray-600">{row.version || 'n/a'}</span>,
@@ -331,14 +354,12 @@ export function InventoryPanel({
               )}
 
               {category === 'ai_tools' && (
-                aiToolRows.filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle)).length === 0 ? (
+                filteredAiToolRows.length === 0 ? (
                   <EmptyState title="No AI IDE/CLI signals" message="AI tool process or DNS signals are not present in this window." />
                 ) : (
                   <BoundedTable
                     headers={['Type', 'Signal', 'Descriptor', 'Device', 'Action']}
-                    rows={aiToolRows
-                      .filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle))
-                      .map((row, idx) => ([
+                    rows={filteredAiToolRows.map((row, idx) => ([
                         <span key={`type-${idx}`} className="text-xs text-gray-600">{row.type}</span>,
                         <span key={`name-${idx}`} className="text-sm font-medium text-gray-900">{formatHostname(row.name)}</span>,
                         <span key={`desc-${idx}`} className="text-xs text-gray-600" title={row.descriptor}>{formatCommandLine(row.descriptor)}</span>,
@@ -352,14 +373,12 @@ export function InventoryPanel({
               )}
 
               {category === 'local_models' && (
-                localRuntimeRows.filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle)).length === 0 ? (
+                filteredLocalRuntimeRows.length === 0 ? (
                   <EmptyState title="No local model runtimes" message="No Ollama/vLLM/local runtime signals observed in this window." />
                 ) : (
                   <BoundedTable
                     headers={['Runtime', 'Command', 'Device', 'Action']}
-                    rows={localRuntimeRows
-                      .filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle))
-                      .map((row, idx) => ([
+                    rows={filteredLocalRuntimeRows.map((row, idx) => ([
                         <span key={`name-${idx}`} className="text-sm font-medium text-gray-900">{row.name}</span>,
                         <span key={`cmd-${idx}`} className="text-xs text-gray-600" title={row.command}>{formatPath(row.command)}</span>,
                         <span key={`dev-${idx}`} className="font-mono text-xs">{formatHash(row.device_id)}</span>,
@@ -372,14 +391,12 @@ export function InventoryPanel({
               )}
 
               {category === 'sase' && (
-                model.saseAggregates.filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle)).length === 0 ? (
+                filteredSaseRows.length === 0 ? (
                   <EmptyState title="No SASE/SSE controls" message="Control component telemetry appears here when observed." />
                 ) : (
                   <BoundedTable
                     headers={['Vendor', 'Product', 'Name', 'Type', 'Status', 'Last seen', 'Devices', 'Action']}
-                    rows={model.saseAggregates
-                      .filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle))
-                      .map((row) => ([
+                    rows={filteredSaseRows.map((row) => ([
                         <span key={`${row.key}-vendor`} className="text-sm font-medium text-gray-900">{formatHostname(row.vendor)}</span>,
                         <span key={`${row.key}-product`} className="text-xs text-gray-600">{formatHostname(row.product)}</span>,
                         <span key={`${row.key}-name`} className="text-xs text-gray-600">{formatHostname(row.name)}</span>,
@@ -396,14 +413,12 @@ export function InventoryPanel({
               )}
 
               {category === 'unknown' && (
-                unknownRows.filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle)).length === 0 ? (
+                filteredUnknownRows.length === 0 ? (
                   <EmptyState title="No unknown signals" message="Unclassified inventory-like findings will appear here." />
                 ) : (
                   <BoundedTable
                     headers={['Title', 'Classification', 'Patterns', 'Device', 'Action']}
-                    rows={unknownRows
-                      .filter((row) => !queryNeedle || JSON.stringify(row).toLowerCase().includes(queryNeedle))
-                      .map((row, idx) => ([
+                    rows={filteredUnknownRows.map((row, idx) => ([
                         <span key={`title-${idx}`} className="text-sm font-medium text-gray-900">{formatHostname(row.title)}</span>,
                         <span key={`class-${idx}`} className="text-xs text-gray-600">{row.classification}</span>,
                         <span key={`patterns-${idx}`} className="text-xs text-gray-600" title={row.patterns}>{formatCommandLine(row.patterns)}</span>,

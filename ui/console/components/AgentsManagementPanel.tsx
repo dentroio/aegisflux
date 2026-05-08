@@ -127,7 +127,7 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
 
   useEffect(() => {
     fetchAgents()
-    const interval = setInterval(fetchAgents, 30000) // Refresh every 30 seconds
+    const interval = setInterval(fetchAgents, 60000)
     return () => clearInterval(interval)
   }, [])
 
@@ -138,7 +138,7 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
 
       const [response, visibilityResponse] = await Promise.all([
         fetch('/api/actions/agents'),
-        fetch('/api/visibility/devices?limit=200')
+        fetch('/api/visibility/devices?limit=120')
       ])
       if (response.ok) {
         const data = await response.json()

@@ -40,7 +40,7 @@ export default function OperationalEventFeedPage() {
 
   useEffect(() => {
     if (!gate) return undefined
-    fetch('/api/actions/platform/operational-events?limit=500', { cache: 'no-store' })
+    fetch('/api/actions/platform/operational-events?limit=200', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((j) => setEvents((j.events as OpEvent[]) || []))
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)))

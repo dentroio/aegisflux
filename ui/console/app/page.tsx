@@ -716,11 +716,11 @@ function AegisDashboardBody() {
   }, [])
 
   useEffect(() => {
-    if (!authenticated) return undefined
+    if (!authenticated || mainPanel !== 'dashboard') return undefined
     fetchDashboard()
-    const interval = setInterval(fetchDashboard, 15000)
+    const interval = setInterval(fetchDashboard, 60000)
     return () => clearInterval(interval)
-  }, [authenticated])
+  }, [authenticated, mainPanel])
 
   async function fetchJson<T>(path: string): Promise<T> {
     const response = await fetch(path, { cache: 'no-store' })
@@ -732,17 +732,14 @@ function AegisDashboardBody() {
     try {
       setLoading(true)
       setError(null)
-      const [deviceResponse, events, extensionEvents, saseEvents, collectorEvents, performanceEvents, processes, flows, dns, findings] = await Promise.all([
-        fetchJson<{ devices?: DeviceRecord[] }>('/api/visibility/devices?limit=100'),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?limit=240'),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.browser_extension.observed&limit=160'),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.sase_component.observed&limit=160'),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.collector.status&limit=220'),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.agent.performance&limit=220'),
-        fetchJson<{ processes?: ProcessRecord[] }>('/api/visibility/processes?limit=180'),
-        fetchJson<{ flows?: FlowRecord[] }>('/api/visibility/flows?limit=180'),
-        fetchJson<{ dns?: DnsRecord[] }>('/api/visibility/dns?limit=180'),
-        fetchJson<{ findings?: FindingRecord[] }>('/api/visibility/findings?limit=120'),
+      const [deviceResponse, events, extensionEvents, saseEvents, collectorEvents, performanceEvents, findings] = await Promise.all([
+        fetchJson<{ devices?: DeviceRecord[] }>('/api/visibility/devices?limit=80'),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?limit=120'),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.browser_extension.observed&limit=80'),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.sase_component.observed&limit=80'),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.collector.status&limit=120'),
+        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.agent.performance&limit=120'),
+        fetchJson<{ findings?: FindingRecord[] }>('/api/visibility/findings?limit=80'),
       ])
 
       const nextDevices = deviceResponse.devices || []
@@ -755,9 +752,9 @@ function AegisDashboardBody() {
           ...(collectorEvents.events || []),
           ...(performanceEvents.events || []),
         ]),
-        processes: processes.processes || [],
-        flows: flows.flows || [],
-        dns: dns.dns || [],
+        processes: [],
+        flows: [],
+        dns: [],
         findings: findings.findings || [],
       })
       setLastRefresh(new Date())
