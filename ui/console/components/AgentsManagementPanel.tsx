@@ -373,7 +373,7 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
         </div>
       )}
 
-      <main className={embedded ? 'max-w-[1500px] mx-auto px-0 py-4' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}>
+      <div className={embedded ? 'max-w-[1500px] mx-auto px-0 py-4' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}>
         {error && (
           <div className="mb-6 bg-danger-50 border border-danger-200 rounded-md p-4">
             <div className="flex">
@@ -791,7 +791,7 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
             )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

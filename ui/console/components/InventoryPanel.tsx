@@ -175,7 +175,7 @@ export function InventoryPanel({
         </div>
       </header>
 
-      <main className={embedded ? 'mx-auto max-w-[1500px] px-0 py-4' : 'mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8'}>
+      <div className={embedded ? 'mx-auto max-w-[1500px] px-0 py-4' : 'mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8'}>
         <div className="mb-6 rounded-lg border border-primary-200 bg-primary-50 p-4 text-sm text-primary-900">
           <strong className="font-semibold">Observe-only.</strong> Counts reflect retained visibility samples, not a
           complete enterprise software asset baseline.
@@ -428,7 +428,7 @@ export function InventoryPanel({
             </div>
           </>
         )}
-      </main>
+      </div>
     </div>
   )
 }

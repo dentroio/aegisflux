@@ -924,7 +924,10 @@ function AegisDashboardBody() {
               </span>
             </div>
             <div style={ui.scrollArea}>
-              <main className="mx-auto max-w-[1500px] px-5 py-6" style={ui.main}>
+              <main
+                className={`mx-auto max-w-[1500px] ${mainPanel === 'dashboard' ? 'px-5 py-6' : 'min-w-0 px-4 py-4'}`}
+                style={ui.main}
+              >
                 {mainPanel === 'dashboard' ? (
                   <>
                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between" style={ui.titleRow}>
@@ -1065,9 +1068,13 @@ function AegisDashboardBody() {
         </section>
                   </>
                 ) : mainPanel === 'agents' ? (
-                  <AgentsManagementPanel embedded />
+                  <div className="min-w-0 w-full">
+                    <AgentsManagementPanel embedded />
+                  </div>
                 ) : (
-                  <InventoryPanel embedded deviceFilter={inventoryDeviceFilter} />
+                  <div className="min-w-0 w-full">
+                    <InventoryPanel embedded deviceFilter={inventoryDeviceFilter} />
+                  </div>
                 )}
       </main>
         </div>
