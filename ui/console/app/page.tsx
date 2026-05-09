@@ -1055,8 +1055,14 @@ function DashboardReadinessBand({
           <DarkStat icon={LockKeyhole} label="SASE" value={model.saseCount} />
         </div>
         <p className="mt-4 text-sm leading-6 text-slate-300" style={ui.darkText}>
-          The next product leap is turning these signals into an Agent Bill of Materials per endpoint.
+          Turn these signals into an Agent Bill of Materials per endpoint — what AI tools exist, what they reach, and the evidence.
         </p>
+        <a
+          href="/discover/abom"
+          className="mt-3 inline-flex items-center gap-2 rounded-md border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20"
+        >
+          Open Agent Bill of Materials →
+        </a>
       </div>
     </section>
   )
@@ -1242,6 +1248,7 @@ function DashboardEndpointScan({
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Next best actions</h3>
         <div className="mt-3 space-y-2 text-sm text-slate-700">
           <a href="/agents" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Review stale endpoints and collector health</a>
+          <a href="/discover/abom" className="block rounded-md border border-blue-200 bg-blue-50 px-3 py-2 font-semibold text-blue-800 hover:bg-blue-100">Open the fleet Agent Bill of Materials</a>
           <a href="/inventory" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Inspect AI tool and extension inventory</a>
           <a href="/detections" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Check detection-pack coverage and rollout</a>
           <a href="/control/controls" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Draft observe-only controls from evidence</a>

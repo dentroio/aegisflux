@@ -30,6 +30,7 @@ export const shellNavGroups: readonly ShellNavGroup[] = [
     label: 'Discover',
     items: [
       { id: 'agents', label: 'Agents', icon: Server },
+      { id: 'abom', label: 'Agent Bill of Materials', icon: Sparkles },
       { id: 'inventory', label: 'Inventory', icon: Database },
       { id: 'activity', label: 'AI Activity', icon: Bot },
     ],
@@ -75,6 +76,8 @@ export function targetForNavItem(itemId: string): string {
       return 'home:agents'
     case 'inventory':
       return 'home:inventory'
+    case 'abom':
+      return '/discover/abom'
     case 'activity':
       return '/discover/activity'
     case 'evidence':
