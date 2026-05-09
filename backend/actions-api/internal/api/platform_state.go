@@ -82,17 +82,28 @@ type OperationalEvent struct {
 }
 
 type DraftControl struct {
-	ID                string   `json:"id"`
-	Status            string   `json:"status"`
-	SourceFindingID   string   `json:"source_finding_id"`
-	ProposedAction    string   `json:"proposed_action"`
-	ScopeSelectors    []string `json:"scope_selectors"`
-	EvidenceRefs      []string `json:"evidence_refs"`
-	ExpectedEffect    string   `json:"expected_effect"`
-	BlastRadius       string   `json:"blast_radius"`
-	RollbackPlan      string   `json:"rollback_plan"`
-	CreatedMS         int64    `json:"created_at_ms"`
-	SimulationMatches int      `json:"simulation_match_count,omitempty"`
+	ID                   string   `json:"id"`
+	Status               string   `json:"status"`
+	SourceFindingID      string   `json:"source_finding_id"`
+	SourceFindingTitle   string   `json:"source_finding_title,omitempty"`
+	SourceDeviceID       string   `json:"source_device_id,omitempty"`
+	ProposedAction       string   `json:"proposed_action"`
+	ScopeSelectors       []string `json:"scope_selectors"`
+	EvidenceRefs         []string `json:"evidence_refs"`
+	ExpectedEffect       string   `json:"expected_effect"`
+	Confidence           string   `json:"confidence,omitempty"`
+	ExpectedMatches      *int     `json:"expected_matches,omitempty"`
+	ExpectedBreakageRisk string   `json:"expected_breakage_risk,omitempty"`
+	BlastRadius          string   `json:"blast_radius"`
+	BlastRadiusNotes     []string `json:"blast_radius_notes,omitempty"`
+	RollbackPlan         string   `json:"rollback_plan"`
+	RollbackSteps        []string `json:"rollback_steps,omitempty"`
+	OperatorNotes        string   `json:"operator_notes,omitempty"`
+	CreatedMS            int64    `json:"created_at_ms"`
+	UpdatedMS            int64    `json:"updated_at_ms,omitempty"`
+	SimulationMatches    int      `json:"simulation_match_count,omitempty"`
+	SimulationDeviceID   string   `json:"simulation_device_id,omitempty"`
+	SimulationAtMS       int64    `json:"simulation_at_ms,omitempty"`
 }
 
 func newPlatformData() *PlatformData {

@@ -608,16 +608,24 @@ function TabContent(props: {
     )
   }
   if (activeTab === 'Policy') {
+    const leadFinding = props.findings[0]
+    const leadFindingId = leadFinding?.finding_id || leadFinding?.event_id || ''
+    const designerHref = `/control/controls?finding_id=${encodeURIComponent(leadFindingId)}&device_id=${encodeURIComponent(props.device.device_id)}`
     return (
       <div className="space-y-3 text-sm text-slate-700">
         <p className="font-semibold text-slate-900">Observe-only posture</p>
         <p>
-          This console does not push enforcement. Use Control → Controls to work observe-only drafts derived from findings, then simulate
-          blast radius before any future enforcement project.
+          This console does not push enforcement. Use the Finding-to-control designer to draft an observe-only control from this device&apos;s
+          evidence, then simulate blast radius before any future enforcement project.
         </p>
-        <a href="/control/controls" className="font-semibold text-primary-700 hover:text-primary-900">
-          Open draft controls
-        </a>
+        <div className="flex flex-wrap gap-3">
+          <a href={designerHref} className="font-semibold text-primary-700 hover:text-primary-900">
+            Design control from {leadFinding ? 'lead finding' : 'this device'}
+          </a>
+          <a href="/control/controls" className="font-semibold text-primary-700 hover:text-primary-900">
+            Open draft queue
+          </a>
+        </div>
       </div>
     )
   }

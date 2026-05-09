@@ -1,24 +1,39 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ConsoleShell } from '@/components/shell/ConsoleShell'
 import type { HealthTone } from '@/components/shell/ConsoleShell'
 import { readLabAuthenticated } from '@/shared/labAuth'
 import { BoundedTable, DetailModal, EmptyState, FilterBar, KpiTile, SummaryStrip } from '@/components/workbench/primitives'
 import { formatHash } from '@/shared/formatting'
+import { FindingToControlPanel } from '@/components/FindingToControlPanel'
 
 type Draft = {
   id: string
   status: string
   source_finding_id: string
+  source_finding_title?: string
+  source_device_id?: string
   proposed_action: string
   simulation_match_count?: number
+  confidence?: string
+  expected_breakage_risk?: string
+  operator_notes?: string
+  blast_radius?: string
+  rollback_plan?: string
+  evidence_refs?: string[]
+  scope_selectors?: string[]
+  blast_radius_notes?: string[]
+  rollback_steps?: string[]
 }
 
-export default function DraftControlsPage() {
+function DraftControlsPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialFindingId = (searchParams.get('finding_id') || '').trim()
+  const initialDeviceId = (searchParams.get('device_id') || '').trim()
   const [gate, setGate] = useState(false)
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [findingId, setFindingId] = useState('lab-finding-001')
@@ -28,6 +43,9 @@ export default function DraftControlsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [detailModal, setDetailModal] = useState<{ title: string; payload: unknown } | null>(null)
   const [showRaw, setShowRaw] = useState(false)
+  const [activeMode, setActiveMode] = useState<'designer' | 'queue'>('designer')
+  const [editing, setEditing] = useState<{ id: string; notes: string; status: string } | null>(null)
+  const [savingNotes, setSavingNotes] = useState(false)
 
   useEffect(() => {
     if (!readLabAuthenticated()) {
@@ -88,17 +106,52 @@ export default function DraftControlsPage() {
 
   return (
     <ConsoleShell activeNavId="controls" breadcrumbs={[{ label: 'Draft controls' }]} health={health} onLogout={onLogout}>
-      <main className="mx-auto max-w-4xl px-4 py-6">
+      <main className="mx-auto max-w-5xl px-4 py-6">
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <strong>Observe-only.</strong> Drafts and simulations do not enforce policy. They project historical matches for review.
         </div>
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Link href="/" className="text-sm font-semibold text-blue-700">Dashboard</Link>
-          <button type="button" className="btn btn-primary h-9 px-3 text-sm" onClick={() => setCreateOpen(true)}>
-            New draft
-          </button>
+          <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setActiveMode('designer')}
+              className={`h-8 rounded-md px-3 ${activeMode === 'designer' ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
+            >
+              Finding-to-control designer
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMode('queue')}
+              className={`h-8 rounded-md px-3 ${activeMode === 'queue' ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
+            >
+              Draft queue
+            </button>
+          </div>
         </div>
 
+        {activeMode === 'designer' ? (
+          <FindingToControlPanel
+            embedded
+            initialFindingId={initialFindingId}
+            initialDeviceId={initialDeviceId}
+            onDraftCreated={() => {
+              void refresh()
+            }}
+          />
+        ) : null}
+
+        {activeMode === 'queue' ? (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm text-slate-500">{queueCount} drafts in the queue</span>
+            <button type="button" className="btn btn-primary h-9 px-3 text-sm" onClick={() => setCreateOpen(true)}>
+              New manual draft
+            </button>
+          </div>
+        ) : null}
+
+        {activeMode === 'queue' ? (
+        <>
         <SummaryStrip>
           <KpiTile label="Draft queue" value={queueCount} />
           <KpiTile label="Simulated" value={simulatedCount} />
@@ -124,16 +177,27 @@ export default function DraftControlsPage() {
               rows={filteredDrafts.map((d) => ([
                 <div key={`${d.id}-draft`}>
                   <div className="font-mono text-xs text-gray-500">{formatHash(d.id)}</div>
-                  <div className="text-xs text-gray-600">Finding: {formatHash(d.source_finding_id)}</div>
+                  <div className="text-xs text-gray-600">Finding: {d.source_finding_title || formatHash(d.source_finding_id)}</div>
+                  {d.source_device_id ? <div className="text-[11px] text-gray-500">Device: {d.source_device_id}</div> : null}
                 </div>,
                 <span key={`${d.id}-action`} className="text-sm text-gray-900">{d.proposed_action}</span>,
-                <span key={`${d.id}-status`} className="text-xs text-gray-600">{d.status}</span>,
+                <div key={`${d.id}-status`} className="flex flex-col text-xs text-gray-600">
+                  <span>{d.status}</span>
+                  {d.confidence ? <span>conf: {d.confidence}</span> : null}
+                </div>,
                 <span key={`${d.id}-sim`} className="text-xs text-gray-600">
                   {typeof d.simulation_match_count === 'number' ? `${d.simulation_match_count} matches` : 'Not simulated'}
                 </span>,
-                <div key={`${d.id}-actions`} className="flex gap-2">
+                <div key={`${d.id}-actions`} className="flex flex-wrap gap-2">
                   <button type="button" className="btn btn-secondary h-8 px-2 text-xs" onClick={() => simulate(d.id)} disabled={!deviceSim.trim()}>
                     Simulate
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary h-8 px-2 text-xs"
+                    onClick={() => setEditing({ id: d.id, notes: d.operator_notes || '', status: d.status })}
+                  >
+                    Notes
                   </button>
                   <button
                     type="button"
@@ -150,6 +214,8 @@ export default function DraftControlsPage() {
             />
           )}
         </section>
+        </>
+        ) : null}
       </main>
 
       <DetailModal
@@ -166,6 +232,58 @@ export default function DraftControlsPage() {
           <button type="button" className="btn btn-secondary h-8 px-2 text-xs" onClick={() => setShowRaw((v) => !v)}>
             {showRaw ? 'Show summary' : 'Show raw'}
           </button>
+        </div>
+      ) : null}
+
+      {editing ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-xl rounded-xl border border-gray-200 bg-white p-4 shadow-xl">
+            <h2 className="text-sm font-semibold text-gray-900">Operator notes & status</h2>
+            <p className="mt-1 text-xs text-gray-500">Document why this scope was chosen, what review is pending, and what would change before promotion.</p>
+            <div className="mt-3 grid gap-3">
+              <label className="grid gap-1 text-xs font-medium text-gray-700">
+                Operator notes
+                <textarea className="input h-32 px-3 py-2 text-sm" value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} />
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-gray-700">
+                Status
+                <select
+                  className="input h-9"
+                  value={editing.status}
+                  onChange={(e) => setEditing({ ...editing, status: e.target.value })}
+                >
+                  <option value="draft_observe_only">draft_observe_only</option>
+                  <option value="draft_in_review">draft_in_review</option>
+                  <option value="draft_archived">draft_archived</option>
+                </select>
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="btn btn-secondary h-9 px-3 text-sm" onClick={() => setEditing(null)}>Cancel</button>
+              <button
+                type="button"
+                className="btn btn-primary h-9 px-3 text-sm"
+                disabled={savingNotes}
+                onClick={async () => {
+                  if (!editing) return
+                  setSavingNotes(true)
+                  try {
+                    await fetch(`/api/actions/platform/draft-controls/${encodeURIComponent(editing.id)}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ operator_notes: editing.notes, status: editing.status }),
+                    })
+                    await refresh()
+                    setEditing(null)
+                  } finally {
+                    setSavingNotes(false)
+                  }
+                }}
+              >
+                {savingNotes ? 'Saving…' : 'Save notes'}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -209,8 +327,33 @@ function summarizeDraft(payload: unknown) {
   return {
     id: d.id,
     status: d.status,
-    finding: d.source_finding_id,
-    action: d.proposed_action,
+    confidence: d.confidence,
+    expected_breakage_risk: d.expected_breakage_risk,
+    source_finding_id: d.source_finding_id,
+    source_finding_title: d.source_finding_title,
+    source_device_id: d.source_device_id,
+    proposed_action: d.proposed_action,
+    scope_selectors: d.scope_selectors,
+    blast_radius: d.blast_radius,
+    blast_radius_notes: d.blast_radius_notes,
+    rollback_plan: d.rollback_plan,
+    rollback_steps: d.rollback_steps,
+    operator_notes: d.operator_notes,
     simulation_match_count: d.simulation_match_count ?? 'not simulated',
+    evidence_refs: d.evidence_refs,
   }
+}
+
+export default function DraftControlsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
+          Loading draft controls…
+        </div>
+      }
+    >
+      <DraftControlsPageInner />
+    </Suspense>
+  )
 }

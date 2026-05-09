@@ -38,18 +38,44 @@ func (s *Server) handleDraftControlsCollection(w http.ResponseWriter, r *http.Re
 		if d.Status == "" {
 			d.Status = "draft_observe_only"
 		}
-		d.CreatedMS = time.Now().UnixMilli()
+		now := time.Now().UnixMilli()
+		d.CreatedMS = now
+		d.UpdatedMS = now
 		if len(d.ScopeSelectors) == 0 {
-			d.ScopeSelectors = []string{"device:*"}
+			if d.SourceDeviceID != "" {
+				d.ScopeSelectors = []string{"device:" + d.SourceDeviceID}
+			} else {
+				d.ScopeSelectors = []string{"device:*"}
+			}
 		}
 		if len(d.EvidenceRefs) == 0 {
 			d.EvidenceRefs = []string{d.SourceFindingID}
 		}
+		if d.Confidence == "" {
+			d.Confidence = "medium"
+		}
+		if d.ExpectedBreakageRisk == "" {
+			d.ExpectedBreakageRisk = "low (observe-only; no enforcement)"
+		}
 		if d.BlastRadius == "" {
-			d.BlastRadius = "single-device observe-only projection"
+			d.BlastRadius = "Single-device observe-only projection. Counts historical matches before any restrict or deny is considered."
+		}
+		if len(d.BlastRadiusNotes) == 0 {
+			d.BlastRadiusNotes = []string{
+				"Counts historical matches for the same scope without enforcing.",
+				"Does not block traffic, processes, or browser activity.",
+				"Re-run simulate after evidence updates to refresh the match count.",
+			}
 		}
 		if d.RollbackPlan == "" {
-			d.RollbackPlan = "disable draft simulation; retain evidence anchors"
+			d.RollbackPlan = "Disable the draft and retain evidence anchors."
+		}
+		if len(d.RollbackSteps) == 0 {
+			d.RollbackSteps = []string{
+				"Set status to draft_archived to stop simulation cycles.",
+				"Keep the source finding link so the audit trail stays intact.",
+				"If a follow-up control was generated from this draft, archive it as well.",
+			}
 		}
 		s.platform.mu.Lock()
 		s.platform.Drafts = append(s.platform.Drafts, d)
@@ -58,11 +84,12 @@ func (s *Server) handleDraftControlsCollection(w http.ResponseWriter, r *http.Re
 			EventType:   "draft_control.created",
 			Status:      d.Status,
 			Subject:     d.ID,
-			Description: "Observe-only draft control recorded",
-			CreatedMS:   time.Now().UnixMilli(),
+			DeviceID:    d.SourceDeviceID,
+			Description: fmt.Sprintf("Observe-only draft control recorded for finding %s", d.SourceFindingID),
+			CreatedMS:   now,
 		})
 		s.platform.mu.Unlock()
-		jsonWrite(w, http.StatusCreated, map[string]any{"id": d.ID})
+		jsonWrite(w, http.StatusCreated, map[string]any{"id": d.ID, "draft": d})
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -74,11 +101,43 @@ func (s *Server) handleDraftControlsItem(w http.ResponseWriter, r *http.Request)
 		http.NotFound(w, r)
 		return
 	}
-	if !strings.HasSuffix(path, "/simulate") || r.Method != http.MethodPost {
-		http.NotFound(w, r)
+
+	if strings.HasSuffix(path, "/simulate") {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		id := strings.TrimSuffix(path, "/simulate")
+		s.simulateDraft(w, r, id)
 		return
 	}
-	id := strings.TrimSuffix(path, "/simulate")
+
+	id := strings.TrimRight(path, "/")
+	switch r.Method {
+	case http.MethodGet:
+		s.platform.mu.Lock()
+		var found *DraftControl
+		for i := range s.platform.Drafts {
+			if s.platform.Drafts[i].ID == id {
+				clone := s.platform.Drafts[i]
+				found = &clone
+				break
+			}
+		}
+		s.platform.mu.Unlock()
+		if found == nil {
+			http.NotFound(w, r)
+			return
+		}
+		jsonWrite(w, http.StatusOK, found)
+	case http.MethodPatch:
+		s.patchDraft(w, r, id)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) simulateDraft(w http.ResponseWriter, r *http.Request, id string) {
 	var body struct {
 		DeviceID string `json:"device_id"`
 	}
@@ -88,13 +147,21 @@ func (s *Server) handleDraftControlsItem(w http.ResponseWriter, r *http.Request)
 	deviceID := strings.TrimSpace(body.DeviceID)
 	s.platform.mu.Lock()
 	found := false
+	var snapshot DraftControl
 	for i := range s.platform.Drafts {
 		if s.platform.Drafts[i].ID != id {
 			continue
 		}
 		found = true
 		matches := simulateMatches(deviceID + id)
+		now := time.Now().UnixMilli()
 		s.platform.Drafts[i].SimulationMatches = matches
+		s.platform.Drafts[i].SimulationDeviceID = deviceID
+		s.platform.Drafts[i].SimulationAtMS = now
+		s.platform.Drafts[i].UpdatedMS = now
+		matchesCopy := matches
+		s.platform.Drafts[i].ExpectedMatches = &matchesCopy
+		snapshot = s.platform.Drafts[i]
 		s.platform.appendOp(OperationalEvent{
 			ID:          uuid.NewString(),
 			EventType:   "draft_control.simulated",
@@ -102,15 +169,80 @@ func (s *Server) handleDraftControlsItem(w http.ResponseWriter, r *http.Request)
 			Subject:     id,
 			DeviceID:    deviceID,
 			Description: fmt.Sprintf("Historical window matched %d events (lab projection)", matches),
-			CreatedMS:   time.Now().UnixMilli(),
+			CreatedMS:   now,
 		})
-		jsonWrite(w, http.StatusOK, map[string]any{"draft_id": id, "matched_events": matches})
 		break
 	}
 	s.platform.mu.Unlock()
 	if !found {
 		http.NotFound(w, r)
+		return
 	}
+	jsonWrite(w, http.StatusOK, map[string]any{
+		"draft_id":       id,
+		"matched_events": *snapshot.ExpectedMatches,
+		"draft":          snapshot,
+	})
+}
+
+func (s *Server) patchDraft(w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		OperatorNotes        *string  `json:"operator_notes,omitempty"`
+		Status               *string  `json:"status,omitempty"`
+		ExpectedBreakageRisk *string  `json:"expected_breakage_risk,omitempty"`
+		ScopeSelectors       []string `json:"scope_selectors,omitempty"`
+		BlastRadius          *string  `json:"blast_radius,omitempty"`
+		RollbackPlan         *string  `json:"rollback_plan,omitempty"`
+	}
+	if !jsonRead(w, r, &body) {
+		return
+	}
+	s.platform.mu.Lock()
+	found := false
+	var snapshot DraftControl
+	for i := range s.platform.Drafts {
+		if s.platform.Drafts[i].ID != id {
+			continue
+		}
+		found = true
+		now := time.Now().UnixMilli()
+		if body.OperatorNotes != nil {
+			s.platform.Drafts[i].OperatorNotes = *body.OperatorNotes
+		}
+		if body.Status != nil && strings.TrimSpace(*body.Status) != "" {
+			s.platform.Drafts[i].Status = *body.Status
+		}
+		if body.ExpectedBreakageRisk != nil {
+			s.platform.Drafts[i].ExpectedBreakageRisk = *body.ExpectedBreakageRisk
+		}
+		if body.ScopeSelectors != nil {
+			s.platform.Drafts[i].ScopeSelectors = body.ScopeSelectors
+		}
+		if body.BlastRadius != nil {
+			s.platform.Drafts[i].BlastRadius = *body.BlastRadius
+		}
+		if body.RollbackPlan != nil {
+			s.platform.Drafts[i].RollbackPlan = *body.RollbackPlan
+		}
+		s.platform.Drafts[i].UpdatedMS = now
+		snapshot = s.platform.Drafts[i]
+		s.platform.appendOp(OperationalEvent{
+			ID:          uuid.NewString(),
+			EventType:   "draft_control.updated",
+			Status:      s.platform.Drafts[i].Status,
+			Subject:     id,
+			DeviceID:    s.platform.Drafts[i].SourceDeviceID,
+			Description: "Observe-only draft control updated",
+			CreatedMS:   now,
+		})
+		break
+	}
+	s.platform.mu.Unlock()
+	if !found {
+		http.NotFound(w, r)
+		return
+	}
+	jsonWrite(w, http.StatusOK, snapshot)
 }
 
 func (s *Server) handleIntegrationDeviceEvidence(w http.ResponseWriter, r *http.Request) {
