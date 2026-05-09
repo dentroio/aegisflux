@@ -21,6 +21,9 @@ func (s *Server) registerPlatformRoutes() {
 	px("/platform/draft-controls", s.handleDraftControlsCollection)
 	px("/platform/draft-controls/", s.handleDraftControlsItem)
 
+	px("/platform/research-feed", s.handleResearchFeedCollection)
+	px("/platform/research-feed/", s.handleResearchFeedItem)
+
 	px("/platform/integration/devices/", s.handleIntegrationDeviceEvidence)
 	px("/platform/redact/preview", s.handleRedactPreview)
 }

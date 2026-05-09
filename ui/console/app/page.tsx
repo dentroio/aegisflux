@@ -1250,6 +1250,7 @@ function DashboardEndpointScan({
           <a href="/agents" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Review stale endpoints and collector health</a>
           <a href="/discover/abom" className="block rounded-md border border-blue-200 bg-blue-50 px-3 py-2 font-semibold text-blue-800 hover:bg-blue-100">Open the fleet Agent Bill of Materials</a>
           <a href="/analyze/evidence" className="block rounded-md border border-blue-200 bg-blue-50 px-3 py-2 font-semibold text-blue-800 hover:bg-blue-100">Trace a finding through process, flow, DNS, and control</a>
+          <a href="/analyze/research" className="block rounded-md border border-blue-200 bg-blue-50 px-3 py-2 font-semibold text-blue-800 hover:bg-blue-100">Triage AI research feed for new detection opportunities</a>
           <a href="/inventory" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Inspect AI tool and extension inventory</a>
           <a href="/detections" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Check detection-pack coverage and rollout</a>
           <a href="/control/controls" className="block rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50">Draft observe-only controls from evidence</a>

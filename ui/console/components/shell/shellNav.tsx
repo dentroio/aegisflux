@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   ListTree,
   Network,
+  Newspaper,
   Plug,
   Server,
   Settings,
@@ -40,6 +41,7 @@ export const shellNavGroups: readonly ShellNavGroup[] = [
     items: [
       { id: 'evidence', label: 'Evidence Graph', icon: Network },
       { id: 'detections', label: 'Detection Packs', icon: Sparkles },
+      { id: 'research', label: 'AI Research Feed', icon: Newspaper },
       { id: 'activity-log', label: 'Findings', icon: Activity },
     ],
   },
@@ -86,6 +88,8 @@ export function targetForNavItem(itemId: string): string {
       return '/detections'
     case 'activity-log':
       return '/analyze/findings'
+    case 'research':
+      return '/analyze/research'
     case 'controls':
       return '/control/controls'
     case 'simulation':
