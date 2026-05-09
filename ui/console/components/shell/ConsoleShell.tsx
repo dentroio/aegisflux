@@ -101,7 +101,7 @@ export function ConsoleShell({
 
         <div style={sh.bodyShell}>
           <aside style={sh.sidebar}>
-            <nav style={sh.sideNav}>
+            <nav data-testid="console-sidebar-nav" style={sh.sideNav}>
               {shellNavGroups.map((group) => (
                 <div key={group.label}>
                   <div style={sh.sideGroupLabel}>{group.label}</div>

@@ -207,30 +207,52 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
   const loadDevice = async () => {
     setRefreshing(true)
     const encoded = encodeURIComponent(deviceId)
-    const [devices, events, processes, flows, dns, findings, extensions, sase, collectors, performance] = await Promise.all([
-      fetchJson<{ devices?: DeviceRecord[] }>(`/api/visibility/devices?limit=120`, {}),
-      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&limit=120`, {}),
-      fetchJson<{ processes?: ProcessRecord[] }>(`/api/visibility/processes?device_id=${encoded}&limit=80`, {}),
-      fetchJson<{ flows?: FlowRecord[] }>(`/api/visibility/flows?device_id=${encoded}&limit=80`, {}),
-      fetchJson<{ observations?: DnsRecord[]; dns?: DnsRecord[] }>(`/api/visibility/dns?device_id=${encoded}&limit=80`, {}),
-      fetchJson<{ findings?: FindingRecord[] }>(`/api/visibility/findings?device_id=${encoded}&limit=80`, {}),
-      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.browser_extension.observed&limit=80`, {}),
-      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.sase_component.observed&limit=80`, {}),
-      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.collector.status&limit=80`, {}),
-      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.agent.performance&limit=80`, {}),
-    ])
-
+    const res = await fetch(`/api/visibility/summary/device?device_id=${encoded}`, { cache: 'no-store' })
+    if (!res.ok) {
+      const [devices, events, processes, flows, dns, findings, extensions, sase, collectors, performance] = await Promise.all([
+        fetchJson<{ devices?: DeviceRecord[] }>(`/api/visibility/devices?limit=120`, {}),
+        fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&limit=120`, {}),
+        fetchJson<{ processes?: ProcessRecord[] }>(`/api/visibility/processes?device_id=${encoded}&limit=80`, {}),
+        fetchJson<{ flows?: FlowRecord[] }>(`/api/visibility/flows?device_id=${encoded}&limit=80`, {}),
+        fetchJson<{ observations?: DnsRecord[]; dns?: DnsRecord[] }>(`/api/visibility/dns?device_id=${encoded}&limit=80`, {}),
+        fetchJson<{ findings?: FindingRecord[] }>(`/api/visibility/findings?device_id=${encoded}&limit=80`, {}),
+        fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.browser_extension.observed&limit=80`, {}),
+        fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.sase_component.observed&limit=80`, {}),
+        fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.collector.status&limit=80`, {}),
+        fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.agent.performance&limit=80`, {}),
+      ])
+      setData({
+        devices: devices.devices || [],
+        events: events.events || [],
+        processes: processes.processes || [],
+        flows: flows.flows || [],
+        dns: dns.observations || dns.dns || [],
+        findings: findings.findings || [],
+        extensions: (extensions.events || []).map((event) => ({ event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...event.payload })),
+        sase: (sase.events || []).map((event) => ({ event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...event.payload })),
+        collectors: (collectors.events || []).map((event) => ({ event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...event.payload })),
+        performance: (performance.events || []).map((event) => ({ event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...event.payload })),
+      })
+      setLoading(false)
+      setRefreshing(false)
+      return
+    }
+    const bundle = await res.json()
+    const mapPayloadEvent = (event: EventRecord & { payload?: Record<string, unknown> }) => {
+      const payload = event.payload && typeof event.payload === 'object' ? event.payload : {}
+      return { event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...payload }
+    }
     setData({
-      devices: devices.devices || [],
-      events: events.events || [],
-      processes: processes.processes || [],
-      flows: flows.flows || [],
-      dns: dns.observations || dns.dns || [],
-      findings: findings.findings || [],
-      extensions: (extensions.events || []).map((event) => ({ event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...event.payload })),
-      sase: (sase.events || []).map((event) => ({ event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...event.payload })),
-      collectors: (collectors.events || []).map((event) => ({ event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...event.payload })),
-      performance: (performance.events || []).map((event) => ({ event_id: event.event_id, timestamp_ms: event.timestamp_ms, ...event.payload })),
+      devices: bundle.devices || [],
+      events: (bundle.events || []) as EventRecord[],
+      processes: (bundle.processes || []) as ProcessRecord[],
+      flows: (bundle.flows || []) as FlowRecord[],
+      dns: (bundle.dns || []) as DnsRecord[],
+      findings: (bundle.findings || []) as FindingRecord[],
+      extensions: (bundle.extension_events || []).map((event: EventRecord) => mapPayloadEvent(event)),
+      sase: (bundle.sase_events || []).map((event: EventRecord) => mapPayloadEvent(event)),
+      collectors: (bundle.collector_events || []).map((event: EventRecord) => mapPayloadEvent(event)),
+      performance: (bundle.performance_events || []).map((event: EventRecord) => mapPayloadEvent(event)),
     })
     setLoading(false)
     setRefreshing(false)

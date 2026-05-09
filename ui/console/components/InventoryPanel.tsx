@@ -99,26 +99,74 @@ export function InventoryPanel({
 
   const load = useCallback(async () => {
     setRefreshing(true)
-    const [deviceRes, extRes, saseRes, dnsRes, procRes, findRes] = await Promise.all([
-      fetchJson<{ devices?: DeviceRecord[] }>('/api/visibility/devices?limit=180', {}),
-      fetchJson<{ events?: EventRecord[] }>(
-        '/api/visibility/events?event_type=aegis.browser_extension.observed&limit=220',
-        {},
-      ),
-      fetchJson<{ events?: EventRecord[] }>(
-        '/api/visibility/events?event_type=aegis.sase_component.observed&limit=220',
-        {},
-      ),
-      fetchJson<{ dns?: DnsRecord[]; observations?: DnsRecord[] }>('/api/visibility/dns?limit=220', {}),
-      fetchJson<{ processes?: ProcessRecord[] }>('/api/visibility/processes?limit=220', {}),
-      fetchJson<{ findings?: FindingRecord[] }>('/api/visibility/findings?limit=120', {}),
-    ])
-    setDevices(deviceRes.devices || [])
-    setExtensionEvents(extRes.events || [])
-    setSaseEvents(saseRes.events || [])
-    setDns(dnsRes.dns || dnsRes.observations || [])
-    setProcesses(procRes.processes || [])
-    setFindings(findRes.findings || [])
+    const res = await fetch('/api/visibility/summary/inventory', { cache: 'no-store' })
+    if (!res.ok) {
+      const [deviceRes, extRes, saseRes, dnsRes, procRes, findRes] = await Promise.all([
+        fetchJson<{ devices?: DeviceRecord[] }>('/api/visibility/devices?limit=180', {}),
+        fetchJson<{ events?: EventRecord[] }>(
+          '/api/visibility/events?event_type=aegis.browser_extension.observed&limit=220',
+          {},
+        ),
+        fetchJson<{ events?: EventRecord[] }>(
+          '/api/visibility/events?event_type=aegis.sase_component.observed&limit=220',
+          {},
+        ),
+        fetchJson<{ dns?: DnsRecord[]; observations?: DnsRecord[] }>('/api/visibility/dns?limit=220', {}),
+        fetchJson<{ processes?: ProcessRecord[] }>('/api/visibility/processes?limit=220', {}),
+        fetchJson<{ findings?: FindingRecord[] }>('/api/visibility/findings?limit=120', {}),
+      ])
+      setDevices(deviceRes.devices || [])
+      setExtensionEvents(extRes.events || [])
+      setSaseEvents(saseRes.events || [])
+      setDns(dnsRes.dns || dnsRes.observations || [])
+      setProcesses(procRes.processes || [])
+      setFindings(findRes.findings || [])
+      setLoading(false)
+      setRefreshing(false)
+      return
+    }
+    const bundle = await res.json()
+    const mapVisEvent = (e: Record<string, unknown>): EventRecord => {
+      let payload = e.payload as Record<string, unknown> | string | undefined
+      if (typeof payload === 'string') {
+        try {
+          payload = JSON.parse(payload) as Record<string, unknown>
+        } catch {
+          payload = {}
+        }
+      }
+      return {
+        event_id: String(e.event_id || ''),
+        event_type: String(e.event_type || ''),
+        timestamp_ms: Number(e.timestamp_ms || 0),
+        received_at_ms: e.received_at_ms !== undefined ? Number(e.received_at_ms) : undefined,
+        source: e.source !== undefined ? String(e.source) : undefined,
+        device_id: String(e.device_id || ''),
+        payload: (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>,
+      }
+    }
+    setDevices((bundle.devices || []) as DeviceRecord[])
+    setExtensionEvents((bundle.events_ext || []).map(mapVisEvent))
+    setSaseEvents((bundle.events_sase || []).map(mapVisEvent))
+    setDns((bundle.dns || []) as DnsRecord[])
+    setProcesses(
+      (bundle.processes || []).map((p: Record<string, unknown>) => ({
+        device_id: p.device_id !== undefined ? String(p.device_id) : undefined,
+        name: p.name !== undefined ? String(p.name) : undefined,
+        path: p.path !== undefined ? String(p.path) : undefined,
+        command_line: p.command_line !== undefined ? String(p.command_line) : undefined,
+      })),
+    )
+    setFindings(
+      (bundle.findings || []).map((f: Record<string, unknown>) => ({
+        device_id: f.device_id !== undefined ? String(f.device_id) : undefined,
+        title: f.title !== undefined ? String(f.title) : undefined,
+        classification: f.classification !== undefined ? String(f.classification) : undefined,
+        detected_patterns: Array.isArray(f.detected_patterns)
+          ? (f.detected_patterns as string[])
+          : undefined,
+      })),
+    )
     setLoading(false)
     setRefreshing(false)
   }, [])

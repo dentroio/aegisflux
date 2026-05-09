@@ -145,6 +145,26 @@ type CollectorStatus = {
   received_at_ms: number
 }
 
+/** Mirrors ingest /v1/visibility/summary/dashboard model payload. */
+type DashboardSummaryModelDTO = {
+  totalDevices: number
+  onlineDevices: number
+  offlineDevices: number
+  maxRisk: number
+  aiSignals: number
+  eventCount: number
+  extensionCount: number
+  saseCount: number
+  extensions: BrowserExtensionRecord[]
+  sase: SaseComponentRecord[]
+  healthyCollectorPairs: number
+  maxCpuPercent: number | null
+  avgCpuPercent: number | null
+  maxMemoryRssMb: number | null
+  collectorStatuses: CollectorStatus[]
+  performance: AgentPerformanceRecord[]
+}
+
 const ui: Record<string, CSSProperties> = {
   page: {
     minHeight: '100vh',
@@ -664,6 +684,7 @@ function AegisDashboardBody() {
   const [devices, setDevices] = useState<DeviceRecord[]>([])
   const [query, setQuery] = useState('')
   const [data, setData] = useState<VisibilityData>({ events: [], processes: [], flows: [], dns: [], findings: [] })
+  const [serverDashboardModel, setServerDashboardModel] = useState<DashboardSummaryModelDTO | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
@@ -721,7 +742,10 @@ function AegisDashboardBody() {
   useEffect(() => {
     if (!authenticated || mainPanel !== 'dashboard') return undefined
     fetchDashboard()
-    const interval = setInterval(fetchDashboard, 60000)
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      fetchDashboard()
+    }, 60000)
     return () => clearInterval(interval)
   }, [authenticated, mainPanel])
 
@@ -735,31 +759,17 @@ function AegisDashboardBody() {
     try {
       setLoading(true)
       setError(null)
-      const [deviceResponse, events, extensionEvents, saseEvents, collectorEvents, performanceEvents, findings] = await Promise.all([
-        fetchJson<{ devices?: DeviceRecord[] }>('/api/visibility/devices?limit=80'),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?limit=120'),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.browser_extension.observed&limit=80'),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.sase_component.observed&limit=80'),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.collector.status&limit=120'),
-        fetchJson<{ events?: EventRecord[] }>('/api/visibility/events?event_type=aegis.agent.performance&limit=120'),
-        fetchJson<{ findings?: FindingRecord[] }>('/api/visibility/findings?limit=80'),
-      ])
-
-      const nextDevices = deviceResponse.devices || []
-      setDevices(nextDevices)
-      setData({
-        events: uniqueEvents([
-          ...(events.events || []),
-          ...(extensionEvents.events || []),
-          ...(saseEvents.events || []),
-          ...(collectorEvents.events || []),
-          ...(performanceEvents.events || []),
-        ]),
-        processes: [],
-        flows: [],
-        dns: [],
-        findings: findings.findings || [],
-      })
+      const summary = await fetchJson<{
+        ok?: boolean
+        devices?: DeviceRecord[]
+        model?: DashboardSummaryModelDTO
+      }>('/api/visibility/summary/dashboard')
+      if (!summary || summary.ok === false || !summary.model) {
+        throw new Error('Dashboard summary unavailable')
+      }
+      setDevices(summary.devices || [])
+      setServerDashboardModel(summary.model)
+      setData({ events: [], processes: [], flows: [], dns: [], findings: [] })
       setLastRefresh(new Date())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load AegisFlux dashboard')
@@ -785,10 +795,14 @@ function AegisDashboardBody() {
     window.localStorage.removeItem('aegisflux.labAuth')
     setAuthenticated(false)
     setDevices([])
+    setServerDashboardModel(null)
     setData({ events: [], processes: [], flows: [], dns: [], findings: [] })
   }
 
-  const model = useMemo(() => buildDashboardModel(data, devices), [data, devices])
+  const model = useMemo(() => {
+    if (serverDashboardModel) return adaptDashboardSummaryModel(serverDashboardModel)
+    return buildDashboardModel(data, devices)
+  }, [serverDashboardModel, data, devices])
   const filteredDevices = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) return devices
@@ -1358,12 +1372,25 @@ function buildDashboardModel(data: VisibilityData, devices: DeviceRecord[]) {
   }
 }
 
-function uniqueEvents(events: EventRecord[]) {
-  const byId = new Map<string, EventRecord>()
-  for (const event of events) byId.set(event.event_id, event)
-  return Array.from(byId.values()).sort((left, right) =>
-    (right.received_at_ms || right.timestamp_ms) - (left.received_at_ms || left.timestamp_ms),
-  )
+function adaptDashboardSummaryModel(m: DashboardSummaryModelDTO): ReturnType<typeof buildDashboardModel> {
+  return {
+    totalDevices: m.totalDevices,
+    onlineDevices: m.onlineDevices,
+    offlineDevices: m.offlineDevices,
+    maxRisk: m.maxRisk,
+    aiSignals: m.aiSignals,
+    eventCount: m.eventCount,
+    extensionCount: m.extensionCount,
+    saseCount: m.saseCount,
+    extensions: m.extensions || [],
+    sase: m.sase || [],
+    collectorStatuses: m.collectorStatuses || [],
+    performance: m.performance || [],
+    maxCpuPercent: m.maxCpuPercent,
+    avgCpuPercent: m.avgCpuPercent,
+    maxMemoryRssMb: m.maxMemoryRssMb,
+    healthyCollectorPairs: m.healthyCollectorPairs,
+  }
 }
 
 function widgetValue(
@@ -1378,7 +1405,7 @@ function widgetValue(
   if (id === 'detection_pack_coverage') return model.healthyCollectorPairs
   if (id === 'agent_performance_budget') return model.maxCpuPercent === null ? 'n/a' : `${model.maxCpuPercent.toFixed(1)}%`
   if (id === 'enterprise_control_inventory') return model.saseCount
-  return data.events.length
+  return model.eventCount
 }
 
 function widgetDetail(

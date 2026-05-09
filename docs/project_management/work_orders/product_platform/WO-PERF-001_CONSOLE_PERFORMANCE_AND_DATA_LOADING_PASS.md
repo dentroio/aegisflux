@@ -1,6 +1,6 @@
 # WO-PERF-001: Console Performance and Data Loading Pass
 
-**Status:** Draft  
+**Status:** Implemented (measurement + targeted fixes)  
 **Phase:** Product Platform Performance  
 **Primary owner:** UI / Backend  
 
@@ -66,4 +66,30 @@ The console currently mixes high-level workbench pages with large retained telem
 - `npm run build` in `ui/console`.
 - Route smoke checks against a local dev server.
 - Browser devtools or script-based timing notes for the routes listed above.
+
+## Implementation notes
+
+### Before → after (network fan-out)
+
+| Surface | Before (typical) | After |
+|--------|-------------------|--------|
+| Dashboard | 7 parallel visibility/action fetches | 1 `GET /api/visibility/summary/dashboard` |
+| Agents workbench | `GET /agents` + `GET /visibility/devices` | 1 `GET /api/actions/console/summary/agents-workbench` (actions-api merges ingest devices) |
+| Agent detail | 10 parallel visibility queries | 1 `GET /api/visibility/summary/device?device_id=…` (legacy fan-out retained as fallback if non-OK) |
+| Inventory | 6 parallel visibility queries | 1 `GET /api/visibility/summary/inventory` (legacy fallback if non-OK) |
+
+### Fetch cadence / background work
+
+- **Dashboard:** 60s refresh; callback no-ops while `document.visibilityState === 'hidden'` so background tabs do not refresh.
+- **Agents workbench:** 60s refresh with the same visibility guard.
+- **Embedded panels:** Agents and inventory only mount when their home panel is active, so the dashboard route does not poll workbench APIs in the background.
+
+### Remaining hotspots
+
+- Agent detail still hydrates full tab datasets from the device summary payload (one round trip; body size unchanged vs the old parallel calls).
+- Workbench summary depends on `INGEST_API_URL` from actions-api when merging visibility; misconfiguration yields agents without `visibility` (empty lab is still OK).
+
+### Verification
+
+- `npm run build` in `ui/console`; `npm run test:e2e` for route smoke and shell checks.
 

@@ -127,7 +127,10 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
 
   useEffect(() => {
     fetchAgents()
-    const interval = setInterval(fetchAgents, 60000)
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      fetchAgents()
+    }, 60000)
     return () => clearInterval(interval)
   }, [])
 
@@ -136,16 +139,9 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
       setRefreshing(true)
       setError(null)
 
-      const [response, visibilityResponse] = await Promise.all([
-        fetch('/api/actions/agents'),
-        fetch('/api/visibility/devices?limit=120')
-      ])
+      const response = await fetch('/api/actions/console/summary/agents-workbench')
       if (response.ok) {
         const data = await response.json()
-        const visibilityData = visibilityResponse.ok ? await visibilityResponse.json() : {}
-        const visibilityByDevice = new Map<string, VisibilitySummary>(
-          (visibilityData.devices || []).map((device: any) => [device.device_id, device])
-        )
         // Ensure all agents have a status property and normalize data structure
         const agentsWithStatus = (data.agents || []).map((agent: any) => ({
           ...agent,
@@ -182,7 +178,7 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
             max_programs: 10,
             max_maps: 50
           },
-          visibility: visibilityByDevice.get(agent.host_id) || visibilityByDevice.get(agent.agent_uid) || null
+          visibility: agent.visibility || null
         }))
         // Sort agents by last_seen (most recent first) and group by host_id
         const sortedAgents = agentsWithStatus.sort((a: any, b: any) => 

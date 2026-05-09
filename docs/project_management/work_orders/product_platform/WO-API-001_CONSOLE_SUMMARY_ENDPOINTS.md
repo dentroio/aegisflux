@@ -1,6 +1,6 @@
 # WO-API-001: Console Summary Endpoints
 
-**Status:** Draft  
+**Status:** Implemented  
 **Phase:** Product Platform API  
 **Primary owner:** Backend / UI  
 
@@ -62,4 +62,33 @@ AegisFlux has useful visibility data, but the UI often has to fetch several raw 
 - Relevant backend unit/integration tests.
 - `go test ./...` for touched Go modules where practical.
 - `npm run build` in `ui/console` if UI code changes.
+
+## Implementation notes
+
+### Ingest (read-only) summaries — `backend/ingest`
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/v1/visibility/summary/dashboard` | Devices list + pre-aggregated dashboard model (replaces multi-fetch client aggregation for the home dashboard). |
+| GET | `/v1/visibility/summary/device?device_id=` | Single bundle: devices list, events, processes, flows, dns, findings, typed extension/sase/collector/performance event streams. |
+| GET | `/v1/visibility/summary/inventory` | Single bundle for inventory workbench (devices, extension/sase events, dns, processes, findings). |
+
+Proxied from the console as `/api/visibility/summary/...` via existing `next.config.js` rewrites.
+
+### Actions API — workbench merge
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/console/summary/agents-workbench` | Same JSON shape as `GET /agents`, with optional `visibility` on each agent populated from ingest (`INGEST_API_URL`, default `http://localhost:9091`). |
+
+Proxied as `GET /api/actions/console/summary/agents-workbench`.
+
+### Tests
+
+- `backend/ingest/internal/server/summary_handlers_test.go` — empty dashboard summary + device `device_id` validation.
+- Run with `CGO_ENABLED=0 go test ./internal/server/...` if the platform linker rejects cgo.
+
+### Verification
+
+- `npm run build` in `ui/console`; console routes consume the new endpoints as described in WO-PERF-001 notes.
 

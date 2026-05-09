@@ -45,6 +45,20 @@ type AgentInfo struct {
 	LastSeen            time.Time            `json:"last_seen"`
 	Status              string               `json:"status"`
 	DetectionPackStatus *DetectionPackStatus `json:"detection_pack_status,omitempty"`
+	Visibility          *VisibilityDeviceRecord `json:"visibility,omitempty"`
+}
+
+// VisibilityDeviceRecord mirrors ingest /v1/visibility/devices rows for console merge.
+type VisibilityDeviceRecord struct {
+	DeviceID       string         `json:"device_id"`
+	AgentID        string         `json:"agent_id"`
+	Source         string         `json:"source"`
+	SensorVersion  string         `json:"sensor_version"`
+	FirstSeenMS    int64          `json:"first_seen_ms"`
+	LastSeenMS     int64          `json:"last_seen_ms"`
+	LastEventType  string         `json:"last_event_type"`
+	EventCount     int            `json:"event_count"`
+	EventTypeCount map[string]int `json:"event_type_count"`
 }
 
 // AgentDetailResponse represents the full agent response

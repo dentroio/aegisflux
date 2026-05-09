@@ -1,6 +1,6 @@
 # WO-QA-001: UI Rendering and Navigation Regression Harness
 
-**Status:** Draft  
+**Status:** Implemented  
 **Phase:** Product Platform Quality  
 **Primary owner:** UI / QA  
 
@@ -71,4 +71,13 @@ The project needs a small, reliable harness that verifies the actual operator pa
 - `npm run build` in `ui/console`.
 - New UI regression command documented by this work order.
 - Manual route check if browser automation is unavailable.
+
+## Implementation notes
+
+- Added Playwright harness under `ui/console/e2e/console-regression.spec.ts` with `npm run test:e2e` (see `ui/console/playwright.config.ts`).
+- The config builds the console and serves `next start` on **127.0.0.1:3041** by default (`PW_PORT` overrides) so checks do not collide with a dev server on 3030.
+- Lab auth is seeded via `localStorage` (`aegisflux.labAuth=admin`) in the authenticated suite; the unauthenticated case clears it before hitting agent detail.
+- `ConsoleShell` exposes `data-testid="console-sidebar-nav"` for stable shell assertions.
+- Row navigation test skips when the workbench has no agent rows (no fixture agents).
+- **Verification:** `npm run build` and `npm run test:e2e` in `ui/console` (7 passed, 1 skipped in a no-agent lab).
 
