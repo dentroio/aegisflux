@@ -82,6 +82,9 @@ The AegisFlux UI should follow the Clarion shell pattern:
 | WO-UX-003 | Agents Workbench Simplification | Focused agents table/list without permanent long-scroll detail column | WO-UX-002, WO-PLAT-005 |
 | WO-UX-004 | Inventory Workbench Simplification | Searchable category-driven inventory workbench | WO-UX-002, WO-INV-001 |
 | WO-UX-005 | Detections, Control, and Operate UX Simplification | Bounded candidate/draft/event workflows | WO-UX-002, WO-DET-002, WO-CTRL-001, WO-PLAT-006 |
+| WO-QA-001 | UI Rendering and Navigation Regression Harness | Repeatable checks for shell, auth, route rendering, row navigation, and bounded pages | WO-UX-001 through WO-UX-005 |
+| WO-PERF-001 | Console Performance and Data Loading Pass | Measured route performance, bounded data loading, and fetch cadence cleanup | WO-QA-001 recommended |
+| WO-API-001 | Console Summary Endpoints | Read-only backend summaries for dashboard, agents, agent detail, and inventory | WO-PERF-001 findings |
 
 ## Parallelization Guidance
 
@@ -102,6 +105,9 @@ These can run in parallel with low conflict:
 - WO-UX-001 should run before adding new UI capability because the dashboard is currently carrying too much detail.
 - WO-UX-002 should follow WO-UX-001 so the later workbench pages share detail and string-formatting behavior.
 - WO-UX-003, WO-UX-004, and WO-UX-005 can run after WO-UX-002; keep their page ownership separate to avoid conflicts.
+- WO-QA-001 should start the next phase so the UI regressions discovered during refinement become repeatable checks.
+- WO-PERF-001 should follow or run alongside WO-QA-001; keep it focused on measurement and low-risk fetch/render improvements.
+- WO-API-001 should use WO-PERF-001 findings to choose which summary endpoints remove the most UI fan-out.
 
 ## Phase Exit Criteria
 
@@ -117,6 +123,9 @@ These can run in parallel with low conflict:
 - Inventory surfaces show AI tools, browser extensions, local model runtimes, and enterprise control components.
 - Findings can produce observe-only draft controls and simulations.
 - Clarion integration has a concrete first API/event slice.
+- Core UI navigation and rendering paths have repeatable regression coverage.
+- Console performance bottlenecks are measured, documented, and reduced where practical.
+- High-impact workbench pages can use backend summaries instead of broad client-side telemetry fan-out.
 
 ## Non-Goals
 
