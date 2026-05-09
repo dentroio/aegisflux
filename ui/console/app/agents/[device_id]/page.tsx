@@ -154,7 +154,7 @@ type VisibilityState = {
   performance: AgentPerformance[]
 }
 
-const tabs = ['Overview', 'Evidence', 'Inventory', 'Detection Packs', 'Performance', 'Policy']
+const tabs = ['Overview', 'Activity', 'Software & Controls', 'Detection Packs', 'Health', 'Policy']
 
 const aiPattern = /chatgpt|openai|anthropic|claude|gemini|copilot|mistral|ollama|litellm|vllm|mcp|modelcontextprotocol/i
 
@@ -208,16 +208,16 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
     setRefreshing(true)
     const encoded = encodeURIComponent(deviceId)
     const [devices, events, processes, flows, dns, findings, extensions, sase, collectors, performance] = await Promise.all([
-      fetchJson<{ devices?: DeviceRecord[] }>(`/api/visibility/devices?limit=200`, {}),
-      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&limit=260`, {}),
-      fetchJson<{ processes?: ProcessRecord[] }>(`/api/visibility/processes?device_id=${encoded}&limit=220`, {}),
-      fetchJson<{ flows?: FlowRecord[] }>(`/api/visibility/flows?device_id=${encoded}&limit=220`, {}),
-      fetchJson<{ observations?: DnsRecord[]; dns?: DnsRecord[] }>(`/api/visibility/dns?device_id=${encoded}&limit=220`, {}),
-      fetchJson<{ findings?: FindingRecord[] }>(`/api/visibility/findings?device_id=${encoded}&limit=160`, {}),
-      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.browser_extension.observed&limit=160`, {}),
-      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.sase_component.observed&limit=160`, {}),
-      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.collector.status&limit=160`, {}),
-      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.agent.performance&limit=160`, {}),
+      fetchJson<{ devices?: DeviceRecord[] }>(`/api/visibility/devices?limit=120`, {}),
+      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&limit=120`, {}),
+      fetchJson<{ processes?: ProcessRecord[] }>(`/api/visibility/processes?device_id=${encoded}&limit=80`, {}),
+      fetchJson<{ flows?: FlowRecord[] }>(`/api/visibility/flows?device_id=${encoded}&limit=80`, {}),
+      fetchJson<{ observations?: DnsRecord[]; dns?: DnsRecord[] }>(`/api/visibility/dns?device_id=${encoded}&limit=80`, {}),
+      fetchJson<{ findings?: FindingRecord[] }>(`/api/visibility/findings?device_id=${encoded}&limit=80`, {}),
+      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.browser_extension.observed&limit=80`, {}),
+      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.sase_component.observed&limit=80`, {}),
+      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.collector.status&limit=80`, {}),
+      fetchJson<{ events?: EventRecord[] }>(`/api/visibility/events?device_id=${encoded}&event_type=aegis.agent.performance&limit=80`, {}),
     ])
 
     setData({
@@ -367,10 +367,10 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-6 grid gap-4 md:grid-cols-5">
-          <Metric label="Events" value={device.event_count || data.events.length} />
-          <Metric label="Processes" value={data.processes.length} />
+          <Metric label="Signals" value={device.event_count || data.events.length} />
+          <Metric label="Observed programs" value={data.processes.length} />
           <Metric label="Network Flows" value={data.flows.length} />
-          <Metric label="DNS" value={data.dns.length} />
+          <Metric label="Domain lookups" value={data.dns.length} />
           <Metric label="Findings" value={data.findings.length} tone={data.findings.length ? 'warning' : 'normal'} />
         </div>
 
@@ -399,13 +399,13 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
           </div>
           <label className="relative min-w-0 lg:w-80">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} className="input pl-9" placeholder="Filter current evidence" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} className="input pl-9" placeholder="Filter this page" />
           </label>
         </div>
 
         <section className="card p-5">
           {loading ? (
-            <EmptyState title="Loading device evidence" detail="Collecting visibility records from ingest." />
+            <EmptyState title="Loading agent detail" detail="Collecting the latest status and activity for this agent." />
           ) : (
             <TabContent
               activeTab={activeTab}
@@ -467,32 +467,31 @@ function TabContent(props: {
 }) {
   const { activeTab } = props
   if (activeTab === 'Overview') {
-    const confidence =
-      props.findings.length > 5 ? 'Moderate' : props.findings.length ? 'Watch' : 'Stable'
+    const confidence = props.findings.length > 5 ? 'Needs review' : props.findings.length ? 'Watch' : 'Stable'
     const unhealthy = props.collectors.filter((c) => c.status !== 'healthy').length
+    const aiSignals = props.aiDns.length + props.aiProcesses.length + props.aiFindings.length
     return (
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel icon={Activity} title="Identity / freshness">
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Panel icon={Activity} title="Agent status">
           <KeyValue label="Device" value={props.device.device_id} />
           <KeyValue label="Sensor" value={props.device.sensor_version || 'unknown'} />
-          <KeyValue label="Freshness" value={props.deviceFresh ? 'Fresh' : 'Stale'} />
+          <KeyValue label="Telemetry" value={props.deviceFresh ? 'Reporting now' : 'Not reporting recently'} />
         </Panel>
-        <Panel icon={Globe2} title="Network context">
-          <KeyValue label="Flows" value={String(props.flows.length)} />
-          <KeyValue label="DNS observations" value={String(props.dns.length)} />
+        <Panel icon={ShieldCheck} title="Risk summary">
+          <KeyValue label="Open findings" value={String(props.findings.length)} />
+          <KeyValue label="State" value={confidence} />
         </Panel>
-        <Panel icon={ShieldCheck} title="Evidence confidence">
-          <KeyValue label="Findings" value={String(props.findings.length)} />
-          <KeyValue label="Heuristic confidence" value={confidence} />
+        <Panel icon={Chrome} title="AI and control signals">
+          <KeyValue label="AI-related signals" value={String(aiSignals)} />
+          <KeyValue label="Enterprise controls" value={String(props.sase.length)} />
         </Panel>
-        <Panel icon={Cpu} title="Detection / policy context">
-          <KeyValue label="Collector alerts" value={String(unhealthy)} />
-          <KeyValue label="Observe-only" value="No enforcement from this console" />
+        <Panel icon={Globe2} title="Network activity">
+          <KeyValue label="Connections" value={String(props.flows.length)} />
+          <KeyValue label="Domain lookups" value={String(props.dns.length)} />
         </Panel>
-        <Panel icon={Chrome} title="AI signal surface">
-          <KeyValue label="AI DNS hints" value={String(props.aiDns.length)} />
-          <KeyValue label="AI findings" value={String(props.aiFindings.length)} />
-          <KeyValue label="AI-ish processes" value={String(props.aiProcesses.length)} />
+        <Panel icon={Cpu} title="Agent health">
+          <KeyValue label="Collector issues" value={String(unhealthy)} />
+          <KeyValue label="Queue depth" value={String(props.performance[0]?.event_queue_depth ?? 'n/a')} />
         </Panel>
         <Panel icon={AlertTriangle} title="Next best action">
           <EmptyLine text={nextBestAction({
@@ -505,32 +504,40 @@ function TabContent(props: {
       </div>
     )
   }
-  if (activeTab === 'Evidence') {
+  if (activeTab === 'Activity') {
     return (
       <div className="grid gap-6">
-        <Panel icon={Activity} title="Processes (sample)">
-          <Table rows={props.processes} empty="No process telemetry for this device." columns={['pid', 'name', 'path', 'command_line']} />
+        <Panel icon={ShieldCheck} title="Findings that need attention">
+          <Table rows={props.findings} empty="No findings for this agent." columns={['severity', 'title', 'classification', 'risk_score']} />
         </Panel>
-        <Panel icon={Network} title="Flows (sample)">
-          <Table rows={props.flows} empty="No network flow telemetry." columns={['protocol', 'direction', 'remote_ip', 'remote_hostname']} />
+        <Panel icon={Chrome} title="AI-related activity">
+          <Table
+            rows={[
+              ...props.aiFindings.map((row) => ({ type: 'finding', signal: row.title, detail: row.classification, action: row.recommended_action })),
+              ...props.aiDns.map((row) => ({ type: 'domain', signal: row.query, detail: row.answers?.join(', '), action: row.correlation_method })),
+              ...props.aiProcesses.map((row) => ({ type: 'program', signal: row.name, detail: row.path || row.command_line, action: row.user })),
+            ]}
+            empty="No AI-related activity is visible in this window."
+            columns={['type', 'signal', 'detail', 'action']}
+          />
         </Panel>
-        <Panel icon={Globe2} title="DNS (sample)">
-          <Table rows={props.dns} empty="No DNS telemetry." columns={['query', 'answers', 'correlation_method']} />
+        <Panel icon={Network} title="External connections">
+          <Table rows={props.flows} empty="No network connections for this agent." columns={['process_name', 'remote_hostname', 'remote_ip', 'remote_port']} />
         </Panel>
-        <Panel icon={ShieldCheck} title="Findings">
-          <Table rows={props.findings} empty="No findings." columns={['severity', 'title', 'classification', 'risk_score']} />
+        <Panel icon={Cpu} title="Observed programs">
+          <Table rows={props.processes} empty="No observed program samples for this agent." columns={['name', 'user', 'path', 'command_line']} />
         </Panel>
       </div>
     )
   }
-  if (activeTab === 'Inventory') {
+  if (activeTab === 'Software & Controls') {
     return (
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel icon={Chrome} title="Browser extensions">
-          <Table rows={props.extensions} empty="No browser extension telemetry." columns={['browser', 'name', 'extension_id', 'version']} />
+          <Table rows={props.extensions} empty="No browser extension inventory for this agent." columns={['browser', 'name', 'version', 'profile']} />
         </Panel>
-        <Panel icon={ShieldCheck} title="SSE / SASE components">
-          <Table rows={props.sase} empty="No enterprise inventory signals." columns={['vendor', 'product', 'name', 'status']} />
+        <Panel icon={ShieldCheck} title="Enterprise controls">
+          <Table rows={props.sase} empty="No SASE/SSE control inventory for this agent." columns={['vendor', 'product', 'name', 'status']} />
         </Panel>
       </div>
     )
@@ -538,12 +545,11 @@ function TabContent(props: {
   if (activeTab === 'Detection Packs') {
     return (
       <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-700">
-        Detection pack telemetry is summarized on the Agents workbench rollout table. This tab focuses on endpoint-local findings (
-        {props.findings.length}) as a proxy until pack version strings are joined here.
+        Detection-pack rollout state is summarized in the Agents rollout table. This page shows endpoint-local findings for this agent: {props.findings.length}.
       </div>
     )
   }
-  if (activeTab === 'Performance') {
+  if (activeTab === 'Health') {
     const latest = props.performance[0]
     return (
       <div className="space-y-5">
@@ -608,8 +614,11 @@ function Panel({ icon: Icon, title, children }: { icon: typeof Activity; title: 
 
 function Table<T extends Record<string, any>>({ rows, columns, empty }: { rows: T[]; columns: string[]; empty: string }) {
   if (rows.length === 0) return <EmptyState title="No telemetry" detail={empty} />
+  const visibleRows = rows.slice(0, 40)
+  const hiddenCount = rows.length - visibleRows.length
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-hidden rounded-lg border border-slate-200">
+      <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead>
           <tr className="text-left text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -617,13 +626,23 @@ function Table<T extends Record<string, any>>({ rows, columns, empty }: { rows: 
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {rows.slice(0, 120).map((row, index) => (
+          {visibleRows.map((row, index) => (
             <tr key={`${row.event_id || row.process_guid || row.flow_id || index}`}>
-              {columns.map((column) => <td key={column} className="max-w-md py-3 pr-5 align-top text-gray-700">{formatCell(row[column])}</td>)}
+              {columns.map((column) => (
+                <td key={column} className="max-w-sm px-3 py-3 align-top text-gray-700">
+                  <span className="line-clamp-2 break-words" title={formatCell(row[column], false)}>{formatCell(row[column])}</span>
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
+      {hiddenCount > 0 ? (
+        <div className="border-t border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          Showing first {visibleRows.length} of {rows.length}. Use the page filter to narrow the list.
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -680,11 +699,12 @@ function formatAge(value?: number) {
   return new Date(value).toLocaleString()
 }
 
-function formatCell(value: any) {
+function formatCell(value: any, compact = true) {
   if (Array.isArray(value)) return value.join(', ')
   if (value === null || value === undefined || value === '') return 'n/a'
   if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
+  const text = String(value)
+  return compact && text.length > 140 ? `${text.slice(0, 137)}...` : text
 }
 
 function formatPercent(value?: number | null) {

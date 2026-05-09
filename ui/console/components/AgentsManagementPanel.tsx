@@ -434,7 +434,8 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
               <EmptyState title="No matching agents" message="Try adjusting the filter or search query." />
             ) : (
               <BoundedTable
-                headers={['Identity', 'Status', 'Platform', 'Pack health', 'Signals', 'Action']}
+                headers={['Identity', 'Status', 'Platform', 'Pack health', 'Signals', 'Open']}
+                rowHrefs={workbenchAgents.map((agent) => `/agents/${encodeURIComponent(agent.host_id || agent.agent_uid)}`)}
                 rows={workbenchAgents.map((agent) => {
                   const stale = Date.now() - new Date(agent.last_seen).getTime() > 5 * 60 * 1000
                   return [
@@ -467,6 +468,7 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
                     <a
                       key={`${agent.agent_uid}-action`}
                       href={`/agents/${encodeURIComponent(agent.host_id || agent.agent_uid)}`}
+                      onClick={(event) => event.stopPropagation()}
                       className="text-xs font-semibold text-primary-700 hover:text-primary-900"
                     >
                       Open detail
@@ -484,7 +486,8 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
                 Detection pack rollout
               </div>
               <BoundedTable
-                headers={['Agent', 'State', 'Active pack', 'Trust', 'Last check', 'Action']}
+                headers={['Agent', 'State', 'Active pack', 'Trust', 'Last check', 'Open']}
+                rowHrefs={rolloutRows.map(({ agent }) => `/agents/${encodeURIComponent(agent.host_id || agent.agent_uid)}`)}
                 rows={rolloutRows.map(({ agent, status }) => ([
                   <div key={`agent-${agent.agent_uid}`}>
                     <p className="text-sm font-medium text-slate-900">{formatHostname(agent.hostname || agent.host_id)}</p>
@@ -501,7 +504,10 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
                   <button
                     key={`trust-${agent.agent_uid}`}
                     className="text-xs text-primary-700 underline underline-offset-2"
-                    onClick={() => setDetailModal({ title: `Trust detail: ${agent.hostname || formatAgentId(agent.agent_uid)}`, payload: status })}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setDetailModal({ title: `Trust detail: ${agent.hostname || formatAgentId(agent.agent_uid)}`, payload: status })
+                    }}
                   >
                     View trust detail
                   </button>,
@@ -511,6 +517,7 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
                   <a
                     key={`action-${agent.agent_uid}`}
                     href={`/agents/${encodeURIComponent(agent.host_id || agent.agent_uid)}`}
+                    onClick={(event) => event.stopPropagation()}
                     className="text-xs font-semibold text-primary-700 hover:text-primary-900"
                   >
                     Open detail

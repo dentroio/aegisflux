@@ -46,10 +46,12 @@ export function BoundedTable({
   headers,
   rows,
   maxRows = 120,
+  rowHrefs,
 }: {
   headers: string[]
   rows: ReactNode[][]
   maxRows?: number
+  rowHrefs?: string[]
 }) {
   const visibleRows = rows.slice(0, maxRows)
   const hiddenCount = Math.max(rows.length - visibleRows.length, 0)
@@ -68,7 +70,21 @@ export function BoundedTable({
         </thead>
         <tbody className="divide-y divide-slate-100 bg-white">
           {visibleRows.map((row, idx) => (
-            <tr key={idx}>
+            <tr
+              key={idx}
+              className={rowHrefs?.[idx] ? 'cursor-pointer hover:bg-slate-50 focus-within:bg-slate-50' : undefined}
+              tabIndex={rowHrefs?.[idx] ? 0 : undefined}
+              onClick={() => {
+                if (rowHrefs?.[idx]) window.location.href = rowHrefs[idx]
+              }}
+              onKeyDown={(event) => {
+                if (!rowHrefs?.[idx]) return
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  window.location.href = rowHrefs[idx]
+                }
+              }}
+            >
               {row.map((cell, cellIdx) => (
                 <td key={cellIdx} className="ux-table-cell px-3 py-2 align-top">{cell}</td>
               ))}
@@ -115,7 +131,8 @@ export function CopyValueButton({ value, label = 'Copy value' }: { value: string
       type="button"
       aria-label={label}
       className="inline-flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-      onClick={async () => {
+      onClick={async (event) => {
+        event.stopPropagation()
         try {
           await navigator.clipboard.writeText(value)
           setCopied(true)
