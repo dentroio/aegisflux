@@ -21,6 +21,7 @@ import {
 import { ConsoleShell } from '@/components/shell/ConsoleShell'
 import { readLabAuthenticated } from '@/shared/labAuth'
 import { AbomPanel } from '@/components/AbomPanel'
+import { EvidenceGraphPanel } from '@/components/EvidenceGraphPanel'
 
 type DeviceRecord = {
   device_id: string
@@ -155,7 +156,7 @@ type VisibilityState = {
   performance: AgentPerformance[]
 }
 
-const tabs = ['Overview', 'AI Capability', 'Activity', 'Software & Controls', 'Detection Packs', 'Health', 'Policy']
+const tabs = ['Overview', 'AI Capability', 'Evidence Path', 'Activity', 'Software & Controls', 'Detection Packs', 'Health', 'Policy']
 
 const aiPattern = /chatgpt|openai|anthropic|claude|gemini|copilot|mistral|ollama|litellm|vllm|mcp|modelcontextprotocol/i
 
@@ -431,6 +432,13 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
             <EmptyState title="Loading agent detail" detail="Collecting the latest status and activity for this agent." />
           ) : activeTab === 'AI Capability' ? (
             <AbomPanel scope="device" deviceId={deviceId} embedded />
+          ) : activeTab === 'Evidence Path' ? (
+            <EvidenceGraphPanel
+              initialDeviceId={deviceId}
+              initialFindingId={data.findings[0]?.finding_id || data.findings[0]?.event_id || ''}
+              embedded
+              autoLoad
+            />
           ) : (
             <TabContent
               activeTab={activeTab}

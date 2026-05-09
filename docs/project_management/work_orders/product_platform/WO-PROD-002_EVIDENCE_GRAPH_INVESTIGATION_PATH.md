@@ -1,6 +1,6 @@
 # WO-PROD-002: Evidence Graph Investigation Path
 
-**Status:** Draft  
+**Status:** Done  
 **Phase:** Product Differentiation  
 **Primary owner:** Backend / UI  
 
@@ -23,41 +23,38 @@ Trust comes from linkage.
 
 ## Deliverables
 
-- Define evidence graph node types:
-  - endpoint
-  - user/session
-  - process
-  - parent process
-  - command
-  - network flow
-  - DNS lookup
-  - browser extension
-  - local runtime
-  - finding
-  - detection pack
-  - draft control
-- Define edge types:
-  - launched
-  - resolved
-  - connected
-  - matched
-  - observed_on
-  - supports_control
-- Add graph/path API for a finding or endpoint activity.
-- Add compact UI path:
-  - high-level path first
-  - expandable raw evidence
-  - confidence and missing-evidence indicators
-- Add docs explaining relationship quality and limitations.
+- Defined evidence graph node types in `backend/ingest/internal/server/evidence_path_query.go`:
+  - `endpoint`, `parent_process`, `process`, `flow`, `dns`, `finding`, `detection_pack`, `draft_control` (forward-compatible: `user_session`, `browser_extension`, `local_runtime`).
+- Defined edge types: `launched`, `resolved`, `connected`, `matched`, `observed_on`, `supports_control`.
+- New backend API: `GET /v1/visibility/evidence-path` with filters `finding_id`, `device_id`, `process_guid`, `agent_id`. Response includes:
+  - subject (finding | process | endpoint),
+  - curated `nodes` and `edges`,
+  - `missing_evidence` callouts (e.g. `parent_process`, `dns`, `detection_pack`),
+  - `confidence_overall` ranked from per-node confidences,
+  - `summary` one-liner ready to read,
+  - bounded raw evidence (`raw_processes`, `raw_flows`, `raw_dns`, `raw_findings`, plus the existing draft-control synthesizer).
+- Reusable `EvidenceGraphPanel` component in the console with:
+  - inputs for finding id, device id, and process GUID,
+  - high-level path cards (one per node), edge labels, confidence dots,
+  - amber missing-evidence callouts and per-node "missing" styling,
+  - bounded raw JSON view behind a collapsible "Raw evidence" section,
+  - graceful empty state.
+- New `/analyze/evidence` route that uses the panel (replacing the placeholder).
+- Endpoint detail page: new `Evidence Path` tab that auto-loads the path for the device's most recent finding.
+- Dashboard "Next best actions" gains a deep link into the evidence path.
+- Backend tests in `evidence_path_query_test.go`:
+  - full path with finding + process + flow + DNS + draft control;
+  - partial evidence (only finding) marks missing nodes and downgrades confidence;
+  - empty inputs return no nodes and low confidence.
 
 ## Acceptance Criteria
 
-- From a finding, an operator can see the most relevant process/network/DNS path without reading raw JSON.
-- Missing evidence is explicit rather than hidden.
-- Raw records remain available behind bounded detail.
-- The graph path is stable enough to support future draft-control generation.
-- Relevant backend tests pass.
-- `npm run build` passes in `ui/console` if UI changes are made.
+- [x] From a finding, an operator can see the most relevant process/network/DNS path without reading raw JSON (path cards plus summary).
+- [x] Missing evidence is explicit rather than hidden (`missing_evidence` field + amber UI callouts + node-level missing badge).
+- [x] Raw records remain available behind bounded detail (collapsible "Raw evidence" with `JSON.stringify` blocks limited to the first six rows per category).
+- [x] The graph path is stable enough to support future draft-control generation (re-uses `buildDraftControls` and surfaces them as `supports_control` edges).
+- [x] Relevant backend tests added.
+- [x] `npm run build` passes in `ui/console`.
 
 ## Dependencies
 
@@ -73,6 +70,6 @@ Trust comes from linkage.
 
 ## Suggested Verification
 
-- Tests for path building with complete and partial evidence.
-- UI route checks for finding/agent drill-in surfaces.
-
+- `cd backend/ingest && go test ./internal/server -run TestBuildEvidencePath`.
+- `cd ui/console && npm run build`.
+- Manual walkthrough: open `/analyze/evidence`, paste a finding id (or device id) from a lab agent, click `Build path`, confirm the path renders with confidence dots and missing-evidence callouts. Then open Agents → endpoint → `Evidence Path` tab and confirm it auto-loads.
