@@ -85,6 +85,11 @@ The AegisFlux UI should follow the Clarion shell pattern:
 | WO-QA-001 | UI Rendering and Navigation Regression Harness | Repeatable checks for shell, auth, route rendering, row navigation, and bounded pages | WO-UX-001 through WO-UX-005 |
 | WO-PERF-001 | Console Performance and Data Loading Pass | Measured route performance, bounded data loading, and fetch cadence cleanup | WO-QA-001 recommended |
 | WO-API-001 | Console Summary Endpoints | Read-only backend summaries for dashboard, agents, agent detail, and inventory | WO-PERF-001 findings |
+| WO-PROD-001 | Agent Bill of Materials | Evidence-backed inventory of AI-capable tools, capabilities, and reachability | WO-INV-001, WO-API-001 recommended |
+| WO-PROD-002 | Evidence Graph Investigation Path | Finding-to-process-to-network-to-control evidence path | WO-API-001, WO-PROD-001 recommended |
+| WO-PROD-003 | Finding-to-Control Design Workflow | Findings become observe-only draft controls with evidence, blast radius, and rollback notes | WO-CTRL-001, WO-PROD-002 |
+| WO-PROD-004 | AI Research Feed and Detection Opportunities | Research opportunities become governed detection candidates | WO-DET-002, WO-AI-002, WO-PLAT-006 |
+| WO-PROD-005 | First-Value Demo and Operator Onboarding | Five-minute guided workflow that shows AegisFlux value | WO-PROD-001 through WO-PROD-003 recommended |
 
 ## Parallelization Guidance
 
@@ -108,6 +113,11 @@ These can run in parallel with low conflict:
 - WO-QA-001 should start the next phase so the UI regressions discovered during refinement become repeatable checks.
 - WO-PERF-001 should follow or run alongside WO-QA-001; keep it focused on measurement and low-risk fetch/render improvements.
 - WO-API-001 should use WO-PERF-001 findings to choose which summary endpoints remove the most UI fan-out.
+- WO-PROD-001 is the first differentiation work order because Agent Bill of Materials is the clearest customer-facing wedge.
+- WO-PROD-002 should follow once the inventory and summary model can support evidence-backed drill-ins.
+- WO-PROD-003 is the core evidence-to-control workflow; keep it observe-only until simulation and approval mature.
+- WO-PROD-004 can run in parallel with WO-PROD-001/002 because it extends the dynamic detection loop rather than the UI data model.
+- WO-PROD-005 should package the first-value story after the first three product-differentiation slices exist.
 
 ## Phase Exit Criteria
 
@@ -126,6 +136,9 @@ These can run in parallel with low conflict:
 - Core UI navigation and rendering paths have repeatable regression coverage.
 - Console performance bottlenecks are measured, documented, and reduced where practical.
 - High-impact workbench pages can use backend summaries instead of broad client-side telemetry fan-out.
+- AegisFlux can show an Agent Bill of Materials that is more meaningful than raw software inventory.
+- A finding can be explained through an evidence path and turned into an observe-only draft control proposal.
+- A new operator can understand AegisFlux's value through a short first-value workflow.
 
 ## Non-Goals
 
