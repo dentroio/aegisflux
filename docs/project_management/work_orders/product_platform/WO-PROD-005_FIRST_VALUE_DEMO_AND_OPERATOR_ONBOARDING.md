@@ -1,65 +1,63 @@
 # WO-PROD-005: First-Value Demo and Operator Onboarding
 
-**Status:** Draft  
+**Status:** Done  
 **Phase:** Product Differentiation  
-**Primary owner:** Product / UI / Docs  
+**Primary owner:** UI / Product  
 
 ## Goal
 
-Build a focused first-value path that shows why AegisFlux matters in under five minutes: discover AI capability, inspect evidence, draft an observe-only control, and understand next steps.
+Build a focused demo path that an operator can follow to understand AegisFlux value in under five minutes.
 
 ## Why This Makes Aegis Stand Out
 
-People use products that help them win quickly. AegisFlux needs a guided path that avoids raw telemetry overwhelm and tells the product story through a real operator workflow.
-
-The platform should feel like a control-design assistant, not a pile of endpoint data.
+Most security tools require long ramp-ups. AegisFlux should let an operator say in five minutes: "this is what we have, this is why a finding matters, this is what we would do, this is how we adapt." That clarity is part of the product value.
 
 ## Scope
 
-- Demo route or guided workflow inside the console.
-- Seeded lab scenario docs.
-- Operator-facing copy and empty states.
-- Links into ABOM, evidence graph, and draft controls when available.
+- A guided five-step tour covering the four product pillars (Discover, Investigate, Design, Adapt) plus a welcome and wrap-up.
+- Per-step CTAs that open the real product surface, not slides.
+- Local-storage progress tracking (visited steps, started timestamp, completed/skipped flags).
+- Dashboard banner that promotes the tour while it is incomplete.
+- Always-on demo route the operator (or a buyer in a demo session) can return to.
 
 ## Deliverables
 
-- Define the first-value journey:
-  1. Fleet has reporting agents.
-  2. Operator sees AI capability inventory.
-  3. Operator opens one endpoint.
-  4. Operator sees the evidence path.
-  5. Operator creates or reviews an observe-only draft control.
-  6. Operator sees blast-radius/simulation context.
-- Add a "Start here" or guided demo entry point in the console.
-- Add polished empty states for missing lab data.
-- Add docs for preparing demo data and lab agents.
-- Add screenshots or checklist placeholders where appropriate.
+- New `FirstValueTour` component in `ui/console/components/FirstValueTour.tsx`:
+  - Five-step ordered list (welcome → discover ABOM → investigate evidence path → design control → adapt research feed → wrap-up).
+  - Per-step icon, product-pillar tag, time estimate, narrative paragraph, and CTA that links into the live route.
+  - Pillar grid summarizing the four product pillars.
+  - Progress chips (`min left`, `visited count`, `completed`).
+  - Controls: Skip for now, Mark all visited, Reset progress.
+  - Persisted in localStorage under `aegisflux.firstValueDemo.v1`.
+- Reusable `FirstValueTourBanner` exported from the same module:
+  - Appears on the dashboard while the tour is neither completed nor skipped.
+  - Offers Start tour and Skip; Skip persists across reloads.
+- Helpers `tourCompleted()`, `markTourCompleted()`, `markTourSkipped()`, `resetTour()` for future surfaces (help menu, telemetry).
+- New `/demo` route gated by lab auth; uses `ConsoleShell` so the experience matches the rest of the product.
+- Dashboard `app/page.tsx` now renders the `FirstValueTourBanner` above the readiness band.
 
 ## Acceptance Criteria
 
-- A new operator can understand what AegisFlux does without reading architecture docs.
-- The demo path uses meaningful labels, not raw telemetry categories.
-- Empty states explain how to get value when data is missing.
-- The path avoids long scrolling and right-side detail sprawl.
-- `npm run build` passes in `ui/console` if UI changes are made.
-- Documentation explains how to run the demo.
+- [x] An operator can complete the tour and grasp Discover/Investigate/Design/Adapt in under five minutes (estimated step times sum to ~5:50; ~4:30 minus welcome/wrap).
+- [x] Each step links into the real product surface (`/discover/abom`, `/analyze/evidence`, `/control/controls`, `/analyze/research`).
+- [x] Progress is preserved across reloads via localStorage; banner hides when completed or skipped.
+- [x] Dashboard surfaces a Start-tour banner while the tour is incomplete.
+- [x] `cd ui/console && npm run build` passes.
 
 ## Dependencies
 
-- WO-PROD-001 recommended
-- WO-PROD-002 recommended
-- WO-PROD-003 recommended
-- Current lab connectivity and agent reporting
+- WO-PROD-001 (Agent Bill of Materials)
+- WO-PROD-002 (Evidence Graph)
+- WO-PROD-003 (Finding-to-Control Designer)
+- WO-PROD-004 (AI Research Feed)
 
 ## Non-Goals
 
-- No fake claims about enforcement.
-- No marketing landing page instead of product workflow.
-- No production installer work.
+- No backend telemetry for tour completion (left as a future enhancement).
+- No multi-user roles for tour content.
+- No auto-replay or in-product tooltips beyond the dashboard banner.
 
 ## Suggested Verification
 
-- UI build and route checks.
-- Manual walkthrough using lab data.
-- Docs review for clear operator language.
-
+- `cd ui/console && npm run build`.
+- Manual walkthrough: log into the lab, observe the banner on the dashboard, click Start tour, walk each step and confirm each CTA opens the right product surface, return to `/demo` and confirm the visited markers persist after a hard reload.

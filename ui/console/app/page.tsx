@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { AgentsManagementPanel } from '@/components/AgentsManagementPanel'
 import { InventoryPanel } from '@/components/InventoryPanel'
 import { ConsoleShell } from '@/components/shell/ConsoleShell'
+import { FirstValueTourBanner } from '@/components/FirstValueTour'
 import {
   CopyValueButton,
   EmptyState,
@@ -983,6 +984,7 @@ function DashboardScanSurface({
         </div>
       )}
 
+      <FirstValueTourBanner />
       <DashboardReadinessBand health={health} model={model} />
       <DashboardWidgetControls
         customizeOpen={customizeOpen}
