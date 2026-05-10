@@ -647,6 +647,7 @@ mod tests {
             sensor_version: "1.0.0".to_string(),
             backend_url: None,
             event_spool: "/tmp/e".into(),
+            process_state_path: "/tmp/e.process-state.json".into(),
             collect_command_line: false,
             controller_url: None,
             detection_packs_enabled: false,

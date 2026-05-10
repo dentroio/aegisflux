@@ -39,6 +39,7 @@ Start with [../../schemas/visibility/agent-heartbeat.schema.json](../../schemas/
 | Collector | Event Types | Evidence Source | Production Direction |
 |-----------|-------------|-----------------|----------------------|
 | `windows.process` | `aegis.process.started` | `sysinfo` process snapshot | ETW/process lifecycle plus signer/hash enrichment |
+| `windows.process_lifecycle` | `aegis.process.started` / `aegis.process.ended` | Snapshot diff vs persisted state (`--lifecycle` or `--interval-secs`) | ETW for kernel-accurate exit codes |
 | `windows.network` | `aegis.flow.started` | `netstat -ano` | ETW/WFP/IP Helper with stronger process attribution |
 | `windows.dns` | `aegis.dns.observed` | `ipconfig /displaydns` | DNS Client ETW and resolver integrations |
 | `windows.browser_history` | `aegis.dns.observed` | Copied Chromium SQLite history | Browser-specific collectors and policy-aware access |
@@ -90,6 +91,21 @@ rustc -vV
 ```bash
 cargo run -- --once --stdout
 ```
+
+### Process lifecycle (start/end without ETW)
+
+Use snapshot diff against a state file (default: alongside the JSONL spool, `*.process-state.json`):
+
+```bash
+# First run: seeds state only (no per-process start flood).
+# Second run: emits aegis.process.started / aegis.process.ended for real changes.
+cargo run -- --once --lifecycle --stdout
+
+# Continuous collection every 60 seconds (implies lifecycle).
+cargo run -- --interval-secs 60 --stdout
+```
+
+Override the state file with `AEGIS_PROCESS_STATE_PATH`.
 
 By default, local events are written to:
 
@@ -160,6 +176,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\uninstall-lab-sche
 | `AEGIS_DEVICE_ID` | hostname fallback | Device identity reported in event envelopes |
 | `AEGIS_SENSOR_VERSION` | crate version | Sensor version in event envelopes |
 | `AEGIS_EVENT_SPOOL` | platform default | JSONL event spool path |
+| `AEGIS_PROCESS_STATE_PATH` | derived from spool | Persisted process snapshot for `--lifecycle` / `--interval-secs` diff |
 | `AEGIS_BACKEND_URL` | empty | Optional Phase 1 ingest base URL for outbound lab telemetry |
 | `AEGIS_COLLECT_COMMAND_LINE` | `false` | Opt-in command-line collection for lab scenarios; values are sanitized and truncated |
 | `AEGIS_CONTROLLER_URL` | empty | Lab detection-pipeline base URL (`http://host:port`) for WO-DET-003 pack APIs |

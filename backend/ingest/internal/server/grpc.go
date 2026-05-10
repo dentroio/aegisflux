@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"os"
 
 	"aegisflux/backend/ingest/internal/health"
 	"aegisflux/backend/ingest/internal/metrics"
@@ -59,7 +58,7 @@ func NewIngestServer(natsURL string, logger *slog.Logger) (*IngestServer, error)
 	}
 	checker.SetNATSReady(natsPublisher.IsReady())
 
-	visibilityStore, err := newFileVisibilityStore(os.Getenv("AEGIS_VISIBILITY_STORE_PATH"))
+	visibilityStore, err := newVisibilityStoreFromEnv()
 	if err != nil {
 		return nil, err
 	}

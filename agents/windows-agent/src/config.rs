@@ -18,6 +18,8 @@ pub struct AgentConfig {
     pub backend_url: Option<String>,
     /// Local JSONL event spool path.
     pub event_spool: PathBuf,
+    /// Persisted process snapshot for lifecycle diff (`aegis.process.started` / `.ended`).
+    pub process_state_path: PathBuf,
     /// Whether command-line collection is enabled.
     pub collect_command_line: bool,
     /// Lab-only detection-pipeline controller base URL (`http://host:port`).
@@ -42,6 +44,9 @@ impl AgentConfig {
         let event_spool = env::var("AEGIS_EVENT_SPOOL")
             .map(PathBuf::from)
             .unwrap_or_else(|_| default_spool_path());
+        let process_state_path = env::var("AEGIS_PROCESS_STATE_PATH")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| default_process_state_path(&event_spool));
         let collect_command_line = env_bool("AEGIS_COLLECT_COMMAND_LINE", false)?;
         let controller_url = env::var("AEGIS_CONTROLLER_URL")
             .ok()
@@ -73,6 +78,7 @@ impl AgentConfig {
             sensor_version,
             backend_url,
             event_spool,
+            process_state_path,
             collect_command_line,
             controller_url,
             detection_packs_enabled,
@@ -143,4 +149,14 @@ fn default_spool_path() -> PathBuf {
 #[cfg(not(windows))]
 fn default_spool_path() -> PathBuf {
     PathBuf::from("/tmp/aegis-windows-agent/events.jsonl")
+}
+
+fn default_process_state_path(event_spool: &std::path::Path) -> PathBuf {
+    let name = event_spool
+        .file_name()
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "events.jsonl".to_string());
+    let mut path = event_spool.to_path_buf();
+    path.set_file_name(format!("{name}.process-state.json"));
+    path
 }

@@ -17,6 +17,9 @@
     "process_guid": "windows-dev-agent-01:1777062000000:9324",
     "flow_id": "windows-dev-agent-01:1777062010000:9324:tcp:10.10.20.55:52944:203.0.113.10:443",
     "detection_id": "det-windows-dev-agent-01-1777062015000-1",
+    "classification": "script_or_agent_runtime",
+    "application_category": "script_or_agent_runtime",
+    "risk_signal": null,
     "evidence": [
       {
         "type": "classification",

@@ -107,6 +107,21 @@ pub enum EventPayload {
         /// Collection method.
         collection_method: String,
     },
+    /// Process exit observed via snapshot diff (exit code unknown without kernel wait).
+    ProcessEnded {
+        /// Stable local process instance identifier.
+        process_guid: String,
+        /// Last observed process ID.
+        pid: u32,
+        /// Image name when known from prior observations.
+        name: Option<String>,
+        /// Exit code when available (often unknown for diff-based collection).
+        exit_code: Option<i32>,
+        /// Approximate run duration when first-seen time was recorded.
+        duration_ms: Option<u64>,
+        /// Collection method.
+        collection_method: String,
+    },
     /// Network flow started or observed in a snapshot payload.
     #[cfg_attr(not(windows), allow(dead_code))]
     FlowStarted {
@@ -118,6 +133,8 @@ pub enum EventPayload {
         pid: Option<u32>,
         /// Process image name when known.
         process_name: Option<String>,
+        /// Executable path for the attributed process when known.
+        process_path: Option<String>,
         /// User or account when available.
         user: Option<String>,
         /// IP protocol.
@@ -134,10 +151,36 @@ pub enum EventPayload {
         remote_port: Option<u16>,
         /// Remote hostname when correlated.
         remote_hostname: Option<String>,
+        /// TCP connection lifecycle state when observed (for example ESTABLISHED).
+        connection_state: Option<String>,
+        /// Bytes sent when available from the collector.
+        bytes_sent: Option<u64>,
+        /// Bytes received when available from the collector.
+        bytes_received: Option<u64>,
         /// Attribution method.
         attribution_method: String,
         /// Attribution confidence.
         attribution_confidence: f32,
+    },
+    /// Flow teardown or terminal snapshot (for example TIME_WAIT in netstat).
+    #[cfg_attr(not(windows), allow(dead_code))]
+    FlowEnded {
+        /// Stable local flow identifier (matches paired flow.started when present).
+        flow_id: String,
+        /// Stable local process instance identifier when known.
+        process_guid: Option<String>,
+        /// Process ID when known.
+        pid: Option<u32>,
+        /// Bytes sent when available.
+        bytes_sent: Option<u64>,
+        /// Bytes received when available.
+        bytes_received: Option<u64>,
+        /// Observed duration when available.
+        duration_ms: Option<u64>,
+        /// Terminal connection state when known.
+        connection_state: Option<String>,
+        /// How this observation was collected.
+        collection_method: String,
     },
     /// DNS observation payload.
     #[cfg_attr(not(windows), allow(dead_code))]
@@ -215,6 +258,10 @@ pub enum EventPayload {
         flow_id: Option<String>,
         /// Detection classification.
         classification: String,
+        /// High-level application or scenario category (for example developer_tool).
+        application_category: Option<String>,
+        /// Optional risk label (for example suspicious_automation).
+        risk_signal: Option<String>,
         /// Likelihood that the activity is agentic automation.
         agent_likelihood: f32,
         /// Detection confidence.
@@ -246,6 +293,12 @@ pub enum EventPayload {
         flow_id: Option<String>,
         /// Related detection identifier when known.
         detection_id: Option<String>,
+        /// Detection classification when this finding mirrors a detection.
+        classification: Option<String>,
+        /// High-level application or scenario category.
+        application_category: Option<String>,
+        /// Optional risk label.
+        risk_signal: Option<String>,
         /// Explainable evidence.
         evidence: Vec<DetectionEvidence>,
         /// Recommended non-blocking action.
@@ -372,11 +425,28 @@ impl AegisEvent {
                 option_json(publisher.as_deref()),
                 escape_json(collection_method)
             ),
+            EventPayload::ProcessEnded {
+                process_guid,
+                pid,
+                name,
+                exit_code,
+                duration_ms,
+                collection_method,
+            } => format!(
+                r#"{{"process_guid":"{}","pid":{},"name":{},"exit_code":{},"duration_ms":{},"collection_method":"{}"}}"#,
+                escape_json(process_guid),
+                pid,
+                option_json(name.as_deref()),
+                option_i32_json(*exit_code),
+                option_u64_json(*duration_ms),
+                escape_json(collection_method)
+            ),
             EventPayload::FlowStarted {
                 flow_id,
                 process_guid,
                 pid,
                 process_name,
+                process_path,
                 user,
                 protocol,
                 direction,
@@ -385,14 +455,18 @@ impl AegisEvent {
                 remote_ip,
                 remote_port,
                 remote_hostname,
+                connection_state,
+                bytes_sent,
+                bytes_received,
                 attribution_method,
                 attribution_confidence,
             } => format!(
-                r#"{{"flow_id":"{}","process_guid":{},"pid":{},"process_name":{},"user":{},"protocol":"{}","direction":"{}","local_ip":"{}","local_port":{},"remote_ip":"{}","remote_port":{},"remote_hostname":{},"attribution_method":"{}","attribution_confidence":{}}}"#,
+                r#"{{"flow_id":"{}","process_guid":{},"pid":{},"process_name":{},"process_path":{},"user":{},"protocol":"{}","direction":"{}","local_ip":"{}","local_port":{},"remote_ip":"{}","remote_port":{},"remote_hostname":{},"connection_state":{},"bytes_sent":{},"bytes_received":{},"attribution_method":"{}","attribution_confidence":{}}}"#,
                 escape_json(flow_id),
                 option_json(process_guid.as_deref()),
                 option_u32_json(*pid),
                 option_json(process_name.as_deref()),
+                option_json(process_path.as_deref()),
                 option_json(user.as_deref()),
                 escape_json(protocol),
                 escape_json(direction),
@@ -401,8 +475,31 @@ impl AegisEvent {
                 escape_json(remote_ip),
                 option_u16_json(*remote_port),
                 option_json(remote_hostname.as_deref()),
+                option_json(connection_state.as_deref()),
+                option_u64_json(*bytes_sent),
+                option_u64_json(*bytes_received),
                 escape_json(attribution_method),
                 finite_f32_json(*attribution_confidence)
+            ),
+            EventPayload::FlowEnded {
+                flow_id,
+                process_guid,
+                pid,
+                bytes_sent,
+                bytes_received,
+                duration_ms,
+                connection_state,
+                collection_method,
+            } => format!(
+                r#"{{"flow_id":"{}","process_guid":{},"pid":{},"bytes_sent":{},"bytes_received":{},"duration_ms":{},"connection_state":{},"collection_method":"{}"}}"#,
+                escape_json(flow_id),
+                option_json(process_guid.as_deref()),
+                option_u32_json(*pid),
+                option_u64_json(*bytes_sent),
+                option_u64_json(*bytes_received),
+                option_u64_json(*duration_ms),
+                option_json(connection_state.as_deref()),
+                escape_json(collection_method)
             ),
             EventPayload::DnsObserved {
                 query,
@@ -475,6 +572,8 @@ impl AegisEvent {
                 process_guid,
                 flow_id,
                 classification,
+                application_category,
+                risk_signal,
                 agent_likelihood,
                 confidence,
                 risk_score,
@@ -482,11 +581,13 @@ impl AegisEvent {
                 evidence,
                 recommended_action,
             } => format!(
-                r#"{{"detection_id":"{}","process_guid":{},"flow_id":{},"classification":"{}","agent_likelihood":{},"confidence":{},"risk_score":{},"detected_patterns":{},"evidence":{},"recommended_action":"{}"}}"#,
+                r#"{{"detection_id":"{}","process_guid":{},"flow_id":{},"classification":"{}","application_category":{},"risk_signal":{},"agent_likelihood":{},"confidence":{},"risk_score":{},"detected_patterns":{},"evidence":{},"recommended_action":"{}"}}"#,
                 escape_json(detection_id),
                 option_json(process_guid.as_deref()),
                 option_json(flow_id.as_deref()),
                 escape_json(classification),
+                option_json(application_category.as_deref()),
+                option_json(risk_signal.as_deref()),
                 finite_f32_json(*agent_likelihood),
                 finite_f32_json(*confidence),
                 risk_score,
@@ -503,10 +604,13 @@ impl AegisEvent {
                 process_guid,
                 flow_id,
                 detection_id,
+                classification,
+                application_category,
+                risk_signal,
                 evidence,
                 recommended_action,
             } => format!(
-                r#"{{"finding_id":"{}","severity":"{}","risk_score":{},"title":"{}","description":"{}","process_guid":{},"flow_id":{},"detection_id":{},"evidence":{},"recommended_action":"{}"}}"#,
+                r#"{{"finding_id":"{}","severity":"{}","risk_score":{},"title":"{}","description":"{}","process_guid":{},"flow_id":{},"detection_id":{},"classification":{},"application_category":{},"risk_signal":{},"evidence":{},"recommended_action":"{}"}}"#,
                 escape_json(finding_id),
                 escape_json(severity),
                 risk_score,
@@ -515,6 +619,9 @@ impl AegisEvent {
                 option_json(process_guid.as_deref()),
                 option_json(flow_id.as_deref()),
                 option_json(detection_id.as_deref()),
+                option_json(classification.as_deref()),
+                option_json(application_category.as_deref()),
+                option_json(risk_signal.as_deref()),
                 evidence_array_json(evidence),
                 escape_json(recommended_action)
             ),
@@ -560,6 +667,13 @@ fn option_json(value: Option<&str>) -> String {
 }
 
 fn option_u32_json(value: Option<u32>) -> String {
+    match value {
+        Some(value) => value.to_string(),
+        None => "null".to_string(),
+    }
+}
+
+fn option_i32_json(value: Option<i32>) -> String {
     match value {
         Some(value) => value.to_string(),
         None => "null".to_string(),
@@ -636,6 +750,7 @@ mod tests {
             process_guid: Some("proc-1".to_string()),
             pid: Some(42),
             process_name: Some("python.exe".to_string()),
+            process_path: None,
             user: None,
             protocol: "tcp".to_string(),
             direction: "outbound".to_string(),
@@ -644,6 +759,9 @@ mod tests {
             remote_ip: "203.0.113.10".to_string(),
             remote_port: Some(443),
             remote_hostname: Some("api.model-gateway.lab".to_string()),
+            connection_state: Some("ESTABLISHED".to_string()),
+            bytes_sent: None,
+            bytes_received: None,
             attribution_method: "test".to_string(),
             attribution_confidence: 0.9,
         };

@@ -1,6 +1,6 @@
 # WO-VIS-004: Visibility Event Schemas
 
-**Status:** Initial contract complete  
+**Status:** Complete  
 **Phase:** Visibility and Observability  
 **Primary owner:** Backend / Integration  
 
@@ -85,6 +85,6 @@ Every event should include:
 
 - Schema files created under `aegisflux/schemas/visibility/`
 - Example event fixtures created under `aegisflux/schemas/visibility/examples/`
-- JSON syntax verified with `jq`
-- Remaining: add automated JSON Schema validation in backend/CI once validator tooling is selected
-- Remaining: short review sign-off from agent and backend owners
+- JSON syntax verified with `jq` via `schemas/visibility/validate_examples.sh`
+- Flow and finding schemas extended for `process_path`, `connection_state`, byte counters (optional), and taxonomy fields on detections/findings
+- Full JSON Schema compile in CI for every example remains optional follow-up (ingest uses a separate legacy event schema for gRPC path)

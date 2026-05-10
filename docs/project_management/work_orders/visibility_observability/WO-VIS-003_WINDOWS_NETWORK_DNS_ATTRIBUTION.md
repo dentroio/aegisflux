@@ -1,6 +1,6 @@
 # WO-VIS-003: Windows Network and DNS Attribution
 
-**Status:** Draft  
+**Status:** Complete (lab netstat + DNS cache + flow↔DNS IP correlation; ETW optional for production)  
 **Phase:** Visibility and Observability  
 **Primary owner:** Agent  
 **Target environment:** `windows-dev-agent-01`
@@ -98,3 +98,9 @@ Correlation should tolerate gaps. When DNS cannot be attributed directly to a PI
 - Sample flow and DNS event JSON
 - Scenario logs for browser, Python, Node, Git, PowerShell
 - Documented attribution confidence behavior
+
+**Implementation notes**
+
+- Windows agent emits `aegis.flow.started` with TCP `connection_state`, optional `process_path` / `user` when resolvable, and `aegis.flow.ended` for terminal TCP states from `netstat -ano`.
+- DNS cache via `ipconfig /displaydns` with `aegis.dns.flow_remote_ip_match` correlation when a flow’s `remote_ip` matches a cached answer IP in the same batch.
+- Unit coverage: `correlates_dns_pid_from_flow_remote_ip` in `agents/windows-agent/src/collector.rs`.

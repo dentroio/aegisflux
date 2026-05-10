@@ -44,6 +44,15 @@
             "detection_id": {
               "type": ["string", "null"]
             },
+            "classification": {
+              "type": ["string", "null"]
+            },
+            "application_category": {
+              "type": ["string", "null"]
+            },
+            "risk_signal": {
+              "type": ["string", "null"]
+            },
             "evidence": {
               "type": "array",
               "items": {

@@ -1,6 +1,6 @@
 # WO-VIS-006: Visibility API and UI Surface
 
-**Status:** Initial investigation and findings query APIs complete  
+**Status:** Complete  
 **Phase:** Visibility and Observability  
 **Primary owner:** Backend / UI  
 

@@ -1,6 +1,7 @@
 //! Non-blocking AI-agent and automation detections.
 
 use std::collections::{BTreeSet, HashMap};
+use std::net::IpAddr;
 use std::time::SystemTime;
 
 use crate::config::AgentConfig;
@@ -10,13 +11,18 @@ use crate::event::{AegisEvent, DetectionEvidence, EventPayload};
 pub fn detect_ai_agent_activity(config: &AgentConfig, events: &[AegisEvent]) -> Vec<AegisEvent> {
     let context = DetectionContext::from_events(events);
     let mut detections = Vec::new();
+    let mut matched_processes = BTreeSet::new();
 
     for process in context.processes.values() {
-        if let Some(candidate) = detect_command_line_agent_marker(process, &context) {
-            detections.extend(candidate.into_events(config));
-        } else if let Some(candidate) = detect_script_or_agent_runtime(process, &context) {
-            detections.extend(candidate.into_events(config));
-        } else if let Some(candidate) = detect_powershell_automation(process, &context) {
+        if matched_processes.contains(&process.process_guid) {
+            continue;
+        }
+        let candidate = detect_command_line_agent_marker(process, &context)
+            .or_else(|| detect_ide_ai_assistant(process, &context))
+            .or_else(|| detect_script_or_agent_runtime(process, &context))
+            .or_else(|| detect_powershell_automation(process, &context));
+        if let Some(candidate) = candidate {
+            matched_processes.insert(process.process_guid.clone());
             detections.extend(candidate.into_events(config));
         }
     }
@@ -134,6 +140,8 @@ struct DnsObservation {
 #[derive(Debug)]
 struct DetectionCandidate {
     classification: String,
+    application_category: Option<String>,
+    risk_signal: Option<String>,
     process_guid: Option<String>,
     flow_id: Option<String>,
     agent_likelihood: f32,
@@ -159,7 +167,9 @@ impl DetectionCandidate {
                 detection_id: detection_id.clone(),
                 process_guid: self.process_guid.clone(),
                 flow_id: self.flow_id.clone(),
-                classification: self.classification,
+                classification: self.classification.clone(),
+                application_category: self.application_category.clone(),
+                risk_signal: self.risk_signal.clone(),
                 agent_likelihood: self.agent_likelihood,
                 confidence: self.confidence,
                 risk_score: self.risk_score,
@@ -181,6 +191,9 @@ impl DetectionCandidate {
                 process_guid: self.process_guid,
                 flow_id: self.flow_id,
                 detection_id: Some(detection_id),
+                classification: Some(self.classification),
+                application_category: self.application_category,
+                risk_signal: self.risk_signal,
                 evidence: self.evidence,
                 recommended_action: self.recommended_action,
             },
@@ -228,6 +241,8 @@ fn detect_command_line_agent_marker(
 
     Some(DetectionCandidate {
         classification: "script_or_agent_runtime".to_string(),
+        application_category: Some("script_or_agent_runtime".to_string()),
+        risk_signal: None,
         process_guid: Some(process.process_guid.clone()),
         flow_id: related_flow.map(|flow| flow.flow_id),
         agent_likelihood: 0.7,
@@ -238,6 +253,68 @@ fn detect_command_line_agent_marker(
         recommended_action: "review".to_string(),
         title: "Agent-like command line marker observed".to_string(),
         description: "A process command line contained explicit agent or model-tooling markers."
+            .to_string(),
+    })
+}
+
+fn detect_ide_ai_assistant(
+    process: &ProcessObservation,
+    context: &DetectionContext,
+) -> Option<DetectionCandidate> {
+    let name = process.name.to_ascii_lowercase();
+    if !matches!(
+        name.as_str(),
+        "node.exe" | "python.exe" | "pythonw.exe" | "npm.exe" | "npx.exe"
+    ) {
+        return None;
+    }
+    let parent = parent_process(process, context)?;
+    let parent_name = parent.name.to_ascii_lowercase();
+    if !matches!(
+        parent_name.as_str(),
+        "cursor.exe" | "code.exe" | "devenv.exe"
+    ) {
+        return None;
+    }
+    let related_flow = best_flow_for_process(process.pid, context)?;
+    let command_line = process.command_line.as_deref().unwrap_or_default();
+    let command_lower = command_line.to_ascii_lowercase();
+    let mut patterns = vec![
+        "ide_helper_runtime".to_string(),
+        "ide_parent_process_chain".to_string(),
+    ];
+    let mut evidence_items = vec![
+        evidence("process", &process.name, 0.78),
+        evidence("parent_process", &parent.name, 0.82),
+        evidence("destination", &related_flow.destination(), 0.74),
+    ];
+    if !command_line.is_empty() {
+        evidence_items.push(evidence("command_line", command_line, 0.8));
+    }
+    if let Some(path) = &process.path {
+        evidence_items.push(evidence("repo_or_runtime_path", path, 0.66));
+    }
+    if contains_any(
+        &command_lower,
+        &["openai", "anthropic", "agent", "tool", "mcp", "copilot"],
+    ) {
+        patterns.push("helper_command_line_model_ref".to_string());
+    }
+
+    Some(DetectionCandidate {
+        classification: "ide_ai_assistant".to_string(),
+        application_category: Some("developer_tool".to_string()),
+        risk_signal: None,
+        process_guid: Some(process.process_guid.clone()),
+        flow_id: Some(related_flow.flow_id),
+        agent_likelihood: 0.72,
+        confidence: 0.74,
+        risk_score: 46,
+        patterns,
+        evidence: evidence_items,
+        recommended_action: "review".to_string(),
+        title: "IDE-launched AI helper runtime observed".to_string(),
+        description: "A developer tool launched a helper runtime that reached an external destination; review for IDE AI or extension traffic."
             .to_string(),
     })
 }
@@ -317,6 +394,8 @@ fn detect_script_or_agent_runtime(
 
     Some(DetectionCandidate {
         classification: "script_or_agent_runtime".to_string(),
+        application_category: Some("script_or_agent_runtime".to_string()),
+        risk_signal: None,
         process_guid: Some(process.process_guid.clone()),
         flow_id: related_flow.map(|flow| flow.flow_id),
         agent_likelihood: if risk_score >= 48 { 0.78 } else { 0.52 },
@@ -377,8 +456,18 @@ fn detect_powershell_automation(
         evidence_items.push(evidence("destination", &flow.destination(), 0.68));
     }
 
+    let risk_signal = if command_lower.contains("-encodedcommand")
+        || command_lower.contains("frombase64string")
+    {
+        Some("suspicious_automation".to_string())
+    } else {
+        None
+    };
+
     Some(DetectionCandidate {
         classification: "shell_automation".to_string(),
+        application_category: Some("shell_automation".to_string()),
+        risk_signal,
         process_guid: Some(process.process_guid.clone()),
         flow_id: related_flow.map(|flow| flow.flow_id),
         agent_likelihood: 0.35,
@@ -398,36 +487,129 @@ fn detect_browser_ai_usage(context: &DetectionContext) -> Option<DetectionCandid
         .dns_queries
         .iter()
         .find(|dns| is_ai_destination(&dns.query))?;
-    let browser = context.processes.values().find(|process| {
-        matches!(
-            process.name.to_ascii_lowercase().as_str(),
-            "chrome.exe" | "msedge.exe" | "firefox.exe" | "brave.exe"
-        )
-    });
+    let ai_ips = ai_resolved_ips(context);
+    let mut correlated_flow: Option<(&ProcessObservation, &FlowObservation)> = None;
+    for process in context.processes.values() {
+        if !is_browser_process(process) {
+            continue;
+        }
+        let Some(flows) = context.flows_by_pid.get(&process.pid) else {
+            continue;
+        };
+        for flow in flows {
+            let hostname_ai = flow
+                .remote_hostname
+                .as_deref()
+                .is_some_and(|host| is_ai_destination(host));
+            let ip_hit = flow
+                .remote_ip
+                .parse::<IpAddr>()
+                .ok()
+                .is_some_and(|ip| ai_ips.contains(&ip.to_string()))
+                || ai_ips.contains(&flow.remote_ip);
+            if hostname_ai || ip_hit {
+                correlated_flow = Some((process, flow));
+                break;
+            }
+        }
+        if correlated_flow.is_some() {
+            break;
+        }
+    }
 
+    let browser = context
+        .processes
+        .values()
+        .find(|process| is_browser_process(process));
+    let correlated_browser_guid = correlated_flow
+        .as_ref()
+        .map(|(browser_proc, _)| browser_proc.process_guid.clone());
+
+    let mut patterns = vec!["ai_destination_dns".to_string()];
     let mut evidence_items = vec![evidence("dns_query", &ai_dns.query, 0.75)];
     if !ai_dns.answers.is_empty() {
         evidence_items.push(evidence("dns_answer", &ai_dns.answers.join(","), 0.55));
     }
-    if let Some(browser) = browser {
-        evidence_items.push(evidence("browser_process", &browser.name, 0.65));
-    }
+    let (flow_id, confidence, agent_likelihood, description) = if let Some((browser_proc, flow)) =
+        correlated_flow
+    {
+        patterns.push("browser_flow_to_ai_destination".to_string());
+        evidence_items.push(evidence("browser_process", &browser_proc.name, 0.82));
+        evidence_items.push(evidence("correlated_flow", &flow.destination(), 0.84));
+        (
+                Some(flow.flow_id.clone()),
+                0.78_f32,
+                0.34_f32,
+                "Browser process network flow correlated to an AI-related DNS answer or hostname; monitor-only (not proof of an autonomous host agent)."
+                    .to_string(),
+            )
+    } else if let Some(browser_proc) = browser {
+        patterns.push("dns_without_flow_correlation".to_string());
+        evidence_items.push(evidence("browser_process", &browser_proc.name, 0.55));
+        evidence_items.push(evidence(
+            "inference_note",
+            "No matching browser flow in this batch; DNS-only inference.",
+            0.5,
+        ));
+        (
+                None,
+                0.52_f32,
+                0.18_f32,
+                "AI-related domain in DNS cache without a correlated browser flow in this snapshot; treat as weak context."
+                    .to_string(),
+            )
+    } else {
+        patterns.push("dns_without_browser_process".to_string());
+        evidence_items.push(evidence(
+            "inference_note",
+            "No browser process in snapshot; DNS-only.",
+            0.45,
+        ));
+        (
+            None,
+            0.41_f32,
+            0.12_f32,
+            "AI-related DNS observation without a browser process in this snapshot.".to_string(),
+        )
+    };
 
     Some(DetectionCandidate {
         classification: "browser_ai_usage".to_string(),
-        process_guid: browser.map(|process| process.process_guid.clone()),
-        flow_id: None,
-        agent_likelihood: 0.22,
-        confidence: if browser.is_some() { 0.62 } else { 0.45 },
+        application_category: Some("browser".to_string()),
+        risk_signal: None,
+        process_guid: correlated_browser_guid.or_else(|| browser.map(|p| p.process_guid.clone())),
+        flow_id,
+        agent_likelihood,
+        confidence,
         risk_score: 18,
-        patterns: vec!["ai_destination_dns".to_string()],
+        patterns,
         evidence: evidence_items,
         recommended_action: "monitor".to_string(),
         title: "Browser AI destination observed".to_string(),
-        description:
-            "A known AI or model-service domain appeared in DNS cache; this is monitor-only evidence."
-                .to_string(),
+        description,
     })
+}
+
+fn is_browser_process(process: &ProcessObservation) -> bool {
+    matches!(
+        process.name.to_ascii_lowercase().as_str(),
+        "chrome.exe" | "msedge.exe" | "firefox.exe" | "brave.exe"
+    )
+}
+
+fn ai_resolved_ips(context: &DetectionContext) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    for dns in &context.dns_queries {
+        if !is_ai_destination(&dns.query) {
+            continue;
+        }
+        for answer in &dns.answers {
+            if answer.parse::<IpAddr>().is_ok() {
+                out.insert(answer.clone());
+            }
+        }
+    }
+    out
 }
 
 fn parent_process<'a>(
@@ -560,6 +742,7 @@ mod tests {
             sensor_version: "0.1.0".to_string(),
             backend_url: None,
             event_spool: "/tmp/events.jsonl".into(),
+            process_state_path: "/tmp/events.jsonl.process-state.json".into(),
             collect_command_line: true,
             controller_url: None,
             detection_packs_enabled: false,
@@ -601,6 +784,7 @@ mod tests {
                     process_guid: Some("proc-1".to_string()),
                     pid: Some(42),
                     process_name: Some("python.exe".to_string()),
+                    process_path: None,
                     user: None,
                     protocol: "tcp".to_string(),
                     direction: "outbound".to_string(),
@@ -609,6 +793,9 @@ mod tests {
                     remote_ip: "203.0.113.10".to_string(),
                     remote_port: Some(443),
                     remote_hostname: Some("api.model-gateway.lab".to_string()),
+                    connection_state: Some("ESTABLISHED".to_string()),
+                    bytes_sent: None,
+                    bytes_received: None,
                     attribution_method: "test".to_string(),
                     attribution_confidence: 0.9,
                 },
@@ -620,6 +807,93 @@ mod tests {
         assert_eq!(detections.len(), 2);
         assert_eq!(detections[0].event_type, "aegis.agent.detected");
         assert_eq!(detections[1].event_type, "aegis.risk_finding.created");
+    }
+
+    #[test]
+    fn detects_ide_helper_runtime_with_parent_chain() {
+        let config = config();
+        let events = vec![
+            AegisEvent::new(
+                &config,
+                "aegis.process.started",
+                SystemTime::now(),
+                EventPayload::ProcessStarted {
+                    process_guid: "proc-ide-parent".to_string(),
+                    parent_process_guid: None,
+                    pid: 500,
+                    ppid: None,
+                    name: "cursor.exe".to_string(),
+                    path: None,
+                    command_line: None,
+                    user: None,
+                    logon_session_id: None,
+                    integrity_level: None,
+                    sha256: None,
+                    publisher: None,
+                    collection_method: "test".to_string(),
+                },
+            ),
+            AegisEvent::new(
+                &config,
+                "aegis.process.started",
+                SystemTime::now(),
+                EventPayload::ProcessStarted {
+                    process_guid: "proc-node-helper".to_string(),
+                    parent_process_guid: Some("proc-ide-parent".to_string()),
+                    pid: 501,
+                    ppid: Some(500),
+                    name: "node.exe".to_string(),
+                    path: Some(r"C:\Program Files\node\node.exe".to_string()),
+                    command_line: Some("node extensionHost.js".to_string()),
+                    user: None,
+                    logon_session_id: None,
+                    integrity_level: None,
+                    sha256: None,
+                    publisher: None,
+                    collection_method: "test".to_string(),
+                },
+            ),
+            AegisEvent::new(
+                &config,
+                "aegis.flow.started",
+                SystemTime::now(),
+                EventPayload::FlowStarted {
+                    flow_id: "flow-ide".to_string(),
+                    process_guid: Some("proc-node-helper".to_string()),
+                    pid: Some(501),
+                    process_name: Some("node.exe".to_string()),
+                    process_path: None,
+                    user: None,
+                    protocol: "tcp".to_string(),
+                    direction: "outbound".to_string(),
+                    local_ip: "10.0.0.2".to_string(),
+                    local_port: Some(51000),
+                    remote_ip: "203.0.113.20".to_string(),
+                    remote_port: Some(443),
+                    remote_hostname: Some("api.openai.com".to_string()),
+                    connection_state: Some("ESTABLISHED".to_string()),
+                    bytes_sent: None,
+                    bytes_received: None,
+                    attribution_method: "test".to_string(),
+                    attribution_confidence: 0.9,
+                },
+            ),
+        ];
+
+        let detections = detect_ai_agent_activity(&config, &events);
+
+        assert_eq!(detections.len(), 2);
+        match &detections[0].payload {
+            EventPayload::AgentDetected {
+                classification,
+                application_category,
+                ..
+            } => {
+                assert_eq!(classification, "ide_ai_assistant");
+                assert_eq!(application_category.as_deref(), Some("developer_tool"));
+            }
+            _ => panic!("expected agent detection"),
+        }
     }
 
     #[test]

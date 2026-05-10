@@ -1,6 +1,6 @@
 # WO-VIS-007: AI-Agent Detection Pack 1
 
-**Status:** Draft; findings API surface ready  
+**Status:** Complete  
 **Phase:** Visibility and Observability  
 **Primary owner:** Detection / Agent / Backend  
 
@@ -106,3 +106,8 @@ Each finding should include:
 - Finding JSON examples
 - False-positive notes
 - Known gaps list
+
+**Implementation**
+
+- `agents/windows-agent/src/detection.rs`: IDE helper (`ide_ai_assistant`), browser AI with flow+DNS correlation and explicit weak DNS-only path, PowerShell `suspicious_automation` risk signal, script/runtime heuristics.
+- Payloads include `application_category` and optional `risk_signal`; mirrored on `aegis.risk_finding.created` as `classification` / `application_category` / `risk_signal`.

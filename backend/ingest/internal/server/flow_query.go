@@ -21,6 +21,7 @@ type flowRecord struct {
 	ProcessGUID           *string         `json:"process_guid,omitempty"`
 	PID                   *int            `json:"pid,omitempty"`
 	ProcessName           *string         `json:"process_name,omitempty"`
+	ProcessPath           *string         `json:"process_path,omitempty"`
 	User                  *string         `json:"user,omitempty"`
 	Protocol              *string         `json:"protocol,omitempty"`
 	Direction             *string         `json:"direction,omitempty"`
@@ -44,6 +45,7 @@ type flowPayload struct {
 	ProcessGUID           *string  `json:"process_guid"`
 	PID                   *int     `json:"pid"`
 	ProcessName           *string  `json:"process_name"`
+	ProcessPath           *string  `json:"process_path"`
 	User                  *string  `json:"user"`
 	Protocol              *string  `json:"protocol"`
 	Direction             *string  `json:"direction"`
@@ -164,6 +166,7 @@ func (e visibilityEvent) toFlowRecord() (flowRecord, error) {
 		ProcessGUID:           payload.ProcessGUID,
 		PID:                   payload.PID,
 		ProcessName:           payload.ProcessName,
+		ProcessPath:           payload.ProcessPath,
 		User:                  payload.User,
 		Protocol:              payload.Protocol,
 		Direction:             payload.Direction,

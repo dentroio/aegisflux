@@ -13,6 +13,7 @@
     "process_guid": "windows-dev-agent-01:1777062000000:9324",
     "pid": 9324,
     "process_name": "python.exe",
+    "process_path": "C:\\AegisLab\\scripts\\python.exe",
     "user": "WINDOWS-DEV-AGENT-01\\aegis-lab",
     "protocol": "tcp",
     "direction": "outbound",
@@ -21,6 +22,9 @@
     "remote_ip": "203.0.113.10",
     "remote_port": 443,
     "remote_hostname": "api.model-gateway.lab",
+    "connection_state": "ESTABLISHED",
+    "bytes_sent": null,
+    "bytes_received": null,
     "attribution_method": "windows.etw.tcpip.pid",
     "attribution_confidence": 0.96
   }

@@ -29,6 +29,9 @@
             "process_name": {
               "type": ["string", "null"]
             },
+            "process_path": {
+              "type": ["string", "null"]
+            },
             "user": {
               "type": ["string", "null"]
             },
@@ -58,6 +61,17 @@
             },
             "remote_hostname": {
               "type": ["string", "null"]
+            },
+            "connection_state": {
+              "type": ["string", "null"]
+            },
+            "bytes_sent": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "bytes_received": {
+              "type": ["integer", "null"],
+              "minimum": 0
             },
             "attribution_method": {
               "type": "string",

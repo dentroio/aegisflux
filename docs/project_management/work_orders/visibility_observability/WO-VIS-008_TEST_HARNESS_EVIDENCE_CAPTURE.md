@@ -1,6 +1,6 @@
 # WO-VIS-008: Test Harness and Evidence Capture
 
-**Status:** Initial backend fixture smoke harness complete  
+**Status:** Complete  
 **Phase:** Visibility and Observability  
 **Primary owner:** QA / Lab / Detection  
 
@@ -71,3 +71,8 @@ Each scenario run should capture:
 - Backend fixture smoke output from `./backend/ingest/scripts/smoke_visibility_investigation.sh`
 - At least three captured evidence bundles
 - Expected-vs-observed report
+
+**Repository artifacts**
+
+- `scripts/lab/windows-dev-agent-01/run-scenarios.ps1` — manual scenario checklist on the lab host.
+- `scripts/lab/windows-dev-agent-01/samples/` — Python/Node stubs for controlled telemetry.

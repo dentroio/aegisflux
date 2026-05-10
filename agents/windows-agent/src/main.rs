@@ -8,13 +8,15 @@ mod config;
 mod detection;
 mod dynamic_pack;
 mod event;
+mod process_lifecycle;
 mod security;
 mod transport;
 
 use std::env;
 use std::fs;
 use std::process::ExitCode;
-use std::time::{Instant, SystemTime};
+use std::thread;
+use std::time::{Duration, Instant, SystemTime};
 
 use collector::CollectorSet;
 use config::AgentConfig;
@@ -37,26 +39,62 @@ fn run() -> Result<(), String> {
     let config = AgentConfig::from_env()?;
     security::validate_startup_posture(&config)?;
 
+    let use_lifecycle = args.lifecycle || args.interval_secs.is_some();
+
+    if args.interval_secs.is_none() && !args.once {
+        return Err(
+            "pass --once for a single collection, or --interval-secs <N> for continuous mode"
+                .to_string(),
+        );
+    }
+
+    if let Some(secs) = args.interval_secs {
+        loop {
+            run_one_cycle(&config, &args, use_lifecycle)?;
+            thread::sleep(Duration::from_secs(secs));
+        }
+    }
+
+    run_one_cycle(&config, &args, use_lifecycle)
+}
+
+fn run_one_cycle(config: &AgentConfig, args: &Args, use_lifecycle: bool) -> Result<(), String> {
     let mut events = Vec::new();
     events.push(AegisEvent::new(
-        &config,
+        config,
         "aegis.agent.heartbeat",
         SystemTime::now(),
         EventPayload::Heartbeat {
-            status: "starting".to_string(),
-            message: "windows visibility agent initialized".to_string(),
+            status: "collecting".to_string(),
+            message: if use_lifecycle {
+                "windows visibility agent collection (process lifecycle diff enabled)".to_string()
+            } else {
+                "windows visibility agent initialized".to_string()
+            },
             os: env::consts::OS.to_string(),
             arch: env::consts::ARCH.to_string(),
         },
     ));
 
+    if use_lifecycle {
+        events.extend(process_lifecycle::collect_process_lifecycle(
+            config,
+            &config.process_state_path,
+        )?);
+    } else {
+        events.extend(collector::collect_process_snapshot_batch(config)?);
+    }
+
     let collectors = CollectorSet::default();
     for collector in collectors.collectors() {
+        if use_lifecycle && collector.name() == "windows.process" {
+            continue;
+        }
         let started = Instant::now();
-        events.extend(collector.collect_once(&config)?);
+        events.extend(collector.collect_once(config)?);
         let runtime_ms = millis_u64(started.elapsed().as_millis());
         events.push(performance_event(
-            &config,
+            config,
             collector.name(),
             runtime_ms,
             None,
@@ -64,18 +102,19 @@ fn run() -> Result<(), String> {
         ));
     }
     collector::enrich_flow_hostnames(&mut events);
+    collector::correlate_dns_to_flow_attribution(&mut events);
     let visibility_for_packs: Vec<AegisEvent> = events.clone();
     events.extend(detection::detect_ai_agent_activity(
-        &config,
+        config,
         &visibility_for_packs,
     ));
     let pack_started = Instant::now();
     events.extend(dynamic_pack::run_dynamic_pack_pipeline(
-        &config,
+        config,
         &visibility_for_packs,
     ));
     events.push(performance_event(
-        &config,
+        config,
         "dynamic_pack",
         0,
         Some(millis_u64(pack_started.elapsed().as_millis())),
@@ -93,13 +132,6 @@ fn run() -> Result<(), String> {
     if let Some(backend_url) = &config.backend_url {
         let transport = HttpVisibilityTransport::new(backend_url)?;
         transport.post_events(&events)?;
-    }
-
-    if !args.once {
-        return Err(
-            "long-running service mode is not implemented yet; use --once for Phase 1 lab runs"
-                .to_string(),
-        );
     }
 
     Ok(())
@@ -157,10 +189,23 @@ fn millis_u64(value: u128) -> u64 {
     value.min(u64::MAX as u128) as u64
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Args {
     once: bool,
     stdout: bool,
+    lifecycle: bool,
+    interval_secs: Option<u64>,
+}
+
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            once: false,
+            stdout: false,
+            lifecycle: false,
+            interval_secs: None,
+        }
+    }
 }
 
 impl Args {
@@ -169,10 +214,21 @@ impl Args {
         I: IntoIterator<Item = String>,
     {
         let mut parsed = Self::default();
-        for arg in args {
+        let mut it = args.into_iter();
+        while let Some(arg) = it.next() {
             match arg.as_str() {
                 "--once" => parsed.once = true,
                 "--stdout" => parsed.stdout = true,
+                "--lifecycle" => parsed.lifecycle = true,
+                "--interval-secs" => {
+                    let raw = it.next().unwrap_or_default();
+                    let secs: u64 = raw.parse().unwrap_or(0);
+                    if secs == 0 {
+                        eprintln!("aegis-windows-agent: ignoring invalid --interval-secs (need positive integer)");
+                    } else {
+                        parsed.interval_secs = Some(secs);
+                    }
+                }
                 _ => {}
             }
         }

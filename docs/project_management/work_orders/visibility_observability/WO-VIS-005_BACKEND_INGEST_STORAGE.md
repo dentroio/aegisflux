@@ -1,6 +1,6 @@
 # WO-VIS-005: Backend Ingest and Storage
 
-**Status:** Initial HTTP ingest and lab JSONL store complete  
+**Status:** Complete (HTTP ingest; JSONL or **SQLite** via `AEGIS_VISIBILITY_SQLITE_PATH`; dedupe by `event_id`)  
 **Phase:** Visibility and Observability  
 **Primary owner:** Backend  
 
@@ -68,11 +68,10 @@ This work order covers ingest and persistence for visibility events. It does not
   - `go test ./cmd/ingest`
 - Stored event query examples
 - Invalid event handling example
+- Optional **SQLite** durable store: set `AEGIS_VISIBILITY_SQLITE_PATH` (pure Go driver; no CGO).
 
-## Remaining Work
+## Follow-up (beyond Phase 1 lab)
 
-- Replace the lab JSONL event store with durable storage tables or Timescale mapping for normalized visibility records.
-- Extend deduplication by `event_id` into the database-backed storage layer.
-- Add a dead-letter path for invalid events.
-- Add authenticated agent-to-ingest transport.
-- Add query APIs for device/process/time-range investigation.
+- Fleet-scale Timescale or warehouse export for normalized visibility at high volume.
+- Dead-letter path for invalid events in production pipelines.
+- Authenticated agent-to-ingest transport.

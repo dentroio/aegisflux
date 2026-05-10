@@ -50,7 +50,11 @@ visibility.v1
 
 ## Examples
 
-Example fixtures live in [examples/](examples/).
+Example fixtures live in [examples/](examples/). Validate JSON syntax locally:
+
+```bash
+./validate_examples.sh
+```
 
 ## Design Notes
 

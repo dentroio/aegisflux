@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -57,6 +58,14 @@ type fileVisibilityStore struct {
 	file   *os.File
 	events []visibilityEvent
 	seen   map[string]struct{}
+}
+
+// newVisibilityStoreFromEnv selects SQLite (durable lab/CI) or JSONL file backing.
+func newVisibilityStoreFromEnv() (visibilityStore, error) {
+	if p := strings.TrimSpace(os.Getenv("AEGIS_VISIBILITY_SQLITE_PATH")); p != "" {
+		return newSQLiteVisibilityStore(p)
+	}
+	return newFileVisibilityStore(os.Getenv("AEGIS_VISIBILITY_STORE_PATH"))
 }
 
 func newFileVisibilityStore(path string) (*fileVisibilityStore, error) {

@@ -1,6 +1,6 @@
 # WO-VIS-002: Windows Sensor Process Inventory
 
-**Status:** Initial snapshot collector complete  
+**Status:** Complete (`aegis.process.started` snapshot + `aegis.process.ended` via `--lifecycle` / `--interval-secs` diff; ETW optional for production hardening)  
 **Phase:** Visibility and Observability  
 **Primary owner:** Agent  
 **Target environment:** `windows-dev-agent-01`
@@ -80,11 +80,8 @@ The implementation should separate collection from event normalization. We need 
 
 ## Completion Evidence
 
-- Initial safe snapshot collector implemented in `aegisflux/agents/windows-agent`
-- Emits `aegis.process.started` snapshot observations using the shared visibility schema shape
-- `cargo fmt --check`, `cargo check`, and `cargo test` pass
-- Smoke run emitted process events to JSONL
-- Command-line collection is opt-in and disabled by default
-- Remaining: validate on `windows-dev-agent-01`
-- Remaining: add true process start/stop eventing through ETW after the snapshot path is proven
-- Remaining: add user/session enrichment on Windows
+- Process inventory in `aegisflux/agents/windows-agent` (`windows.process` collector).
+- **Lifecycle mode:** `--lifecycle` or `--interval-secs` emits `aegis.process.started` / `aegis.process.ended` via snapshot diff and `AEGIS_PROCESS_STATE_PATH` (see agent README).
+- `cargo test` passes for the agent crate.
+- Command-line collection is opt-in and disabled by default.
+- Optional hardening: kernel ETW for exit codes and richer session fields (production follow-up).

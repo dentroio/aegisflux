@@ -12,43 +12,47 @@ type findingQueryResponse struct {
 }
 
 type findingRecord struct {
-	EventID           string          `json:"event_id"`
-	EventType         string          `json:"event_type"`
-	TimestampMS       int64           `json:"timestamp_ms"`
-	DeviceID          string          `json:"device_id"`
-	AgentID           string          `json:"agent_id"`
-	DetectionID       *string         `json:"detection_id,omitempty"`
-	FindingID         *string         `json:"finding_id,omitempty"`
-	Severity          *string         `json:"severity,omitempty"`
-	Title             *string         `json:"title,omitempty"`
-	Description       *string         `json:"description,omitempty"`
-	Classification    *string         `json:"classification,omitempty"`
-	AgentLikelihood   *float64        `json:"agent_likelihood,omitempty"`
-	Confidence        *float64        `json:"confidence,omitempty"`
-	RiskScore         int             `json:"risk_score"`
-	ProcessGUID       *string         `json:"process_guid,omitempty"`
-	FlowID            *string         `json:"flow_id,omitempty"`
-	DetectedPatterns  []string        `json:"detected_patterns,omitempty"`
-	Evidence          json.RawMessage `json:"evidence"`
-	RecommendedAction string          `json:"recommended_action"`
-	Payload           json.RawMessage `json:"payload"`
+	EventID             string          `json:"event_id"`
+	EventType           string          `json:"event_type"`
+	TimestampMS         int64           `json:"timestamp_ms"`
+	DeviceID            string          `json:"device_id"`
+	AgentID             string          `json:"agent_id"`
+	DetectionID         *string         `json:"detection_id,omitempty"`
+	FindingID           *string         `json:"finding_id,omitempty"`
+	Severity            *string         `json:"severity,omitempty"`
+	Title               *string         `json:"title,omitempty"`
+	Description         *string         `json:"description,omitempty"`
+	Classification      *string         `json:"classification,omitempty"`
+	ApplicationCategory *string         `json:"application_category,omitempty"`
+	RiskSignal          *string         `json:"risk_signal,omitempty"`
+	AgentLikelihood     *float64        `json:"agent_likelihood,omitempty"`
+	Confidence          *float64        `json:"confidence,omitempty"`
+	RiskScore           int             `json:"risk_score"`
+	ProcessGUID         *string         `json:"process_guid,omitempty"`
+	FlowID              *string         `json:"flow_id,omitempty"`
+	DetectedPatterns    []string        `json:"detected_patterns,omitempty"`
+	Evidence            json.RawMessage `json:"evidence"`
+	RecommendedAction   string          `json:"recommended_action"`
+	Payload             json.RawMessage `json:"payload"`
 }
 
 type findingPayload struct {
-	DetectionID       *string         `json:"detection_id"`
-	FindingID         *string         `json:"finding_id"`
-	Severity          *string         `json:"severity"`
-	Title             *string         `json:"title"`
-	Description       *string         `json:"description"`
-	Classification    *string         `json:"classification"`
-	AgentLikelihood   *float64        `json:"agent_likelihood"`
-	Confidence        *float64        `json:"confidence"`
-	RiskScore         int             `json:"risk_score"`
-	ProcessGUID       *string         `json:"process_guid"`
-	FlowID            *string         `json:"flow_id"`
-	DetectedPatterns  []string        `json:"detected_patterns"`
-	Evidence          json.RawMessage `json:"evidence"`
-	RecommendedAction string          `json:"recommended_action"`
+	DetectionID         *string         `json:"detection_id"`
+	FindingID           *string         `json:"finding_id"`
+	Severity            *string         `json:"severity"`
+	Title               *string         `json:"title"`
+	Description         *string         `json:"description"`
+	Classification      *string         `json:"classification"`
+	ApplicationCategory *string         `json:"application_category"`
+	RiskSignal          *string         `json:"risk_signal"`
+	AgentLikelihood     *float64        `json:"agent_likelihood"`
+	Confidence          *float64        `json:"confidence"`
+	RiskScore           int             `json:"risk_score"`
+	ProcessGUID         *string         `json:"process_guid"`
+	FlowID              *string         `json:"flow_id"`
+	DetectedPatterns    []string        `json:"detected_patterns"`
+	Evidence            json.RawMessage `json:"evidence"`
+	RecommendedAction   string          `json:"recommended_action"`
 }
 
 func (s *IngestServer) handleVisibilityFindings(w http.ResponseWriter, r *http.Request) {
@@ -141,26 +145,28 @@ func (e visibilityEvent) toFindingRecord() (findingRecord, error) {
 	}
 
 	record := findingRecord{
-		EventID:           e.EventID,
-		EventType:         e.EventType,
-		TimestampMS:       e.TimestampMS,
-		DeviceID:          e.DeviceID,
-		AgentID:           e.AgentID,
-		DetectionID:       payload.DetectionID,
-		FindingID:         payload.FindingID,
-		Severity:          payload.Severity,
-		Title:             payload.Title,
-		Description:       payload.Description,
-		Classification:    payload.Classification,
-		AgentLikelihood:   payload.AgentLikelihood,
-		Confidence:        payload.Confidence,
-		RiskScore:         payload.RiskScore,
-		ProcessGUID:       payload.ProcessGUID,
-		FlowID:            payload.FlowID,
-		DetectedPatterns:  payload.DetectedPatterns,
-		Evidence:          payload.Evidence,
-		RecommendedAction: payload.RecommendedAction,
-		Payload:           e.Payload,
+		EventID:             e.EventID,
+		EventType:           e.EventType,
+		TimestampMS:         e.TimestampMS,
+		DeviceID:            e.DeviceID,
+		AgentID:             e.AgentID,
+		DetectionID:         payload.DetectionID,
+		FindingID:           payload.FindingID,
+		Severity:            payload.Severity,
+		Title:               payload.Title,
+		Description:         payload.Description,
+		Classification:      payload.Classification,
+		ApplicationCategory: payload.ApplicationCategory,
+		RiskSignal:          payload.RiskSignal,
+		AgentLikelihood:     payload.AgentLikelihood,
+		Confidence:          payload.Confidence,
+		RiskScore:           payload.RiskScore,
+		ProcessGUID:         payload.ProcessGUID,
+		FlowID:              payload.FlowID,
+		DetectedPatterns:    payload.DetectedPatterns,
+		Evidence:            payload.Evidence,
+		RecommendedAction:   payload.RecommendedAction,
+		Payload:             e.Payload,
 	}
 	return record, nil
 }

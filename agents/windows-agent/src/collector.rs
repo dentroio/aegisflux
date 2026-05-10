@@ -232,6 +232,73 @@ impl Collector for SaseInventoryCollector {
     }
 }
 
+/// Full process snapshot as `aegis.process.started` (legacy `--once` without lifecycle).
+pub(crate) fn collect_process_snapshot_batch(
+    config: &AgentConfig,
+) -> Result<Vec<AegisEvent>, String> {
+    let collector = ProcessCollector;
+    Collector::collect_once(&collector, config)
+}
+
+/// Infer DNS process attribution from outbound flows whose remote IP appears in DNS answers.
+pub fn correlate_dns_to_flow_attribution(events: &mut [AegisEvent]) {
+    let mut best_by_ip: std::collections::HashMap<String, (u32, String, f32)> =
+        std::collections::HashMap::new();
+    for event in events.iter() {
+        if let EventPayload::FlowStarted {
+            remote_ip,
+            pid,
+            process_guid,
+            attribution_confidence,
+            ..
+        } = &event.payload
+        {
+            if let (Some(pid), Some(guid)) = (*pid, process_guid.clone()) {
+                let entry = best_by_ip.entry(remote_ip.clone()).or_insert((
+                    pid,
+                    guid.clone(),
+                    *attribution_confidence,
+                ));
+                if *attribution_confidence > entry.2 {
+                    *entry = (pid, guid, *attribution_confidence);
+                }
+            }
+        }
+    }
+
+    if best_by_ip.is_empty() {
+        return;
+    }
+
+    for event in events.iter_mut() {
+        if let EventPayload::DnsObserved {
+            answers,
+            pid,
+            process_guid,
+            correlation_method,
+            correlation_confidence,
+            ..
+        } = &mut event.payload
+        {
+            if pid.is_some() {
+                continue;
+            }
+            for answer in answers.iter() {
+                if !is_ip_address(answer) {
+                    continue;
+                }
+                if let Some((matched_pid, guid, flow_conf)) = best_by_ip.get(answer) {
+                    *pid = Some(*matched_pid);
+                    *process_guid = Some(guid.clone());
+                    *correlation_method = "aegis.dns.flow_remote_ip_match".to_string();
+                    *correlation_confidence = (*flow_conf * 0.88).min(0.94);
+                    break;
+                }
+            }
+        }
+    }
+}
+
 /// Enrich flow observations with hostnames from DNS answers in the same batch.
 pub fn enrich_flow_hostnames(events: &mut [AegisEvent]) {
     let mut host_by_ip = std::collections::HashMap::new();
@@ -310,7 +377,7 @@ fn process_guid(config: &AgentConfig, start_time_secs: u64, pid: u32) -> String 
     format!("{}:{}:{}", config.device_id, start_time_secs, pid)
 }
 
-fn command_line(parts: &[std::ffi::OsString], enabled: bool) -> Option<String> {
+pub(crate) fn command_line(parts: &[std::ffi::OsString], enabled: bool) -> Option<String> {
     if !enabled {
         return None;
     }
@@ -359,16 +426,50 @@ fn collect_windows_network(
 
     for flow in flows {
         let process = flow.pid.and_then(|pid| process_map.get(&pid).cloned());
+        let flow_key = flow_id(config, &flow);
+        let user = process.as_ref().and_then(|process| process.user.clone());
+        let process_path = process.as_ref().and_then(|process| process.path.clone());
+        let attribution_confidence = if flow.pid.is_some() { 0.72 } else { 0.35 };
+
+        if flow.protocol == "tcp" {
+            if let Some(state) = &flow.connection_state {
+                if is_tcp_listen_state(state) {
+                    continue;
+                }
+                if is_tcp_terminal_state(state) {
+                    events.push(AegisEvent::new(
+                        config,
+                        "aegis.flow.ended",
+                        SystemTime::now(),
+                        EventPayload::FlowEnded {
+                            flow_id: flow_key,
+                            process_guid: process
+                                .as_ref()
+                                .map(|process| process.process_guid.clone()),
+                            pid: flow.pid,
+                            bytes_sent: None,
+                            bytes_received: None,
+                            duration_ms: None,
+                            connection_state: Some(state.clone()),
+                            collection_method: "windows.netstat_ano.snapshot".to_string(),
+                        },
+                    ));
+                    continue;
+                }
+            }
+        }
+
         events.push(AegisEvent::new(
             config,
             "aegis.flow.started",
             SystemTime::now(),
             EventPayload::FlowStarted {
-                flow_id: flow_id(config, &flow),
+                flow_id: flow_key,
                 process_guid: process.as_ref().map(|process| process.process_guid.clone()),
                 pid: flow.pid,
-                process_name: process.map(|process| process.name),
-                user: None,
+                process_name: process.as_ref().map(|process| process.name.clone()),
+                process_path,
+                user,
                 protocol: flow.protocol,
                 direction: flow.direction,
                 local_ip: flow.local_ip,
@@ -376,8 +477,11 @@ fn collect_windows_network(
                 remote_ip: flow.remote_ip,
                 remote_port: flow.remote_port,
                 remote_hostname: None,
+                connection_state: flow.connection_state.clone(),
+                bytes_sent: None,
+                bytes_received: None,
                 attribution_method: "windows.netstat_ano.pid".to_string(),
-                attribution_confidence: if flow.pid.is_some() { 0.72 } else { 0.35 },
+                attribution_confidence,
             },
         ));
     }
@@ -1333,11 +1437,14 @@ fn query_browser_history_hosts(
 struct ProcessSnapshot {
     process_guid: String,
     name: String,
+    path: Option<String>,
+    user: Option<String>,
 }
 
 #[cfg(windows)]
 fn process_snapshot_map(config: &AgentConfig) -> std::collections::HashMap<u32, ProcessSnapshot> {
     let mut system = System::new();
+    system.refresh_users_list();
     system.refresh_processes_specifics(
         ProcessesToUpdate::All,
         true,
@@ -1349,11 +1456,26 @@ fn process_snapshot_map(config: &AgentConfig) -> std::collections::HashMap<u32, 
         .values()
         .map(|process| {
             let pid = process.pid().as_u32();
+            let user = process
+                .user_id()
+                .and_then(|uid| {
+                    system
+                        .users()
+                        .iter()
+                        .find(|user| user.id() == uid)
+                        .map(|user| user.name().to_string())
+                })
+                .filter(|name| !name.is_empty());
             (
                 pid,
                 ProcessSnapshot {
                     process_guid: process_guid(config, process.start_time(), pid),
                     name: process.name().to_string_lossy().to_string(),
+                    path: process
+                        .exe()
+                        .map(|path| path.display().to_string())
+                        .filter(|value| !value.is_empty()),
+                    user,
                 },
             )
         })
@@ -1370,6 +1492,7 @@ struct NetworkFlowObservation {
     remote_ip: String,
     remote_port: Option<u16>,
     pid: Option<u32>,
+    connection_state: Option<String>,
 }
 
 #[cfg(any(windows, test))]
@@ -1404,12 +1527,15 @@ fn parse_netstat_line(line: &str) -> Option<NetworkFlowObservation> {
 
     let local = parse_socket_addr(parts.get(1)?)?;
     let remote = parse_socket_addr(parts.get(2)?)?;
-    let (state, pid_index) = if protocol == "tcp" {
-        (parts.get(3).copied(), 4)
+    let (connection_state, pid_index) = if protocol == "tcp" {
+        (parts.get(3).map(|value| value.to_string()), 4)
     } else {
         (None, 3)
     };
-    if matches!(state, Some("LISTENING")) {
+    if connection_state
+        .as_deref()
+        .is_some_and(|state| is_tcp_listen_state(state))
+    {
         return None;
     }
 
@@ -1426,6 +1552,7 @@ fn parse_netstat_line(line: &str) -> Option<NetworkFlowObservation> {
         remote_ip: remote.0,
         remote_port: remote.1,
         pid,
+        connection_state,
     })
 }
 
@@ -1473,17 +1600,36 @@ fn flow_id(config: &AgentConfig, flow: &NetworkFlowObservation) -> String {
         config.device_id,
         flow.pid
             .map(|pid| pid.to_string())
-            .unwrap_or_else(|| "unknown-pid".to_string()),
+            .unwrap_or_else(|| "0".to_string()),
         flow.protocol,
         flow.local_ip,
         flow.local_port
             .map(|port| port.to_string())
-            .unwrap_or_else(|| "any".to_string()),
+            .unwrap_or_else(|| "0".to_string()),
         flow.remote_ip,
         flow.remote_port
             .map(|port| port.to_string())
-            .unwrap_or_else(|| "any".to_string()),
-        "snapshot"
+            .unwrap_or_else(|| "0".to_string()),
+        "netstat"
+    )
+}
+
+#[cfg(any(windows, test))]
+fn is_tcp_listen_state(state: &str) -> bool {
+    state.eq_ignore_ascii_case("LISTENING")
+}
+
+#[cfg(windows)]
+fn is_tcp_terminal_state(state: &str) -> bool {
+    matches!(
+        state.to_ascii_uppercase().as_str(),
+        "TIME_WAIT"
+            | "FIN_WAIT_1"
+            | "FIN_WAIT_2"
+            | "CLOSE_WAIT"
+            | "CLOSING"
+            | "LAST_ACK"
+            | "CLOSED"
     )
 }
 
@@ -1617,10 +1763,10 @@ mod tests {
     use crate::event::{AegisEvent, EventPayload};
 
     use super::{
-        enrich_flow_hostnames, host_from_url, match_sase_vendor, parse_extension_manifest_json,
-        parse_ipconfig_displaydns, parse_netstat_ano, parse_sase_installed_products,
-        parse_sase_network_adapters, parse_sase_proxy_config, parse_sase_services,
-        parse_socket_addr,
+        correlate_dns_to_flow_attribution, enrich_flow_hostnames, host_from_url, match_sase_vendor,
+        parse_extension_manifest_json, parse_ipconfig_displaydns, parse_netstat_ano,
+        parse_sase_installed_products, parse_sase_network_adapters, parse_sase_proxy_config,
+        parse_sase_services, parse_socket_addr,
     };
 
     #[test]
@@ -1642,6 +1788,7 @@ mod tests {
         assert_eq!(flows[0].remote_ip, "203.0.113.10");
         assert_eq!(flows[0].remote_port, Some(443));
         assert_eq!(flows[0].pid, Some(3084));
+        assert_eq!(flows[0].connection_state.as_deref(), Some("ESTABLISHED"));
     }
 
     #[test]
@@ -1710,6 +1857,7 @@ Windows IP Configuration
                     process_guid: None,
                     pid: Some(1000),
                     process_name: Some("msedge.exe".to_string()),
+                    process_path: None,
                     user: None,
                     protocol: "tcp".to_string(),
                     direction: "outbound".to_string(),
@@ -1718,6 +1866,9 @@ Windows IP Configuration
                     remote_ip: "203.0.113.10".to_string(),
                     remote_port: Some(443),
                     remote_hostname: None,
+                    connection_state: Some("ESTABLISHED".to_string()),
+                    bytes_sent: None,
+                    bytes_received: None,
                     attribution_method: "test".to_string(),
                     attribution_confidence: 0.7,
                 },
@@ -1746,6 +1897,69 @@ Windows IP Configuration
                 remote_hostname, ..
             } => assert_eq!(remote_hostname.as_deref(), Some("chatgpt.com")),
             _ => panic!("expected flow event"),
+        }
+    }
+
+    #[test]
+    fn correlates_dns_pid_from_flow_remote_ip() {
+        let config = test_config();
+        let mut events = vec![
+            AegisEvent::new(
+                &config,
+                "aegis.flow.started",
+                SystemTime::now(),
+                EventPayload::FlowStarted {
+                    flow_id: "flow-1".to_string(),
+                    process_guid: Some("proc-net".to_string()),
+                    pid: Some(9001),
+                    process_name: Some("git.exe".to_string()),
+                    process_path: None,
+                    user: None,
+                    protocol: "tcp".to_string(),
+                    direction: "outbound".to_string(),
+                    local_ip: "10.0.0.2".to_string(),
+                    local_port: Some(52000),
+                    remote_ip: "203.0.113.55".to_string(),
+                    remote_port: Some(443),
+                    remote_hostname: None,
+                    connection_state: Some("ESTABLISHED".to_string()),
+                    bytes_sent: None,
+                    bytes_received: None,
+                    attribution_method: "test".to_string(),
+                    attribution_confidence: 0.8,
+                },
+            ),
+            AegisEvent::new(
+                &config,
+                "aegis.dns.observed",
+                SystemTime::now(),
+                EventPayload::DnsObserved {
+                    query: "github.com".to_string(),
+                    query_type: Some("A".to_string()),
+                    answers: vec!["203.0.113.55".to_string()],
+                    resolver: None,
+                    process_guid: None,
+                    pid: None,
+                    correlation_method: "windows.ipconfig_displaydns.cache".to_string(),
+                    correlation_confidence: 0.35,
+                },
+            ),
+        ];
+
+        correlate_dns_to_flow_attribution(&mut events);
+
+        match &events[1].payload {
+            EventPayload::DnsObserved {
+                pid,
+                process_guid,
+                correlation_method,
+                ..
+            } => {
+                assert_eq!(*pid, Some(9001));
+                assert_eq!(process_guid.as_deref(), Some("proc-net"));
+                assert_eq!(correlation_method, "aegis.dns.flow_remote_ip_match");
+            }
+            _ => panic!("expected dns event"),
         }
     }
 
@@ -1852,6 +2066,7 @@ Windows IP Configuration
             sensor_version: "test".to_string(),
             backend_url: None,
             event_spool: PathBuf::from("/tmp/aegis-test.jsonl"),
+            process_state_path: PathBuf::from("/tmp/aegis-test.jsonl.process-state.json"),
             collect_command_line: false,
             controller_url: None,
             detection_packs_enabled: false,

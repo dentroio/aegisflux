@@ -162,7 +162,10 @@ Events are validated against a JSON Schema with the following requirements:
 
 ### Local Visibility Event Store
 
-The ingest service keeps a durable lab event log for Phase 1 visibility validation. Set `AEGIS_VISIBILITY_STORE_PATH` to control the JSONL file location. If unset, the service writes to `data/visibility-events.jsonl` relative to its working directory.
+The ingest service keeps a durable lab event log for Phase 1 visibility validation.
+
+- **JSONL (default):** set `AEGIS_VISIBILITY_STORE_PATH` to control the file location. If unset, the service writes to `data/visibility-events.jsonl` relative to its working directory.
+- **SQLite (durable, query-friendly):** set `AEGIS_VISIBILITY_SQLITE_PATH` to a `.db` file path. When this variable is non-empty, ingest uses SQLite with WAL instead of JSONL (JSONL path is ignored).
 
 Query recent stored events:
 
@@ -175,7 +178,7 @@ curl -sS 'http://localhost:9090/v1/visibility/findings?device_id=RMARTINEZ-WS&pr
 curl -sS 'http://localhost:9090/v1/visibility/investigation?device_id=RMARTINEZ-WS&process_guid=windows-dev-agent-01:1777062000000:9324&limit=50'
 ```
 
-This store is intended for lab validation and replay protection. Production normalized storage should move to the database-backed visibility model.
+The JSONL store loads all events into memory for queries. The SQLite store keeps events on disk and is better for sustained lab runs. Production may still move to a fleet-scale database model later.
 
 ### Clarion Lab Export
 

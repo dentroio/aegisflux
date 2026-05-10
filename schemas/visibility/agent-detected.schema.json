@@ -29,6 +29,12 @@
               "type": "string",
               "minLength": 1
             },
+            "application_category": {
+              "type": ["string", "null"]
+            },
+            "risk_signal": {
+              "type": ["string", "null"]
+            },
             "agent_likelihood": {
               "type": "number",
               "minimum": 0,

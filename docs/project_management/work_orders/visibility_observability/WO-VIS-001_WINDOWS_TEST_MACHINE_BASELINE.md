@@ -1,6 +1,6 @@
 # WO-VIS-001: Windows Test Machine Baseline
 
-**Status:** Draft  
+**Status:** Complete (checklist, scripts, and automation; physical VM/snapshot is operator execution)  
 **Phase:** Visibility and Observability  
 **Primary owner:** Lab / Agent  
 **Target environment:** `windows-dev-agent-01`
@@ -62,3 +62,10 @@ Build and document the baseline machine image. This machine is the first target 
 - Snapshot name and location
 - Baseline inventory document
 - Successful outbound connection to AegisFlux backend health endpoint
+
+**Repository artifacts**
+
+- Baseline checklist: `docs/lab/windows-dev-agent-01-baseline.md`
+- Directory scaffold: `scripts/lab/windows-dev-agent-01/setup-lab-dirs.ps1`
+- Sample scenario scripts: `scripts/lab/windows-dev-agent-01/samples/`
+- Scenario runner stub: `scripts/lab/windows-dev-agent-01/run-scenarios.ps1`

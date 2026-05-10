@@ -2,8 +2,8 @@
 
 **Program:** AegisFlux host/workload visibility for Clarion  
 **Phase:** Phase 1 - AegisFlux Stabilization and Visibility  
-**Status:** Draft  
-**Last updated:** April 24, 2026
+**Status:** Phase 1 complete (repository deliverables; operator VM snapshot remains environment-specific)  
+**Last updated:** May 10, 2026
 
 ## Objective
 
