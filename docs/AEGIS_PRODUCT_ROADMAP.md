@@ -13,6 +13,19 @@ The larger platform vision is captured in [AEGIS_PLATFORM_VISION.md](AEGIS_PLATF
 
 Clarion's AI-agent patterns should also carry into AegisFlux. AegisFlux should support governed AI providers, registered AI platform agents, privacy controls, audit records, endpoint-specific AI assistance, and research-to-detection workflows. See [AEGIS_AI_AGENT_PLATFORM_ARCHITECTURE.md](AEGIS_AI_AGENT_PLATFORM_ARCHITECTURE.md).
 
+## Product Loop
+
+The product should be shaped around one memorable operator loop:
+
+**Discover -> Explain -> Design -> Simulate -> Govern -> Adapt**
+
+- **Discover:** Agent Bill of Materials shows AI-capable tools, local runtimes, model gateways, browser/IDE/CLI agents, and capability changes across the fleet.
+- **Explain:** Evidence graph turns endpoint telemetry into a plain-language investigation path with confidence and missing-evidence callouts.
+- **Design:** Findings become observe-only draft controls with scope, evidence, and rollback notes.
+- **Simulate:** Operators see historical matches, affected endpoints/users/destinations, and breakage risk before staging anything.
+- **Govern:** Agent health/readiness, decision history, approvals, operational events, and audit records make trust visible.
+- **Adapt:** Research opportunities become detection candidates, simulated packs, signed observe-only rollout, and retired detections when stale.
+
 ## Current Lab State
 
 The lab now has a working visibility foundation:
@@ -23,6 +36,7 @@ The lab now has a working visibility foundation:
 - Device discovery across reporting endpoints.
 - Investigation drill-in from a process or finding to linked processes, flows, DNS records, and detections.
 - Observe-only UI that can show evidence without pretending to enforce policy yet.
+- Agent Bill of Materials, evidence path, finding-to-control designer, AI research feed, first-value demo, console summary APIs, and UI regression harness have initial lab slices.
 
 This is enough to demonstrate the core loop: endpoint evidence arrives, AegisFlux connects it into a path, then AegisFlux starts drafting the control that would reduce risk.
 
@@ -87,22 +101,26 @@ The first implementation should stay observe-only. The UI can show the draft, bu
 - Improve device health: event freshness, collector version, last successful run, and tunnel status.
 - Add better sample detections for AI agents, suspicious automation, model gateways, and unusual outbound flows.
 - Keep the console focused on evidence and investigation rather than broad dashboards.
+- Keep UI regression and performance checks part of every product slice.
 
-### Near: Evidence Graph and Draft Controls
+### Near: Product Pull and Trust
 
-- Persist process-to-flow-to-DNS-to-finding relationships as first-class investigation records.
-- Add draft controls generated from findings and investigations.
-- Add control simulation: show matching historical events before any policy is staged.
-- Add operator notes and decision history.
+- Polish ABOM into fleet insights: new, risky, widespread, low-confidence, and stale AI capabilities.
+- Refine evidence graph UX so operators see what happened, why it matters, what is missing, and what to do next.
+- Deepen draft-control simulation with affected endpoints/users/destinations, breakage risk, and decision history.
+- Add agent health/readiness scoring so evidence trust is visible.
+- Improve the first-value demo with sample scenarios and polished empty states.
 - Add signed policy bundle models without enabling enforcement by default.
 
-### Mid: Safe Change Management
+### Mid: Governed Adaptation and Audit-Mode Controls
 
 - Add policy staging, approval gates, and rollback plans.
 - Add device health scoring and deployment readiness.
 - Add signed agent registration and mTLS transport.
 - Add policy diff views: what changed, why, who approved it, and which evidence justified it.
-- Add lab enforcement adapters for Windows Firewall/WFP and Linux nftables/eBPF in observe or audit mode first.
+- Mature adaptive detection workflow from research opportunity to candidate, simulation, signed pack, rollout, and retirement.
+- Add lab enforcement adapters for Windows Firewall/WFP and Linux nftables/eBPF in audit mode first.
+- Show audit-mode policy delivery/status and match telemetry without blocking behavior.
 
 ### Later: Enterprise Control Plane
 
@@ -137,23 +155,23 @@ This tells the market that AegisFlux is not another alert feed. It is a control 
 
 ### 30 Days
 
-- Harden lab deployment for Windows, Linux, and Mac-hosted ingest.
-- Add device health and collector freshness to the console.
-- Expand AI-agent detection patterns.
-- Add observe-only draft control panels in the UI.
-- Document lab demos and repeatable setup.
+- Polish ABOM fleet insights and change detection.
+- Refine evidence graph explainability.
+- Add richer draft-control simulation and decision history.
+- Add agent health/readiness scoring.
+- Keep QA/performance harnesses green for all console product paths.
 
 ### 60 Days
 
-- Store investigation relationships and draft controls in the backend.
-- Add policy simulation against historical events.
+- Mature adaptive detection workflow from research feed to signed pack rollout and retirement.
+- Polish first-value demo scenarios and lab setup docs.
 - Add signed policy bundle models.
 - Add operator approval and decision history.
-- Start one host-level enforcement adapter in audit mode.
+- Start one host-level audit-mode adapter.
 
 ### 90 Days
 
-- Add rollback execution for the first enforcement adapter.
+- Add rollback execution planning for the first audit-mode adapter.
 - Add identity and network enrichment from a source-of-truth integration.
 - Add packaged endpoint deployment.
 - Add reporting for Agent Bill of Materials, risky AI activity, and proposed controls.

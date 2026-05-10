@@ -1,9 +1,9 @@
 # AegisFlux Product Platform Work Orders
 
 **Program:** AegisFlux product platform and Clarion-aligned management experience  
-**Phase:** Phase 2 - Productization and AI-Agent Platform  
+**Phase:** Phase 3 - Growth, Trust, and Safe Control Design  
 **Status:** Draft  
-**Last updated:** May 8, 2026
+**Last updated:** May 10, 2026
 
 ## Objective
 
@@ -21,6 +21,19 @@ The product direction is solid:
 - AegisFlux adapts through signed detection packs, validated candidates, and continuous research-to-detection workflows.
 - AegisFlux enforces only after evidence, simulation, approval, and rollback readiness are in place.
 - Clarion remains the broader enterprise context and policy intelligence platform; AegisFlux eventually integrates as the host/workload evidence and endpoint-control subsystem.
+
+## Current Product Loop
+
+The next work-order wave drives AegisFlux toward the loop that should make people want to use it:
+
+**Discover -> Explain -> Design -> Simulate -> Govern -> Adapt**
+
+- **Discover:** Agent Bill of Materials and fleet AI-capability insights.
+- **Explain:** Evidence graph and plain-language investigation paths.
+- **Design:** Findings become observe-only control proposals.
+- **Simulate:** Operators see blast radius before any enforcement work.
+- **Govern:** Agent health, decision history, operational audit, and approval readiness.
+- **Adapt:** Research opportunities mature into governed signed detection packs.
 
 ## Architecture Baseline
 
@@ -90,6 +103,13 @@ The AegisFlux UI should follow the Clarion shell pattern:
 | WO-PROD-003 | Finding-to-Control Design Workflow | Findings become observe-only draft controls with evidence, blast radius, and rollback notes | WO-CTRL-001, WO-PROD-002 |
 | WO-PROD-004 | AI Research Feed and Detection Opportunities | Research opportunities become governed detection candidates | WO-DET-002, WO-AI-002, WO-PLAT-006 |
 | WO-PROD-005 | First-Value Demo and Operator Onboarding | Five-minute guided workflow that shows AegisFlux value | WO-PROD-001 through WO-PROD-003 recommended |
+| WO-GROWTH-001 | ABOM Fleet Insights and Change Detection | New/risky/widespread AI capability insights for daily review | WO-PROD-001, WO-API-001 |
+| WO-GROWTH-002 | Evidence Graph UX and Explainability | Plain-language evidence explanations with confidence reasons and missing evidence | WO-PROD-002, WO-PROD-003 |
+| WO-GROWTH-003 | Control Simulation Depth and Decision History | Richer blast-radius simulation, draft revisions, and operator decision history | WO-PROD-003, WO-PLAT-006 |
+| WO-GROWTH-004 | Agent Health and Readiness Scoring | Trust/readiness score for endpoint evidence and future control decisions | WO-AGENT-001, WO-API-001 |
+| WO-GROWTH-005 | Adaptive Detection Workflow Maturity | Research -> candidate -> simulation -> signed pack -> rollout -> retirement workflow | WO-PROD-004, WO-DET-003 |
+| WO-GROWTH-006 | First-Value Demo Polish and Sample Scenarios | Credible buyer/operator demo path with sample scenarios and setup docs | WO-PROD-005 |
+| WO-GROWTH-007 | Audit-Mode Enforcement Adapter Foundation | Audit-only policy bundle delivery/status path without blocking behavior | WO-GROWTH-003, WO-GROWTH-004 |
 
 ## Parallelization Guidance
 
@@ -118,6 +138,12 @@ These can run in parallel with low conflict:
 - WO-PROD-003 is the core evidence-to-control workflow; keep it observe-only until simulation and approval mature.
 - WO-PROD-004 can run in parallel with WO-PROD-001/002 because it extends the dynamic detection loop rather than the UI data model.
 - WO-PROD-005 should package the first-value story after the first three product-differentiation slices exist.
+- WO-GROWTH-001 should lead the growth wave because ABOM is the clearest "open daily" feature.
+- WO-GROWTH-002 and WO-GROWTH-003 should follow together: evidence must explain controls, and controls must be simulatable.
+- WO-GROWTH-004 can run in parallel because trust/readiness scoring supports every later control decision.
+- WO-GROWTH-005 matures the Adapt workflow and can run alongside growth UX work if detection/API ownership is separate.
+- WO-GROWTH-006 should package the demo after ABOM, evidence, and controls are polished enough to tell the story cleanly.
+- WO-GROWTH-007 comes last in this wave; audit-mode is a bridge to enforcement, not a shortcut around trust.
 
 ## Phase Exit Criteria
 
@@ -139,6 +165,12 @@ These can run in parallel with low conflict:
 - AegisFlux can show an Agent Bill of Materials that is more meaningful than raw software inventory.
 - A finding can be explained through an evidence path and turned into an observe-only draft control proposal.
 - A new operator can understand AegisFlux's value through a short first-value workflow.
+- ABOM highlights new, risky, widespread, and low-confidence AI capabilities.
+- Evidence explanations are readable without raw telemetry knowledge.
+- Draft controls show blast radius, revision history, and operator decisions.
+- Agent readiness scores clarify when evidence can be trusted.
+- Adaptive detection lifecycle is auditable from research to rollout and retirement.
+- Audit-mode policy delivery can be tested without blocking endpoint behavior.
 
 ## Non-Goals
 
