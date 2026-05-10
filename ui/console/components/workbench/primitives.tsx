@@ -148,11 +148,23 @@ export function CopyValueButton({ value, label = 'Copy value' }: { value: string
   )
 }
 
-export function EmptyState({ title, message }: { title: string; message: string }) {
+export function EmptyState({
+  title,
+  message,
+  hint,
+  actions,
+}: {
+  title: string
+  message: string
+  hint?: string
+  actions?: ReactNode
+}) {
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-10 text-center">
       <p className="text-sm font-semibold text-slate-700">{title}</p>
       <p className="mt-1 text-sm text-slate-500">{message}</p>
+      {hint ? <p className="mx-auto mt-2 max-w-md text-xs text-slate-500">{hint}</p> : null}
+      {actions ? <div className="mt-4 flex flex-wrap items-center justify-center gap-2">{actions}</div> : null}
     </div>
   )
 }

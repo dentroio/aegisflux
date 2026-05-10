@@ -305,6 +305,15 @@ export function EvidenceGraphPanel({
         <EmptyState
           title="No path requested yet"
           message="Enter a finding id, device id, or process GUID and click Build path to assemble an evidence trail."
+          hint="Not sure where to start? The sample scenarios include subject ids that exercise the evidence path end to end."
+          actions={
+            <a
+              href="/demo/scenarios"
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              View sample scenarios
+            </a>
+          }
         />
       ) : null}
 
@@ -312,6 +321,15 @@ export function EvidenceGraphPanel({
         <EmptyState
           title="No evidence yet"
           message={data.empty_help || 'No process, flow, DNS, or finding evidence yet for this subject.'}
+          hint="In the lab, run the matching sample scenario so the agent emits the expected process, DNS, and finding evidence."
+          actions={
+            <a
+              href="/demo/scenarios"
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              View sample scenarios
+            </a>
+          }
         />
       ) : null}
 

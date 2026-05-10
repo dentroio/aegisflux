@@ -359,6 +359,13 @@ export function FirstValueTour() {
             <Play className="h-4 w-4" />
             Reset progress
           </button>
+          <Link
+            href="/demo/scenarios"
+            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Sparkles className="h-4 w-4" />
+            Sample scenarios
+          </Link>
         </div>
       </header>
 

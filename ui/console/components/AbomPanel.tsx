@@ -450,6 +450,29 @@ export function AbomPanel({ scope, deviceId, embedded = false }: AbomPanelProps)
                   'ABOM populates as agents report process, browser extension, SASE, DNS, and finding telemetry.'
                 : 'Try a broader filter or category.'
             }
+            hint={
+              items.length === 0
+                ? 'In the lab/demo environment, the sample scenarios walk through the data needed to populate ABOM.'
+                : undefined
+            }
+            actions={
+              items.length === 0 ? (
+                <>
+                  <a
+                    href="/demo/scenarios"
+                    className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    View sample scenarios
+                  </a>
+                  <a
+                    href="/agents"
+                    className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Check agents
+                  </a>
+                </>
+              ) : null
+            }
           />
         ) : (
           <BoundedTable

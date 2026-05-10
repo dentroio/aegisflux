@@ -367,6 +367,15 @@ export function FindingToControlPanel({
         <EmptyState
           title="No evidence loaded"
           message="Provide a finding id (and optionally a device id), then click Load evidence path to seed a proposal."
+          hint="Sample scenarios include the finding ids needed to exercise the design flow end to end."
+          actions={
+            <a
+              href="/demo/scenarios"
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              View sample scenarios
+            </a>
+          }
         />
       ) : null}
 

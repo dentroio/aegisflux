@@ -380,6 +380,15 @@ export function ResearchFeedPanel({ embedded = false }: { embedded?: boolean }) 
           <EmptyState
             title="No research items match this view"
             message="Try clearing filters, or add a research item via API to populate this feed."
+            hint="In lab/demo, run the suspicious automation scenario to seed a research item with indicators and guard rails."
+            actions={
+              <a
+                href="/demo/scenarios"
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                View sample scenarios
+              </a>
+            }
           />
         ) : (
           <BoundedTable
