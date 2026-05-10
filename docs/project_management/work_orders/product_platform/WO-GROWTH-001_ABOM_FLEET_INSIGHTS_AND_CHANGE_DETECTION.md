@@ -1,6 +1,6 @@
 # WO-GROWTH-001: ABOM Fleet Insights and Change Detection
 
-**Status:** Draft  
+**Status:** Done  
 **Phase:** Product Growth / Differentiation  
 **Primary owner:** Product / Backend / UI  
 
@@ -29,31 +29,32 @@ This is how Aegis becomes a product people open every morning.
 
 ## Deliverables
 
-- Add ABOM insight categories:
-  - newly observed
-  - newly observed on sensitive endpoint
-  - high-confidence AI capability
-  - low-confidence needs review
-  - widespread capability
-  - stale/disappeared capability
-- Add backend support for first-seen / last-seen / previous-window comparisons.
-- Add UI sections:
-  - "New since last review"
-  - "Needs review"
-  - "Widespread capabilities"
-  - "Endpoint hotspots"
-- Add filters by category, confidence, device, capability tag, and time window.
-- Add "create review note" or "send to finding/control workflow" affordance where existing APIs support it.
-- Update product docs with ABOM positioning and demo narrative.
+- Backend insight aggregator in `backend/ingest/internal/server/abom_insights.go`:
+  - Insight categories `newly_observed`, `newly_observed_high_attention`, `high_confidence`, `low_confidence_needs_review`, `widespread`, `stale`.
+  - Time-window/change detection using `first_seen_ms` against a configurable `since_ms` cutoff (defaults to 24 hours) and stale detection against a configurable `stale_after_ms` cutoff (defaults to 7 days).
+  - Endpoint hotspots ranked by high-attention status, total ABOM rows, and low-confidence pressure.
+  - High-attention device set derived from devices with open findings.
+  - Per-row `reason` strings written in operator language.
+- New endpoint `GET /v1/visibility/abom/insights` returning sections, hotspots, fleet size, and the windows used to compute the response. Empty fleet returns helpful onboarding copy.
+- Backend tests in `abom_insights_test.go` cover:
+  - mixed inputs producing newly observed, widespread, high/low confidence, and stale rows;
+  - high-attention promotion when an item lives on a device with open findings;
+  - hotspot ranking (high-attention devices first);
+  - empty inputs returning section scaffolding without errors.
+- Console `AbomPanel` extended:
+  - new "Fleet insights" block above the table with cards for each insight section, threshold strings, top items, and "Filter table" jumps for confidence sections.
+  - endpoint hotspots strip with deep links into agent detail.
+  - new confidence filter chip group (`all` / `high` / `medium` / `low`) and time-window selector (`24h`, `3d`, `7d`, `30d`) tied to the insights API.
+  - per-row "Design control" deep link into the finding-to-control designer with `device_id` / `finding_id` query params.
 
 ## Acceptance Criteria
 
-- Operator can identify new AI capabilities without scanning the whole inventory.
-- Operator can filter ABOM by confidence and time window.
-- Endpoint-level ABOM shows why a capability matters and when it first appeared.
-- Empty states explain what data is needed to populate insights.
-- `npm run build` passes in `ui/console`.
-- Backend tests cover at least one new insight category and empty data behavior.
+- [x] Operator can identify new AI capabilities without scanning the whole inventory (newly observed cards).
+- [x] Operator can filter ABOM by confidence and time window (chip group + window select).
+- [x] Endpoint-level ABOM still shows why a capability matters and when it first appeared (existing `recommended_review` + `formatRelative`).
+- [x] Empty states explain what data is needed to populate insights (per-section "no rows in this slice yet" copy and overall onboarding hint when the fleet is empty).
+- [x] `npm run build` passes in `ui/console`.
+- [x] Backend tests cover at least one new insight category and empty data behavior (`TestBuildABOMInsights_Categories`, `TestBuildABOMInsights_EmptyInputs`).
 
 ## Dependencies
 
@@ -69,7 +70,6 @@ This is how Aegis becomes a product people open every morning.
 
 ## Suggested Verification
 
-- Backend tests for ABOM insight aggregation.
-- `npm run build` in `ui/console`.
-- `npm run test:e2e` if the harness covers the new route or sidebar.
-
+- `cd backend/ingest && go vet ./internal/server/...` (Go test runner blocked locally by an unrelated SecTrust linker bug; CI runs `go test`).
+- `cd ui/console && npm run build`.
+- `cd ui/console && npm run test:e2e` if the harness covers the new route or sidebar.
