@@ -27,6 +27,9 @@ func (s *Server) registerPlatformRoutes() {
 	px("/platform/detection-candidates", s.handleDetectionCandidatesCollection)
 	px("/platform/detection-candidates/", s.handleDetectionCandidateItem)
 
+	px("/platform/audit-bundles", s.handleAuditBundlesCollection)
+	px("/platform/audit-bundles/", s.handleAuditBundleItem)
+
 	px("/platform/integration/devices/", s.handleIntegrationDeviceEvidence)
 	px("/platform/redact/preview", s.handleRedactPreview)
 }

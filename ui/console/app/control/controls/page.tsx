@@ -111,7 +111,12 @@ function DraftControlsPageInner() {
           <strong>Observe-only.</strong> Drafts and simulations do not enforce policy. They project historical matches for review.
         </div>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="text-sm font-semibold text-blue-700">Dashboard</Link>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="text-sm font-semibold text-blue-700">Dashboard</Link>
+            <Link href="/control/audit-bundles" className="text-sm font-semibold text-blue-700">
+              Audit-mode bundles
+            </Link>
+          </div>
           <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5 text-xs font-semibold">
             <button
               type="button"

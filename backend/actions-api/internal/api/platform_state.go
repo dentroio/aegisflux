@@ -20,9 +20,79 @@ type PlatformData struct {
 	Runs       []AIRunRecord
 	Audit      []PrivacyAuditRecord
 	Events     []OperationalEvent
-	Drafts     []DraftControl
-	Research   []ResearchItem
-	Candidates []DetectionCandidate
+	Drafts       []DraftControl
+	Research     []ResearchItem
+	Candidates   []DetectionCandidate
+	AuditBundles []AuditBundle
+}
+
+// AuditBundle is the foundation for safe enforcement (WO-GROWTH-007).
+//
+// An audit-mode bundle expresses a control or detection in a form an endpoint
+// could one day enforce, but the bundle itself is observe-only by design:
+// agents accept it, evaluate it, and report matches as telemetry. The bundle
+// never asks the agent to deny, block, or quarantine.
+//
+// Lifecycle:
+//
+//	draft -> staged -> [accepted | rejected | incompatible | stale | expired]
+//
+// "staged" means the bundle has been published for one or more endpoints to
+// pick up. The endpoint contract is documented in
+// docs/safety/AUDIT_MODE_BUNDLE_CONTRACT.md.
+type AuditBundle struct {
+	ID                  string                  `json:"id"`
+	Version             string                  `json:"version"`
+	Mode                string                  `json:"mode"`
+	Title               string                  `json:"title"`
+	Description         string                  `json:"description,omitempty"`
+	Scope               []string                `json:"scope"`
+	ExpectedTelemetry   []string                `json:"expected_match_telemetry,omitempty"`
+	ApprovalRefs        []string                `json:"approval_refs,omitempty"`
+	RollbackNotes       string                  `json:"rollback_notes,omitempty"`
+	SourceCandidateID   string                  `json:"source_candidate_id,omitempty"`
+	SourceDraftID       string                  `json:"source_draft_id,omitempty"`
+	Status              string                  `json:"status"`
+	StagedAtMS          int64                   `json:"staged_at_ms,omitempty"`
+	ExpiresAtMS         int64                   `json:"expires_at_ms,omitempty"`
+	CreatedAtMS         int64                   `json:"created_at_ms"`
+	UpdatedAtMS         int64                   `json:"updated_at_ms,omitempty"`
+	EndpointStatuses    []AuditBundleStatus     `json:"endpoint_statuses,omitempty"`
+	Matches             []AuditBundleMatch      `json:"matches,omitempty"`
+	History             []AuditBundleEvent      `json:"history,omitempty"`
+}
+
+// AuditBundleStatus captures one endpoint's response to a staged audit bundle.
+// Status values: pending, accepted, rejected, incompatible, stale.
+type AuditBundleStatus struct {
+	DeviceID       string `json:"device_id"`
+	Status         string `json:"status"`
+	Reason         string `json:"reason,omitempty"`
+	AgentVersion   string `json:"agent_version,omitempty"`
+	ReportedAtMS   int64  `json:"reported_at_ms"`
+	LastMatchAtMS  int64  `json:"last_match_at_ms,omitempty"`
+}
+
+// AuditBundleMatch is a deterministic, observe-only summary of an audit
+// match. Agents are expected to send these as ordinary telemetry.
+type AuditBundleMatch struct {
+	ID         string `json:"id"`
+	DeviceID   string `json:"device_id,omitempty"`
+	Process    string `json:"process,omitempty"`
+	AtMS       int64  `json:"at_ms"`
+	Indicator  string `json:"indicator,omitempty"`
+	Detail     string `json:"detail,omitempty"`
+}
+
+// AuditBundleEvent records a lifecycle change for an audit bundle.
+type AuditBundleEvent struct {
+	ID     string `json:"id"`
+	AtMS   int64  `json:"at_ms"`
+	Action string `json:"action"`
+	From   string `json:"from_status,omitempty"`
+	To     string `json:"to_status,omitempty"`
+	Note   string `json:"note,omitempty"`
+	Actor  string `json:"actor,omitempty"`
 }
 
 // ResearchItem captures a piece of AI ecosystem intelligence and its
@@ -443,5 +513,12 @@ func (p *PlatformData) appendCandidate(c DetectionCandidate) {
 	p.Candidates = append(p.Candidates, c)
 	if len(p.Candidates) > 200 {
 		p.Candidates = p.Candidates[len(p.Candidates)-200:]
+	}
+}
+
+func (p *PlatformData) appendAuditBundle(b AuditBundle) {
+	p.AuditBundles = append(p.AuditBundles, b)
+	if len(p.AuditBundles) > 200 {
+		p.AuditBundles = p.AuditBundles[len(p.AuditBundles)-200:]
 	}
 }
