@@ -174,6 +174,128 @@ func TestBuildEvidencePath_NoInputs(t *testing.T) {
 	}
 }
 
+func TestEnrichEvidenceForOperator_NarrativeAndLabels(t *testing.T) {
+	process := processRecord{
+		EventID:     "p-1",
+		EventType:   "aegis.process.started",
+		TimestampMS: 1_700_000_000_000,
+		DeviceID:    "win-lab-1",
+		ProcessGUID: "proc-guid-1",
+		PID:         4321,
+		Name:        ptrString("ollama"),
+		Path:        ptrString("/usr/local/bin/ollama"),
+		CommandLine: ptrString("ollama serve"),
+	}
+	flow := flowRecord{
+		EventID:     "f-1",
+		EventType:   "aegis.flow.started",
+		TimestampMS: 1_700_000_001_000,
+		DeviceID:    "win-lab-1",
+		FlowID:      "flow-1",
+		Protocol:    ptrString("tcp"),
+		Direction:   ptrString("outbound"),
+		RemoteIP:    ptrString("104.18.6.1"),
+		RemotePort:  intPtr(443),
+		ProcessGUID: &process.ProcessGUID,
+	}
+	dnsHit := dnsRecord{
+		EventID:     "d-1",
+		EventType:   "aegis.dns.observed",
+		TimestampMS: 1_700_000_001_500,
+		DeviceID:    "win-lab-1",
+		Query:       "api.openai.com",
+		Answers:     []string{"104.18.6.1"},
+		ProcessGUID: &process.ProcessGUID,
+	}
+	finding := findingRecord{
+		EventID:     "find-1",
+		EventType:   "aegis.risk_finding.created",
+		TimestampMS: 1_700_000_002_000,
+		DeviceID:    "win-lab-1",
+		Title:       ptrString("AI agent egress"),
+		FindingID:   ptrString("find-uuid-1"),
+		ProcessGUID: &process.ProcessGUID,
+		RiskScore:   72,
+		Severity:    ptrString("high"),
+	}
+	drafts := buildDraftControls("win-lab-1", investigationFilters{ProcessGUID: process.ProcessGUID}, []processRecord{process}, []flowRecord{flow}, []dnsRecord{dnsHit}, []findingRecord{finding})
+
+	nodes, _, missing, overall, _ := buildEvidencePath(
+		"win-lab-1", "agent-1", &finding,
+		[]processRecord{process}, []flowRecord{flow}, []dnsRecord{dnsHit}, []findingRecord{finding}, drafts,
+	)
+	enriched, narrative, overallReason := enrichEvidenceForOperator(nodes, missing, overall, "win-lab-1", &finding, []processRecord{process}, []flowRecord{flow}, []dnsRecord{dnsHit}, []findingRecord{finding}, drafts)
+
+	processNode := requireNode(t, enriched, "process")
+	if processNode.OperatorLabel == "" {
+		t.Fatalf("expected operator_label to be set on process node")
+	}
+	if processNode.ConfidenceReason == "" {
+		t.Fatalf("expected confidence_reason to be set on process node")
+	}
+	if processNode.RelatedABOMID == "" || processNode.RelatedABOMLabel == "" {
+		t.Fatalf("expected related ABOM cross-link on process node, got %+v", processNode)
+	}
+
+	dnsNode := requireNode(t, enriched, "dns")
+	if dnsNode.RelatedABOMID == "" || dnsNode.RelatedABOMLabel == "" {
+		t.Fatalf("expected related ABOM cross-link on DNS node for openai.com, got %+v", dnsNode)
+	}
+
+	if narrative.WhatHappened == "" || narrative.WhyItMatters == "" {
+		t.Fatalf("expected what-happened and why-it-matters to be filled, got %+v", narrative)
+	}
+	if len(narrative.WhatWeKnow) == 0 {
+		t.Fatalf("expected what-we-know bullets, got %+v", narrative)
+	}
+	if narrative.RecommendedNextStep == "" {
+		t.Fatalf("expected recommended next step")
+	}
+
+	if overallReason == "" {
+		t.Fatalf("expected overall confidence reason")
+	}
+}
+
+func TestEnrichEvidenceForOperator_PartialEvidenceMissingCopy(t *testing.T) {
+	finding := findingRecord{
+		EventID:     "find-2",
+		EventType:   "aegis.risk_finding.created",
+		TimestampMS: 1,
+		DeviceID:    "linux-lab-1",
+		Title:       ptrString("Telemetry anomaly"),
+		FindingID:   ptrString("find-2"),
+		RiskScore:   30,
+	}
+	nodes, _, missing, overall, _ := buildEvidencePath(
+		"linux-lab-1", "", &finding,
+		nil, nil, nil, []findingRecord{finding}, nil,
+	)
+	enriched, narrative, _ := enrichEvidenceForOperator(nodes, missing, overall, "linux-lab-1", &finding, nil, nil, nil, []findingRecord{finding}, nil)
+
+	processNode := requireNode(t, enriched, "process")
+	if !processNode.Missing {
+		t.Fatalf("expected process to be flagged missing")
+	}
+	if processNode.ConfidenceReason == "" || !strings.Contains(strings.ToLower(processNode.ConfidenceReason), "no process") {
+		t.Fatalf("expected explicit missing reason on process, got %q", processNode.ConfidenceReason)
+	}
+
+	if len(narrative.WhatIsMissing) == 0 {
+		t.Fatalf("expected what-is-missing copy to be present")
+	}
+	hasFlowMissing := false
+	for _, line := range narrative.WhatIsMissing {
+		if strings.Contains(strings.ToLower(line), "flow") {
+			hasFlowMissing = true
+			break
+		}
+	}
+	if !hasFlowMissing {
+		t.Fatalf("expected flow missing explanation in narrative, got %+v", narrative.WhatIsMissing)
+	}
+}
+
 func requireNode(t *testing.T, nodes []evidenceNode, nodeType string) evidenceNode {
 	t.Helper()
 	for _, node := range nodes {

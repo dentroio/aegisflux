@@ -29,14 +29,18 @@ const (
 
 // evidenceNode is one step along the curated investigation path.
 type evidenceNode struct {
-	ID         string            `json:"id"`
-	Type       string            `json:"type"`
-	Label      string            `json:"label"`
-	Detail     string            `json:"detail,omitempty"`
-	EvidenceID string            `json:"evidence_id,omitempty"`
-	Confidence string            `json:"confidence"`
-	Attributes map[string]string `json:"attributes,omitempty"`
-	Missing    bool              `json:"missing,omitempty"`
+	ID                 string            `json:"id"`
+	Type               string            `json:"type"`
+	Label              string            `json:"label"`
+	OperatorLabel      string            `json:"operator_label,omitempty"`
+	Detail             string            `json:"detail,omitempty"`
+	EvidenceID         string            `json:"evidence_id,omitempty"`
+	Confidence         string            `json:"confidence"`
+	ConfidenceReason   string            `json:"confidence_reason,omitempty"`
+	Attributes         map[string]string `json:"attributes,omitempty"`
+	Missing            bool              `json:"missing,omitempty"`
+	RelatedABOMID      string            `json:"related_abom_id,omitempty"`
+	RelatedABOMLabel   string            `json:"related_abom_label,omitempty"`
 }
 
 // evidenceEdge connects two nodes in the curated path. Edges follow the
@@ -56,15 +60,29 @@ type evidencePathSubject struct {
 	AgentID  string `json:"agent_id,omitempty"`
 }
 
+// evidenceNarrative is the plain-language explanation block surfaced at the
+// top of the UI. WO-GROWTH-002 requires we tell the operator: what happened,
+// why it matters, what we know with confidence, what is missing, and what to
+// do next — without making them read JSON.
+type evidenceNarrative struct {
+	WhatHappened        string   `json:"what_happened"`
+	WhyItMatters        string   `json:"why_it_matters"`
+	WhatWeKnow          []string `json:"what_we_know"`
+	WhatIsMissing       []string `json:"what_is_missing"`
+	RecommendedNextStep string   `json:"recommended_next_step"`
+}
+
 type evidencePathResponse struct {
 	OK                 bool                  `json:"ok"`
 	GeneratedAtMS      int64                 `json:"generated_at_ms"`
 	Subject            evidencePathSubject   `json:"subject"`
 	Summary            string                `json:"summary"`
+	Narrative          evidenceNarrative     `json:"narrative"`
 	Nodes              []evidenceNode        `json:"nodes"`
 	Edges              []evidenceEdge        `json:"edges"`
 	MissingEvidence    []string              `json:"missing_evidence"`
 	ConfidenceOverall  string                `json:"confidence_overall"`
+	ConfidenceReason   string                `json:"confidence_reason,omitempty"`
 	DraftControls      []draftControlRecord  `json:"draft_controls"`
 	RawProcesses       []processRecord       `json:"raw_processes"`
 	RawFlows           []flowRecord          `json:"raw_flows"`
@@ -158,16 +176,19 @@ func (s *IngestServer) handleEvidencePath(w http.ResponseWriter, r *http.Request
 	}
 
 	nodes, edges, missing, overall, summary := buildEvidencePath(deviceID, agentID, anchorFinding, processes, flows, dnsRows, findings, drafts)
+	enriched, narrative, overallReason := enrichEvidenceForOperator(nodes, missing, overall, deviceID, anchorFinding, processes, flows, dnsRows, findings, drafts)
 
 	resp := evidencePathResponse{
 		OK:                true,
 		GeneratedAtMS:     time.Now().UnixMilli(),
 		Subject:           subject,
 		Summary:           summary,
-		Nodes:             nodes,
+		Narrative:         narrative,
+		Nodes:             enriched,
 		Edges:             edges,
 		MissingEvidence:   missing,
 		ConfidenceOverall: overall,
+		ConfidenceReason:  overallReason,
 		DraftControls:     drafts,
 		RawProcesses:      processes,
 		RawFlows:          flows,
@@ -645,4 +666,359 @@ func defaultStringEv(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+// enrichEvidenceForOperator turns the curated nodes into a plain-language
+// explanation block and adds operator labels, confidence reasons, and ABOM
+// cross-links to each node.
+func enrichEvidenceForOperator(
+	nodes []evidenceNode,
+	missing []string,
+	overallConfidence string,
+	deviceID string,
+	finding *findingRecord,
+	processes []processRecord,
+	flows []flowRecord,
+	dnsRows []dnsRecord,
+	findings []findingRecord,
+	drafts []draftControlRecord,
+) ([]evidenceNode, evidenceNarrative, string) {
+	enriched := make([]evidenceNode, len(nodes))
+	copy(enriched, nodes)
+
+	missingSet := map[string]struct{}{}
+	for _, m := range missing {
+		missingSet[m] = struct{}{}
+	}
+
+	leadProcess := pickLeadProcess(finding, processes)
+	leadFlow := pickLeadFlow(leadProcess, flows)
+	leadDNS := pickLeadDNS(leadProcess, dnsRows)
+	leadFinding := finding
+	if leadFinding == nil && len(findings) > 0 {
+		leadFinding = &findings[0]
+	}
+
+	for i := range enriched {
+		switch enriched[i].Type {
+		case "endpoint":
+			enriched[i].OperatorLabel = "Computer where this happened"
+			if enriched[i].Missing {
+				enriched[i].ConfidenceReason = "No endpoint id resolved — cannot anchor evidence to a single device."
+			} else {
+				enriched[i].ConfidenceReason = "Endpoint id confirmed by direct telemetry from the agent."
+			}
+		case "parent_process":
+			enriched[i].OperatorLabel = "Program that started it"
+			if enriched[i].Missing {
+				enriched[i].ConfidenceReason = "No parent process linked. The agent did not report parent_process_guid for this run."
+			} else {
+				enriched[i].ConfidenceReason = "Parent process id linked through process telemetry."
+			}
+		case "process":
+			enriched[i].OperatorLabel = "Program that ran"
+			if enriched[i].Missing {
+				enriched[i].ConfidenceReason = "No process record linked. Without a process, this finding cannot be tied to a binary or command."
+			} else if leadProcess != nil {
+				enriched[i].ConfidenceReason = fmt.Sprintf(
+					"Process %q (pid %d) observed by the agent. command_line and user attributes are present.",
+					defaultStringEv(stringValue(leadProcess.Name), "process"),
+					leadProcess.PID,
+				)
+				if abomID, label := relatedABOMForProcess(leadProcess); abomID != "" {
+					enriched[i].RelatedABOMID = abomID
+					enriched[i].RelatedABOMLabel = label
+				}
+			}
+		case "flow":
+			enriched[i].OperatorLabel = "Where it talked to"
+			if enriched[i].Missing {
+				enriched[i].ConfidenceReason = "No matching network flow linked. Either the program made no outbound traffic or the flow telemetry is not yet aggregated."
+			} else if leadFlow != nil {
+				enriched[i].ConfidenceReason = fmt.Sprintf(
+					"Flow telemetry confirms %s connecting to %s.",
+					defaultStringEv(stringValue(leadFlow.Direction), "outbound"),
+					socketText(leadFlow.RemoteIP, leadFlow.RemotePort),
+				)
+			}
+		case "dns":
+			enriched[i].OperatorLabel = "How it resolved the destination"
+			if enriched[i].Missing {
+				enriched[i].ConfidenceReason = "No DNS lookup linked. The flow may be IP-only or DNS telemetry is not yet captured for this window."
+			} else if leadDNS != nil {
+				enriched[i].ConfidenceReason = fmt.Sprintf(
+					"DNS query %q resolved to %s — confirms the destination domain in plain text.",
+					leadDNS.Query,
+					defaultStringEv(strings.Join(leadDNS.Answers, ", "), "no answers recorded"),
+				)
+				if abomID, label := relatedABOMForDNS(leadDNS); abomID != "" {
+					enriched[i].RelatedABOMID = abomID
+					enriched[i].RelatedABOMLabel = label
+				}
+			}
+		case "finding":
+			enriched[i].OperatorLabel = "Why we flagged this"
+			if enriched[i].Missing {
+				enriched[i].ConfidenceReason = "No finding anchored. Without a finding, the path is observation only — no detection rule fired."
+			} else if leadFinding != nil {
+				enriched[i].ConfidenceReason = fmt.Sprintf(
+					"Detection scored %d (severity %s). The reason this row exists in the path.",
+					leadFinding.RiskScore,
+					defaultStringEv(stringValue(leadFinding.Severity), "unknown"),
+				)
+			}
+		case "detection_pack":
+			enriched[i].OperatorLabel = "Detection that matched"
+			enriched[i].ConfidenceReason = "Detection id supplied by the finding — links this evidence to the rule that fired."
+		case "draft_control":
+			enriched[i].OperatorLabel = "Suggested observe-only response"
+			enriched[i].ConfidenceReason = "Synthesized from this evidence by the finding-to-control workflow. No enforcement until you promote it."
+		}
+	}
+
+	narrative := buildEvidenceNarrativeBlock(deviceID, leadFinding, leadProcess, leadFlow, leadDNS, drafts, missing, missingSet)
+	overallReason := buildOverallConfidenceReason(overallConfidence, missing, leadProcess, leadFlow, leadDNS, leadFinding)
+
+	return enriched, narrative, overallReason
+}
+
+func pickLeadProcess(finding *findingRecord, processes []processRecord) *processRecord {
+	if finding != nil && finding.ProcessGUID != nil && *finding.ProcessGUID != "" {
+		for i := range processes {
+			if processes[i].ProcessGUID == *finding.ProcessGUID {
+				return &processes[i]
+			}
+		}
+	}
+	if len(processes) == 0 {
+		return nil
+	}
+	sorted := append([]processRecord{}, processes...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].TimestampMS > sorted[j].TimestampMS })
+	return &sorted[0]
+}
+
+func pickLeadFlow(process *processRecord, flows []flowRecord) *flowRecord {
+	if process != nil {
+		for i := range flows {
+			if stringValue(flows[i].ProcessGUID) == process.ProcessGUID {
+				return &flows[i]
+			}
+		}
+	}
+	if len(flows) == 0 {
+		return nil
+	}
+	sorted := append([]flowRecord{}, flows...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].TimestampMS > sorted[j].TimestampMS })
+	return &sorted[0]
+}
+
+func pickLeadDNS(process *processRecord, rows []dnsRecord) *dnsRecord {
+	if process != nil {
+		for i := range rows {
+			if stringValue(rows[i].ProcessGUID) == process.ProcessGUID {
+				return &rows[i]
+			}
+		}
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	sorted := append([]dnsRecord{}, rows...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].TimestampMS > sorted[j].TimestampMS })
+	return &sorted[0]
+}
+
+func relatedABOMForProcess(process *processRecord) (string, string) {
+	if process == nil {
+		return "", ""
+	}
+	name := strings.ToLower(stringValue(process.Name))
+	path := strings.ToLower(stringValue(process.Path))
+	cmd := strings.ToLower(stringValue(process.CommandLine))
+	hay := name + " " + path + " " + cmd
+	switch {
+	case abomMCPPattern.MatchString(hay):
+		return abomItemID(abomCategoryMCPEndpoint, productNameForProcess(stringValue(process.Name), stringValue(process.Path), "MCP server")), "MCP endpoint"
+	case abomLocalRuntimePattern.MatchString(hay):
+		return abomItemID(abomCategoryLocalModelRuntime, productNameForProcess(stringValue(process.Name), stringValue(process.Path), "Local model runtime")), "Local model runtime"
+	case abomDesktopAppPattern.MatchString(hay):
+		return abomItemID(abomCategoryAIDesktopApp, productNameForProcess(stringValue(process.Name), stringValue(process.Path), "AI desktop app")), "AI desktop app"
+	case abomCodingAgentPattern.MatchString(hay):
+		return abomItemID(abomCategoryCodingAgent, productNameForProcess(stringValue(process.Name), stringValue(process.Path), "Coding agent")), "Coding agent"
+	case abomCLIAgentPattern.MatchString(hay):
+		return abomItemID(abomCategoryCLIAgent, productNameForProcess(stringValue(process.Name), stringValue(process.Path), "AI CLI agent")), "CLI agent"
+	}
+	return "", ""
+}
+
+func relatedABOMForDNS(record *dnsRecord) (string, string) {
+	if record == nil {
+		return "", ""
+	}
+	host := strings.ToLower(record.Query)
+	if abomGatewayDomainPattern.MatchString(host) {
+		return abomItemID(abomCategoryModelGateway, gatewayProductForHost(record.Query)), "Model gateway"
+	}
+	return "", ""
+}
+
+func buildEvidenceNarrativeBlock(
+	deviceID string,
+	finding *findingRecord,
+	process *processRecord,
+	flow *flowRecord,
+	dnsHit *dnsRecord,
+	drafts []draftControlRecord,
+	missing []string,
+	missingSet map[string]struct{},
+) evidenceNarrative {
+	what := narrativeWhatHappened(deviceID, finding, process, flow, dnsHit)
+	why := narrativeWhyItMatters(finding, process)
+
+	whatWeKnow := []string{}
+	if finding != nil {
+		whatWeKnow = append(whatWeKnow, fmt.Sprintf("Detection fired with risk score %d.", finding.RiskScore))
+	}
+	if process != nil {
+		whatWeKnow = append(whatWeKnow, fmt.Sprintf("Program %q ran on %s.", defaultStringEv(stringValue(process.Name), "process"), defaultStringEv(deviceID, "this endpoint")))
+	}
+	if flow != nil {
+		whatWeKnow = append(whatWeKnow, fmt.Sprintf("Outbound flow to %s recorded.", socketText(flow.RemoteIP, flow.RemotePort)))
+	}
+	if dnsHit != nil {
+		whatWeKnow = append(whatWeKnow, fmt.Sprintf("DNS query %q resolved to %s.", dnsHit.Query, defaultStringEv(strings.Join(dnsHit.Answers, ", "), "no answers")))
+	}
+	if len(whatWeKnow) == 0 {
+		whatWeKnow = append(whatWeKnow, "Telemetry has not yet attached strong evidence to this subject.")
+	}
+
+	whatIsMissing := []string{}
+	for _, m := range missing {
+		whatIsMissing = append(whatIsMissing, missingExplanation(m))
+	}
+	if _, ok := missingSet["parent_process"]; ok && process != nil {
+		whatIsMissing = append(whatIsMissing, "Parent process is unknown — verify the agent reports parent_process_guid for richer attribution.")
+	}
+	if len(whatIsMissing) == 0 {
+		whatIsMissing = append(whatIsMissing, "Nothing critical missing in this window — confidence is not bounded by gaps.")
+	}
+
+	next := narrativeNextStep(finding, process, drafts, missing)
+
+	return evidenceNarrative{
+		WhatHappened:        what,
+		WhyItMatters:        why,
+		WhatWeKnow:          whatWeKnow,
+		WhatIsMissing:       whatIsMissing,
+		RecommendedNextStep: next,
+	}
+}
+
+func narrativeWhatHappened(deviceID string, finding *findingRecord, process *processRecord, flow *flowRecord, dnsHit *dnsRecord) string {
+	parts := []string{}
+	subject := defaultStringEv(deviceID, "an endpoint")
+	if finding != nil {
+		title := stringValue(finding.Title)
+		if title == "" {
+			title = stringValue(finding.Classification)
+		}
+		if title == "" {
+			title = "a finding"
+		}
+		parts = append(parts, fmt.Sprintf("On %s, %s.", subject, strings.ToLower(title)))
+	} else {
+		parts = append(parts, fmt.Sprintf("Activity observed on %s.", subject))
+	}
+	if process != nil {
+		parts = append(parts, fmt.Sprintf("Program %q (pid %d) ran the activity.", defaultStringEv(stringValue(process.Name), "process"), process.PID))
+	}
+	if flow != nil {
+		parts = append(parts, fmt.Sprintf("It talked outbound to %s.", socketText(flow.RemoteIP, flow.RemotePort)))
+	}
+	if dnsHit != nil {
+		parts = append(parts, fmt.Sprintf("DNS lookup %q confirms the destination domain.", dnsHit.Query))
+	}
+	return strings.Join(parts, " ")
+}
+
+func narrativeWhyItMatters(finding *findingRecord, process *processRecord) string {
+	if finding != nil {
+		title := strings.ToLower(stringValue(finding.Title))
+		if strings.Contains(title, "ai") || strings.Contains(title, "agent") || strings.Contains(title, "model") {
+			return "An AI-related signal is interesting because it lives outside the normal SaaS perimeter — programs talking to model providers can carry secrets and code in real time."
+		}
+		if process != nil && abomLocalRuntimePattern.MatchString(strings.ToLower(stringValue(process.Name))) {
+			return "Local model runtimes can expose APIs to other devices on the same network without authentication. The risk is lateral abuse, not crash damage."
+		}
+		return fmt.Sprintf("A detection at risk %d is enough to warrant operator attention before drift becomes the norm.", finding.RiskScore)
+	}
+	if process != nil {
+		return "Without a finding this is observation only, but the program path provides starting context for review."
+	}
+	return "Without a finding or a strong process link, this row is informational only."
+}
+
+func narrativeNextStep(finding *findingRecord, process *processRecord, drafts []draftControlRecord, missing []string) string {
+	if len(missing) > 2 {
+		return "Confirm telemetry coverage on this endpoint (process, flow, DNS) before treating the path as authoritative. The missing-evidence list points to the gaps."
+	}
+	if len(drafts) > 0 {
+		return fmt.Sprintf("Open the finding-to-control designer with this finding and review draft control %s as an observe-only response.", drafts[0].ControlID)
+	}
+	if finding != nil && process != nil {
+		return "Open the finding-to-control designer with this finding to draft an observe-only response with scope and rollback."
+	}
+	if process != nil {
+		return "Cross-link the program to the Agent Bill of Materials. If it is not in ABOM yet, consider whether it should be sanctioned or reviewed."
+	}
+	return "Investigate adjacent telemetry on this endpoint to build enough evidence for a draft control."
+}
+
+func missingExplanation(name string) string {
+	switch name {
+	case "endpoint":
+		return "No endpoint id linked — open the device record manually to verify telemetry."
+	case "process":
+		return "No process linked — without a process this row cannot be tied to a binary or command."
+	case "parent_process":
+		return "Parent process not linked — the spawning chain is incomplete."
+	case "flow":
+		return "No matching outbound flow — the program may be local-only or flow telemetry is missing."
+	case "dns":
+		return "No DNS lookup linked — confirm DNS collector status before treating the destination as ground truth."
+	case "finding":
+		return "No finding anchored — the path is observation only, no detection has fired."
+	case "detection_pack":
+		return "Finding does not reference a detection id — pack lineage cannot be verified."
+	}
+	return name
+}
+
+func buildOverallConfidenceReason(overall string, missing []string, process *processRecord, flow *flowRecord, dnsHit *dnsRecord, finding *findingRecord) string {
+	have := []string{}
+	if finding != nil {
+		have = append(have, "finding")
+	}
+	if process != nil {
+		have = append(have, "process")
+	}
+	if flow != nil {
+		have = append(have, "flow")
+	}
+	if dnsHit != nil {
+		have = append(have, "dns")
+	}
+	switch overall {
+	case evidenceConfidenceHigh:
+		return fmt.Sprintf("High confidence: %s aligned without major gaps.", strings.Join(have, ", "))
+	case evidenceConfidenceMedium:
+		if len(missing) > 0 {
+			return fmt.Sprintf("Medium confidence: anchored by %s but missing %s.", strings.Join(have, ", "), strings.Join(missing, ", "))
+		}
+		return fmt.Sprintf("Medium confidence: %s present but evidence is shallow.", strings.Join(have, ", "))
+	default:
+		return fmt.Sprintf("Low confidence: limited anchors (%s) and missing %s.", strings.Join(have, ", "), strings.Join(missing, ", "))
+	}
 }

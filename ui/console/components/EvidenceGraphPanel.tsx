@@ -28,11 +28,15 @@ type Node = {
   id: string
   type: string
   label: string
+  operator_label?: string
   detail?: string
   evidence_id?: string
   confidence: 'high' | 'medium' | 'low' | string
+  confidence_reason?: string
   attributes?: Record<string, string>
   missing?: boolean
+  related_abom_id?: string
+  related_abom_label?: string
 }
 
 type Edge = {
@@ -42,15 +46,25 @@ type Edge = {
   confidence: string
 }
 
+type Narrative = {
+  what_happened?: string
+  why_it_matters?: string
+  what_we_know?: string[]
+  what_is_missing?: string[]
+  recommended_next_step?: string
+}
+
 type EvidencePathResponse = {
   ok?: boolean
   generated_at_ms?: number
   subject?: { type?: string; id?: string; device_id?: string; agent_id?: string }
   summary?: string
+  narrative?: Narrative
   nodes?: Node[]
   edges?: Edge[]
   missing_evidence?: string[]
   confidence_overall?: string
+  confidence_reason?: string
   draft_controls?: Array<{
     control_id?: string
     title?: string
@@ -310,26 +324,18 @@ export function EvidenceGraphPanel({
             <KpiTile label="Confidence" value={overallTone.label} />
           </SummaryStrip>
 
-          {data.summary ? (
+          {data.narrative ? (
+            <NarrativeBlock
+              narrative={data.narrative}
+              overallTone={overallTone}
+              confidenceReason={data.confidence_reason}
+              draftControls={data.draft_controls || []}
+              subject={data.subject}
+            />
+          ) : data.summary ? (
             <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Path summary</h3>
               <p className="mt-2 text-sm leading-6 text-slate-800">{data.summary}</p>
-            </section>
-          ) : null}
-
-          {(data.missing_evidence || []).length > 0 ? (
-            <section className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              <div className="flex items-start gap-2 font-semibold">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                Missing evidence
-              </div>
-              <ul className="mt-2 grid gap-1 pl-6 text-amber-900/90 list-disc">
-                {(data.missing_evidence || []).map((item) => (
-                  <li key={item}>
-                    {item.replace(/_/g, ' ')} — open the device’s collectors to confirm telemetry coverage.
-                  </li>
-                ))}
-              </ul>
             </section>
           ) : null}
 
@@ -351,6 +357,9 @@ export function EvidenceGraphPanel({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          {node.operator_label || NODE_TYPE_LABEL[node.type] || node.type}
+                        </span>
+                        <span className="text-[10px] uppercase tracking-wide text-slate-400">
                           {NODE_TYPE_LABEL[node.type] || node.type}
                         </span>
                         <span className={`inline-flex items-center gap-1 text-xs ${node.missing ? 'text-amber-800' : 'text-slate-600'}`}>
@@ -366,6 +375,11 @@ export function EvidenceGraphPanel({
                           {node.detail}
                         </p>
                       ) : null}
+                      {node.confidence_reason ? (
+                        <p className={`mt-2 text-xs leading-relaxed ${node.missing ? 'text-amber-900' : 'text-slate-600'}`}>
+                          {node.confidence_reason}
+                        </p>
+                      ) : null}
                       {node.attributes && Object.keys(node.attributes).length > 0 ? (
                         <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
                           {Object.entries(node.attributes).map(([key, value]) => (
@@ -375,6 +389,15 @@ export function EvidenceGraphPanel({
                             </div>
                           ))}
                         </dl>
+                      ) : null}
+                      {node.related_abom_id ? (
+                        <a
+                          href={`/discover/abom`}
+                          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900"
+                        >
+                          Open related ABOM item ({node.related_abom_label || node.related_abom_id})
+                          <ArrowRight className="h-3 w-3" />
+                        </a>
                       ) : null}
                       {node.evidence_id ? (
                         <p className="mt-2 truncate font-mono text-[11px] text-slate-500" title={node.evidence_id}>
@@ -399,6 +422,115 @@ export function EvidenceGraphPanel({
       ) : null}
 
     </div>
+  )
+}
+
+function NarrativeBlock({
+  narrative,
+  overallTone,
+  confidenceReason,
+  draftControls,
+  subject,
+}: {
+  narrative: Narrative
+  overallTone: { dot: string; label: string }
+  confidenceReason?: string
+  draftControls: NonNullable<EvidencePathResponse['draft_controls']>
+  subject?: EvidencePathResponse['subject']
+}) {
+  const designerHref = useMemo(() => {
+    const params = new URLSearchParams()
+    const findingId = subject?.type === 'finding' ? subject.id : undefined
+    if (findingId) params.set('finding_id', findingId)
+    if (subject?.device_id) params.set('device_id', subject.device_id)
+    return `/control/controls?${params.toString()}`
+  }, [subject])
+
+  return (
+    <section className="mb-4 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Investigation explanation</h3>
+        <span className="inline-flex items-center gap-1 text-xs text-slate-600">
+          <span className={`h-2 w-2 rounded-full ${overallTone.dot}`} />
+          Overall confidence {overallTone.label}
+        </span>
+      </div>
+      {confidenceReason ? (
+        <p className="text-xs leading-relaxed text-slate-600">{confidenceReason}</p>
+      ) : null}
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <NarrativeCard title="What happened" emphasis>
+          <p className="text-sm leading-6 text-slate-800">{narrative.what_happened || 'No description yet.'}</p>
+        </NarrativeCard>
+        <NarrativeCard title="Why it matters" emphasis>
+          <p className="text-sm leading-6 text-slate-800">{narrative.why_it_matters || 'No commentary yet.'}</p>
+        </NarrativeCard>
+        <NarrativeCard title="What we know">
+          <BulletList items={narrative.what_we_know} fallback="No bulletable evidence yet." />
+        </NarrativeCard>
+        <NarrativeCard title="What is missing" tone="amber">
+          <BulletList items={narrative.what_is_missing} fallback="No critical gaps." />
+        </NarrativeCard>
+      </div>
+
+      <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+        <p className="font-semibold">Recommended next step</p>
+        <p className="mt-1 leading-6">{narrative.recommended_next_step || 'No recommendation yet.'}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <a
+            href={designerHref}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-blue-600 bg-blue-600 px-3 font-semibold text-white hover:bg-blue-700"
+          >
+            <ShieldCheck className="h-4 w-4" />
+            Design observe-only control
+          </a>
+          {draftControls.length > 0 && draftControls[0].control_id ? (
+            <span className="text-blue-900/80">
+              Seeded draft: <span className="font-mono">{draftControls[0].control_id}</span>
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function NarrativeCard({
+  title,
+  emphasis,
+  tone,
+  children,
+}: {
+  title: string
+  emphasis?: boolean
+  tone?: 'amber'
+  children: React.ReactNode
+}) {
+  const toneClass =
+    tone === 'amber'
+      ? 'border-amber-200 bg-amber-50'
+      : emphasis
+        ? 'border-slate-200 bg-slate-50'
+        : 'border-slate-200 bg-white'
+  return (
+    <article className={`rounded-md border p-3 shadow-sm ${toneClass}`}>
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h4>
+      <div className="mt-1">{children}</div>
+    </article>
+  )
+}
+
+function BulletList({ items, fallback }: { items?: string[]; fallback: string }) {
+  if (!items || items.length === 0) {
+    return <p className="text-sm text-slate-600">{fallback}</p>
+  }
+  return (
+    <ul className="grid gap-1 pl-5 text-sm leading-6 text-slate-800 list-disc">
+      {items.map((item, idx) => (
+        <li key={`${idx}-${item}`}>{item}</li>
+      ))}
+    </ul>
   )
 }
 
