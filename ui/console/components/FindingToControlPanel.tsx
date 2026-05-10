@@ -55,6 +55,46 @@ const DEFAULT_FORM: ProposalForm = {
   confidence: 'medium',
 }
 
+type SimulationResult = {
+  id?: string
+  at_ms?: number
+  device_id?: string
+  mode?: string
+  match_count?: number
+  matched_device_ids?: string[]
+  matched_users?: string[]
+  top_process_paths?: string[]
+  top_destinations?: string[]
+  window_start_ms?: number
+  window_end_ms?: number
+  confidence?: string
+  expected_breakage_risk?: string
+  summary?: string
+  scope_snapshot?: string[]
+}
+
+type DecisionEntry = {
+  id?: string
+  at_ms?: number
+  actor?: string
+  action?: string
+  note?: string
+  status?: string
+  changed_keys?: string[]
+  simulation_id?: string
+  before?: Record<string, unknown>
+  after?: Record<string, unknown>
+}
+
+type SavedDraftState = {
+  id: string
+  matches?: number
+  status?: string
+  history?: DecisionEntry[]
+  simulations?: SimulationResult[]
+  latestSimulation?: SimulationResult
+}
+
 export type FindingToControlPanelProps = {
   initialFindingId?: string
   initialDeviceId?: string
@@ -76,7 +116,8 @@ export function FindingToControlPanel({
   const [savingDraft, setSavingDraft] = useState(false)
   const [simBusy, setSimBusy] = useState(false)
   const [simulationDeviceId, setSimulationDeviceId] = useState(initialDeviceId)
-  const [savedDraft, setSavedDraft] = useState<{ id: string; matches?: number; status?: string } | null>(null)
+  const [savedDraft, setSavedDraft] = useState<SavedDraftState | null>(null)
+  const [decisionNote, setDecisionNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
 
@@ -184,9 +225,15 @@ export function FindingToControlPanel({
         throw new Error(text || `HTTP ${res.status}`)
       }
       const body = await res.json()
-      const id = body?.id || body?.draft?.id
-      const status = body?.draft?.status || 'draft_observe_only'
-      setSavedDraft({ id, status })
+      const draft = body?.draft || {}
+      const id = body?.id || draft.id
+      const status = draft.status || 'draft_observe_only'
+      setSavedDraft({
+        id,
+        status,
+        history: draft.history || [],
+        simulations: draft.simulations || [],
+      })
       setInfo(`Draft control ${id} saved as observe-only.`)
       onDraftCreated?.()
     } catch (err) {
@@ -212,7 +259,7 @@ export function FindingToControlPanel({
       const res = await fetch(`/api/actions/platform/draft-controls/${encodeURIComponent(savedDraft.id)}/simulate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_id: target }),
+        body: JSON.stringify({ device_id: target, note: decisionNote || undefined }),
       })
       if (!res.ok) {
         const text = await res.text().catch(() => '')
@@ -220,7 +267,16 @@ export function FindingToControlPanel({
       }
       const body = await res.json()
       const matches = Number(body?.matched_events ?? 0)
-      setSavedDraft({ ...savedDraft, matches })
+      const sim = (body?.simulation || null) as SimulationResult | null
+      const draft = body?.draft || {}
+      setSavedDraft({
+        ...savedDraft,
+        matches,
+        history: draft.history || savedDraft.history,
+        simulations: draft.simulations || savedDraft.simulations,
+        latestSimulation: sim || savedDraft.latestSimulation,
+      })
+      setDecisionNote('')
       setInfo(`Simulation projected ${matches} historical match(es) for ${target}. No enforcement.`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to simulate draft control')
@@ -455,7 +511,19 @@ export function FindingToControlPanel({
                   : '· not yet simulated'}
               </span>
             ) : null}
+            <input
+              value={decisionNote}
+              onChange={(event) => setDecisionNote(event.target.value)}
+              placeholder="Decision note for the simulation run (optional)"
+              className="ml-auto h-9 min-w-[260px] flex-1 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500"
+            />
           </section>
+
+          {savedDraft?.latestSimulation ? <SimulationCard sim={savedDraft.latestSimulation} /> : null}
+
+          {savedDraft?.history && savedDraft.history.length > 0 ? (
+            <DecisionHistorySection history={savedDraft.history} />
+          ) : null}
 
           <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
             <div className="flex items-center gap-2 font-semibold">
@@ -471,6 +539,126 @@ export function FindingToControlPanel({
       ) : null}
     </div>
   )
+}
+
+function SimulationCard({ sim }: { sim: SimulationResult }) {
+  const matched = sim.matched_device_ids || []
+  const users = sim.matched_users || []
+  return (
+    <section className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-emerald-900">Latest simulation projection</h3>
+        <span className="text-[11px] uppercase tracking-wide text-emerald-700">{sim.mode || 'observe_only'}</span>
+      </div>
+      {sim.summary ? <p className="mt-2 text-sm leading-6 text-emerald-900/90">{sim.summary}</p> : null}
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <SimulationMetric label="Matched events" value={String(sim.match_count ?? 0)} />
+        <SimulationMetric label="Matched devices" value={String(matched.length)} detail={matched.slice(0, 4).join(', ')} />
+        <SimulationMetric label="Matched users" value={String(users.length)} detail={users.slice(0, 4).join(', ')} />
+      </div>
+      {(sim.top_process_paths || []).length > 0 || (sim.top_destinations || []).length > 0 ? (
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <SimulationList title="Top process paths" items={sim.top_process_paths || []} />
+          <SimulationList title="Top destinations" items={sim.top_destinations || []} />
+        </div>
+      ) : null}
+      <div className="mt-3 grid gap-2 md:grid-cols-3 text-xs text-emerald-900/80">
+        <div>
+          <span className="font-semibold uppercase tracking-wide">Window</span>
+          <p>{formatWindow(sim.window_start_ms, sim.window_end_ms)}</p>
+        </div>
+        <div>
+          <span className="font-semibold uppercase tracking-wide">Confidence</span>
+          <p>{sim.confidence || 'medium'}</p>
+        </div>
+        <div>
+          <span className="font-semibold uppercase tracking-wide">Expected breakage</span>
+          <p>{sim.expected_breakage_risk || 'low (observe-only)'}</p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function SimulationMetric({ label, value, detail }: { label: string; value: string; detail?: string }) {
+  return (
+    <div className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-900">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">{label}</p>
+      <p className="mt-1 text-lg font-semibold">{value}</p>
+      {detail ? <p className="mt-1 truncate text-xs text-emerald-900/70" title={detail}>{detail}</p> : null}
+    </div>
+  )
+}
+
+function SimulationList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-900">
+      <p className="font-semibold uppercase tracking-wide text-emerald-700">{title}</p>
+      {items.length === 0 ? (
+        <p className="mt-1 italic text-emerald-900/70">none observed</p>
+      ) : (
+        <ul className="mt-1 grid gap-1 pl-4 list-disc">
+          {items.slice(0, 5).map((item) => (
+            <li key={item} className="break-all">
+              {item}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function DecisionHistorySection({ history }: { history: DecisionEntry[] }) {
+  const sorted = [...history].sort((a, b) => (b.at_ms || 0) - (a.at_ms || 0)).slice(0, 8)
+  return (
+    <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-slate-900">Decision history</h3>
+        <span className="text-[11px] uppercase tracking-wide text-slate-500">{history.length} entries</span>
+      </div>
+      <ul className="mt-3 grid gap-2">
+        {sorted.map((entry, idx) => (
+          <li key={entry.id || `${idx}-${entry.at_ms}`} className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 font-semibold uppercase tracking-wide text-slate-700">
+                  {(entry.action || 'updated').replace(/_/g, ' ')}
+                </span>
+                {entry.status ? <span className="text-slate-600">→ {entry.status}</span> : null}
+                {entry.simulation_id ? (
+                  <span className="font-mono text-[10px] text-slate-500">sim {entry.simulation_id.slice(0, 8)}</span>
+                ) : null}
+              </div>
+              <span className="text-slate-500">{entry.at_ms ? new Date(entry.at_ms).toLocaleString() : ''}</span>
+            </div>
+            {entry.changed_keys && entry.changed_keys.length > 0 ? (
+              <p className="mt-1 text-slate-600">Changed: {entry.changed_keys.join(', ')}</p>
+            ) : null}
+            {entry.note ? <p className="mt-1 italic text-slate-700">"{entry.note}"</p> : null}
+            <details className="mt-2 text-slate-600">
+              <summary className="cursor-pointer text-[11px] uppercase tracking-wide text-slate-500">Before / after</summary>
+              <div className="mt-1 grid gap-2 md:grid-cols-2">
+                <pre className="overflow-x-auto rounded bg-white p-2 text-[11px] text-slate-700">
+{JSON.stringify(entry.before ?? {}, null, 2)}
+                </pre>
+                <pre className="overflow-x-auto rounded bg-white p-2 text-[11px] text-slate-700">
+{JSON.stringify(entry.after ?? {}, null, 2)}
+                </pre>
+              </div>
+            </details>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function formatWindow(start?: number, end?: number): string {
+  if (!start || !end) return 'unspecified window'
+  const startStr = new Date(start).toLocaleString()
+  const endStr = new Date(end).toLocaleString()
+  return `${startStr} → ${endStr}`
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

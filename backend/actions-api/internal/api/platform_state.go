@@ -119,28 +119,82 @@ type OperationalEvent struct {
 }
 
 type DraftControl struct {
-	ID                   string   `json:"id"`
-	Status               string   `json:"status"`
-	SourceFindingID      string   `json:"source_finding_id"`
-	SourceFindingTitle   string   `json:"source_finding_title,omitempty"`
-	SourceDeviceID       string   `json:"source_device_id,omitempty"`
-	ProposedAction       string   `json:"proposed_action"`
-	ScopeSelectors       []string `json:"scope_selectors"`
-	EvidenceRefs         []string `json:"evidence_refs"`
-	ExpectedEffect       string   `json:"expected_effect"`
-	Confidence           string   `json:"confidence,omitempty"`
-	ExpectedMatches      *int     `json:"expected_matches,omitempty"`
-	ExpectedBreakageRisk string   `json:"expected_breakage_risk,omitempty"`
-	BlastRadius          string   `json:"blast_radius"`
-	BlastRadiusNotes     []string `json:"blast_radius_notes,omitempty"`
-	RollbackPlan         string   `json:"rollback_plan"`
-	RollbackSteps        []string `json:"rollback_steps,omitempty"`
-	OperatorNotes        string   `json:"operator_notes,omitempty"`
-	CreatedMS            int64    `json:"created_at_ms"`
-	UpdatedMS            int64    `json:"updated_at_ms,omitempty"`
-	SimulationMatches    int      `json:"simulation_match_count,omitempty"`
-	SimulationDeviceID   string   `json:"simulation_device_id,omitempty"`
-	SimulationAtMS       int64    `json:"simulation_at_ms,omitempty"`
+	ID                   string                 `json:"id"`
+	Status               string                 `json:"status"`
+	SourceFindingID      string                 `json:"source_finding_id"`
+	SourceFindingTitle   string                 `json:"source_finding_title,omitempty"`
+	SourceDeviceID       string                 `json:"source_device_id,omitempty"`
+	ProposedAction       string                 `json:"proposed_action"`
+	ScopeSelectors       []string               `json:"scope_selectors"`
+	EvidenceRefs         []string               `json:"evidence_refs"`
+	ExpectedEffect       string                 `json:"expected_effect"`
+	Confidence           string                 `json:"confidence,omitempty"`
+	ExpectedMatches      *int                   `json:"expected_matches,omitempty"`
+	ExpectedBreakageRisk string                 `json:"expected_breakage_risk,omitempty"`
+	BlastRadius          string                 `json:"blast_radius"`
+	BlastRadiusNotes     []string               `json:"blast_radius_notes,omitempty"`
+	RollbackPlan         string                 `json:"rollback_plan"`
+	RollbackSteps        []string               `json:"rollback_steps,omitempty"`
+	OperatorNotes        string                 `json:"operator_notes,omitempty"`
+	CreatedMS            int64                  `json:"created_at_ms"`
+	UpdatedMS            int64                  `json:"updated_at_ms,omitempty"`
+	SimulationMatches    int                    `json:"simulation_match_count,omitempty"`
+	SimulationDeviceID   string                 `json:"simulation_device_id,omitempty"`
+	SimulationAtMS       int64                  `json:"simulation_at_ms,omitempty"`
+	History              []DraftDecisionEntry   `json:"history,omitempty"`
+	Simulations          []DraftSimulationResult `json:"simulations,omitempty"`
+}
+
+// DraftDecisionEntry records a meaningful transition on a draft control
+// (creation, scope edit, simulation run, status change, archive). Each entry
+// captures actor, optional note, and before/after snapshots when fields
+// changed.
+type DraftDecisionEntry struct {
+	ID           string         `json:"id"`
+	AtMS         int64          `json:"at_ms"`
+	Actor        string         `json:"actor,omitempty"`
+	Action       string         `json:"action"`
+	Note         string         `json:"note,omitempty"`
+	Status       string         `json:"status,omitempty"`
+	ChangedKeys  []string       `json:"changed_keys,omitempty"`
+	Before       *DraftSnapshot `json:"before,omitempty"`
+	After        *DraftSnapshot `json:"after,omitempty"`
+	SimulationID string         `json:"simulation_id,omitempty"`
+}
+
+// DraftSnapshot captures the subset of a draft that operators edit. It is used
+// for before/after diffs in decision history.
+type DraftSnapshot struct {
+	Status             string   `json:"status,omitempty"`
+	ScopeSelectors     []string `json:"scope_selectors,omitempty"`
+	BlastRadius        string   `json:"blast_radius,omitempty"`
+	BlastRadiusNotes   []string `json:"blast_radius_notes,omitempty"`
+	RollbackPlan       string   `json:"rollback_plan,omitempty"`
+	RollbackSteps      []string `json:"rollback_steps,omitempty"`
+	OperatorNotes      string   `json:"operator_notes,omitempty"`
+	ExpectedMatches    *int     `json:"expected_matches,omitempty"`
+	ExpectedBreakage   string   `json:"expected_breakage_risk,omitempty"`
+}
+
+// DraftSimulationResult captures one run of the observe-only simulation: the
+// scope used, deterministic lab projections of matches, top process paths,
+// top destinations, and an explanation summary.
+type DraftSimulationResult struct {
+	ID               string   `json:"id"`
+	AtMS             int64    `json:"at_ms"`
+	DeviceID         string   `json:"device_id,omitempty"`
+	Mode             string   `json:"mode"`
+	MatchCount       int      `json:"match_count"`
+	MatchedDeviceIDs []string `json:"matched_device_ids,omitempty"`
+	MatchedUsers     []string `json:"matched_users,omitempty"`
+	TopProcessPaths  []string `json:"top_process_paths,omitempty"`
+	TopDestinations  []string `json:"top_destinations,omitempty"`
+	WindowStartMS    int64    `json:"window_start_ms,omitempty"`
+	WindowEndMS      int64    `json:"window_end_ms,omitempty"`
+	Confidence       string   `json:"confidence,omitempty"`
+	ExpectedBreakage string   `json:"expected_breakage_risk,omitempty"`
+	Summary          string   `json:"summary"`
+	ScopeSnapshot    []string `json:"scope_snapshot,omitempty"`
 }
 
 func newPlatformData() *PlatformData {
