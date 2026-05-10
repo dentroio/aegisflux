@@ -31,21 +31,22 @@ type AgentListResponse struct {
 
 // AgentInfo represents agent information for list responses (without sensitive data)
 type AgentInfo struct {
-	AgentUID            string               `json:"agent_uid"`
-	OrgID               string               `json:"org_id"`
-	HostID              string               `json:"host_id"`
-	Hostname            string               `json:"hostname,omitempty"`
-	MachineIDHash       string               `json:"machine_id_hash,omitempty"`
-	AgentVersion        string               `json:"agent_version,omitempty"`
-	Platform            map[string]any       `json:"platform,omitempty"`
-	Network             map[string]any       `json:"network,omitempty"`
-	Labels              []string             `json:"labels"`
-	Note                string               `json:"note,omitempty"`
-	Created             time.Time            `json:"created"`
-	LastSeen            time.Time            `json:"last_seen"`
-	Status              string               `json:"status"`
-	DetectionPackStatus *DetectionPackStatus `json:"detection_pack_status,omitempty"`
+	AgentUID            string                  `json:"agent_uid"`
+	OrgID               string                  `json:"org_id"`
+	HostID              string                  `json:"host_id"`
+	Hostname            string                  `json:"hostname,omitempty"`
+	MachineIDHash       string                  `json:"machine_id_hash,omitempty"`
+	AgentVersion        string                  `json:"agent_version,omitempty"`
+	Platform            map[string]any          `json:"platform,omitempty"`
+	Network             map[string]any          `json:"network,omitempty"`
+	Labels              []string                `json:"labels"`
+	Note                string                  `json:"note,omitempty"`
+	Created             time.Time               `json:"created"`
+	LastSeen            time.Time               `json:"last_seen"`
+	Status              string                  `json:"status"`
+	DetectionPackStatus *DetectionPackStatus    `json:"detection_pack_status,omitempty"`
 	Visibility          *VisibilityDeviceRecord `json:"visibility,omitempty"`
+	Readiness           *AgentReadiness         `json:"readiness,omitempty"`
 }
 
 // VisibilityDeviceRecord mirrors ingest /v1/visibility/devices rows for console merge.

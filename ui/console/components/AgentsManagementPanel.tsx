@@ -66,6 +66,40 @@ interface Agent {
   status: 'online' | 'offline' | 'unknown'
   detection_pack_status?: DetectionPackStatus | null
   visibility?: VisibilitySummary | null
+  readiness?: AgentReadiness | null
+}
+
+export interface AgentReadiness {
+  bucket: 'ready' | 'needs_attention' | 'stale' | 'degraded' | 'unknown' | string
+  score: number
+  summary?: string
+  fix_first?: string
+  dimensions?: AgentReadinessDimension[]
+}
+
+export interface AgentReadinessDimension {
+  id: string
+  label: string
+  state: 'good' | 'warn' | 'bad' | 'unknown' | string
+  value?: string
+  detail?: string
+  weight?: number
+}
+
+export const READINESS_BUCKET_LABEL: Record<string, string> = {
+  ready: 'Ready',
+  needs_attention: 'Needs attention',
+  stale: 'Stale',
+  degraded: 'Degraded',
+  unknown: 'Unknown',
+}
+
+export const READINESS_BUCKET_TONE: Record<string, string> = {
+  ready: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+  needs_attention: 'border-amber-200 bg-amber-50 text-amber-900',
+  stale: 'border-slate-300 bg-slate-100 text-slate-800',
+  degraded: 'border-rose-200 bg-rose-50 text-rose-900',
+  unknown: 'border-slate-200 bg-slate-50 text-slate-700',
 }
 
 interface VisibilitySummary {
@@ -370,6 +404,9 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
           <KpiTile label="Budget pressure" value={budgetPressureAgents} />
         </SummaryStrip>
 
+        <FleetReadinessStrip agents={agents} />
+
+
         <FilterBar>
           {(
             [
@@ -450,6 +487,7 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
                       <p className="text-xs text-slate-500" title={formatDate(agent.last_seen)}>
                         Last seen {formatRelativeAge(agent.last_seen)}
                       </p>
+                      <ReadinessBadge readiness={agent.readiness} />
                     </div>,
                     <div key={`${agent.agent_uid}-platform`} className="text-xs text-slate-600">
                       <p>{agent.platform.os || 'unknown'} · {agent.platform.architecture || 'unknown'}</p>
@@ -531,5 +569,63 @@ export function AgentsManagementPanel({ embedded = false }: { embedded?: boolean
         onClose={() => setDetailModal(null)}
       />
     </div>
+  )
+}
+
+function FleetReadinessStrip({ agents }: { agents: Agent[] }) {
+  const stats = useMemo(() => {
+    const buckets: Record<string, number> = { ready: 0, needs_attention: 0, stale: 0, degraded: 0, unknown: 0 }
+    let scoreSum = 0
+    let scored = 0
+    for (const agent of agents) {
+      const r = agent.readiness
+      if (!r) {
+        buckets.unknown++
+        continue
+      }
+      buckets[r.bucket] = (buckets[r.bucket] || 0) + 1
+      scoreSum += r.score
+      scored++
+    }
+    return { buckets, average: scored > 0 ? Math.round(scoreSum / scored) : 0 }
+  }, [agents])
+
+  const order = ['ready', 'needs_attention', 'degraded', 'stale', 'unknown'] as const
+  return (
+    <section className="mb-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Fleet readiness
+        </h3>
+        <span className="text-xs text-slate-600">
+          Avg score <span className="font-semibold text-slate-900">{stats.average}</span>/100
+        </span>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {order.map((bucket) => (
+          <div
+            key={bucket}
+            className={`rounded-md border px-3 py-2 text-xs ${READINESS_BUCKET_TONE[bucket] || READINESS_BUCKET_TONE.unknown}`}
+          >
+            <p className="font-semibold uppercase tracking-wide">{READINESS_BUCKET_LABEL[bucket] || bucket}</p>
+            <p className="mt-1 text-lg font-semibold">{stats.buckets[bucket] || 0}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+export function ReadinessBadge({ readiness }: { readiness?: AgentReadiness | null }) {
+  if (!readiness) return null
+  const tone = READINESS_BUCKET_TONE[readiness.bucket] || READINESS_BUCKET_TONE.unknown
+  return (
+    <span
+      title={readiness.summary || ''}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${tone}`}
+    >
+      {READINESS_BUCKET_LABEL[readiness.bucket] || readiness.bucket}
+      <span className="font-mono normal-case tracking-normal text-[10px] opacity-70">{readiness.score}</span>
+    </span>
   )
 }

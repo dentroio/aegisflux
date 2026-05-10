@@ -46,6 +46,7 @@ func (s *Server) routes() {
 	s.registerPlatformRoutes()
 
 	s.mux.HandleFunc("/console/summary/agents-workbench", s.getAgentsWorkbenchSummary)
+	s.mux.HandleFunc("/console/summary/agent-readiness", s.handleAgentReadinessFleet)
 
 	// Agent registration endpoints
 	s.mux.HandleFunc("/agents/register/init", s.postRegisterInit)

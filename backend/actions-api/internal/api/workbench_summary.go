@@ -46,6 +46,9 @@ func (s *Server) getAgentsWorkbenchSummary(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
+	currentBaseline := os.Getenv("AEGISFLUX_AGENT_BASELINE_VERSION")
+	now := time.Now()
+
 	s.store.mu.Lock()
 	defer s.store.mu.Unlock()
 
@@ -77,6 +80,8 @@ func (s *Server) getAgentsWorkbenchSummary(w http.ResponseWriter, r *http.Reques
 		} else if v := byHost[agent.AgentUID]; v != nil {
 			agentInfo.Visibility = v
 		}
+		readiness := computeAgentReadiness(agentInfo, currentBaseline, now)
+		agentInfo.Readiness = &readiness
 		filteredAgents = append(filteredAgents, agentInfo)
 	}
 

@@ -22,6 +22,12 @@ import { ConsoleShell } from '@/components/shell/ConsoleShell'
 import { readLabAuthenticated } from '@/shared/labAuth'
 import { AbomPanel } from '@/components/AbomPanel'
 import { EvidenceGraphPanel } from '@/components/EvidenceGraphPanel'
+import {
+  ReadinessBadge,
+  type AgentReadiness,
+  READINESS_BUCKET_LABEL,
+  READINESS_BUCKET_TONE,
+} from '@/components/AgentsManagementPanel'
 
 type DeviceRecord = {
   device_id: string
@@ -190,6 +196,7 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
     collectors: [],
     performance: [],
   })
+  const [readiness, setReadiness] = useState<AgentReadiness | null>(null)
 
   useEffect(() => {
     if (!readLabAuthenticated()) {
@@ -203,8 +210,24 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
   useEffect(() => {
     if (!authGate) return undefined
     loadDevice()
+    void loadReadiness()
     return undefined
   }, [deviceId, authGate])
+
+  const loadReadiness = async () => {
+    try {
+      const res = await fetch('/api/actions/console/summary/agent-readiness', { cache: 'no-store' })
+      if (!res.ok) return
+      const body = await res.json()
+      const rows: Array<{ agent_uid?: string; host_id?: string; readiness?: AgentReadiness }> = body?.agents || []
+      const match = rows.find(
+        (row) => row.host_id === deviceId || row.agent_uid === deviceId || row.host_id === decodeURIComponent(deviceId),
+      )
+      if (match?.readiness) setReadiness(match.readiness)
+    } catch {
+      // Readiness is optional; ignore fetch errors.
+    }
+  }
 
   const loadDevice = async () => {
     setRefreshing(true)
@@ -456,6 +479,7 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
               aiProcesses={aiProcesses}
               aiFindings={aiFindings}
               deviceFresh={isFresh}
+              readiness={readiness}
             />
           )}
         </section>
@@ -497,6 +521,7 @@ function TabContent(props: {
   aiProcesses: ProcessRecord[]
   aiFindings: FindingRecord[]
   deviceFresh: boolean
+  readiness?: AgentReadiness | null
 }) {
   const { activeTab } = props
   if (activeTab === 'Overview') {
@@ -584,8 +609,12 @@ function TabContent(props: {
   }
   if (activeTab === 'Health') {
     const latest = props.performance[0]
+    const readiness = props.readiness
     return (
       <div className="space-y-5">
+        {readiness ? (
+          <ReadinessExplanation readiness={readiness} />
+        ) : null}
         <div className="grid gap-4 md:grid-cols-4">
           <Metric label="CPU" value={formatPercent(latest?.process_cpu_percent)} />
           <Metric label="RSS" value={formatMb(latest?.process_memory_rss_mb)} />
@@ -765,4 +794,52 @@ function formatBytes(value?: number | null) {
 
 function labelize(value: string) {
   return value.replace(/_/g, ' ')
+}
+
+function ReadinessExplanation({ readiness }: { readiness: AgentReadiness }) {
+  const tone = READINESS_BUCKET_TONE[readiness.bucket] || READINESS_BUCKET_TONE.unknown
+  return (
+    <section className={`rounded-xl border p-4 shadow-sm ${tone}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">Endpoint readiness</h3>
+        <div className="flex items-center gap-2">
+          <ReadinessBadge readiness={readiness} />
+          <span className="text-xs">Score {readiness.score}/100</span>
+        </div>
+      </div>
+      <p className="mt-2 text-sm leading-6">{readiness.summary || 'No readiness summary.'}</p>
+      {readiness.fix_first ? (
+        <p className="mt-2 rounded-md border border-white/40 bg-white/60 px-3 py-2 text-xs font-semibold">
+          Fix first → {readiness.fix_first}
+        </p>
+      ) : null}
+      <ul className="mt-3 grid gap-2 md:grid-cols-2">
+        {(readiness.dimensions || []).map((dim) => (
+          <li
+            key={dim.id}
+            className={`rounded-md border bg-white/70 p-2 text-xs ${
+              dim.state === 'good'
+                ? 'border-emerald-200 text-emerald-900'
+                : dim.state === 'warn'
+                  ? 'border-amber-200 text-amber-900'
+                  : dim.state === 'bad'
+                    ? 'border-rose-200 text-rose-900'
+                    : 'border-slate-200 text-slate-700'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-semibold">{dim.label}</p>
+              <span className="font-mono uppercase">{dim.state}</span>
+            </div>
+            {dim.value ? <p className="mt-1 text-[11px] font-semibold">{dim.value}</p> : null}
+            {dim.detail ? <p className="mt-1">{dim.detail}</p> : null}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-[11px] text-slate-600">
+        Readiness is observe-only — it does not imply enforcement readiness, only whether this endpoint is currently trustworthy
+        for evidence.
+      </p>
+    </section>
+  )
 }
