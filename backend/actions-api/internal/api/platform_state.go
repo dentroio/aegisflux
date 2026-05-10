@@ -17,11 +17,12 @@ type PlatformData struct {
 
 	Privacy PrivacySettings
 
-	Runs     []AIRunRecord
-	Audit    []PrivacyAuditRecord
-	Events   []OperationalEvent
-	Drafts   []DraftControl
-	Research []ResearchItem
+	Runs       []AIRunRecord
+	Audit      []PrivacyAuditRecord
+	Events     []OperationalEvent
+	Drafts     []DraftControl
+	Research   []ResearchItem
+	Candidates []DetectionCandidate
 }
 
 // ResearchItem captures a piece of AI ecosystem intelligence and its
@@ -38,12 +39,77 @@ type ResearchItem struct {
 	EvidenceRequired    []string                `json:"evidence_required"`
 	SuggestedDetection  ResearchSuggestedRule   `json:"suggested_detection"`
 	ProposedPackID      string                  `json:"proposed_pack_id,omitempty"`
+	LinkedCandidateID   string                  `json:"linked_candidate_id,omitempty"`
 	Status              string                  `json:"status"`
 	RiskScore           int                     `json:"risk_score"`
 	OperatorNotes       string                  `json:"operator_notes,omitempty"`
 	PublishedMS         int64                   `json:"published_at_ms,omitempty"`
 	IngestedMS          int64                   `json:"ingested_at_ms"`
 	UpdatedMS           int64                   `json:"updated_at_ms,omitempty"`
+}
+
+// DetectionCandidate links a research item to a detection-pack pipeline
+// (WO-GROWTH-005). It carries quality gates, simulation results, reviewer
+// notes, and rollout/retirement status so an operator can follow a
+// detection from opportunity → candidate → signed pack → rollout → retire.
+type DetectionCandidate struct {
+	ID                 string                       `json:"id"`
+	SourceResearchID   string                       `json:"source_research_id"`
+	SourceResearchURL  string                       `json:"source_research_url,omitempty"`
+	Title              string                       `json:"title"`
+	Category           string                       `json:"category"`
+	Status             string                       `json:"status"`
+	PackID             string                       `json:"pack_id,omitempty"`
+	PackVersion        string                       `json:"pack_version,omitempty"`
+	RolloutStatus      string                       `json:"rollout_status,omitempty"`
+	QualityGate        DetectionCandidateGate       `json:"quality_gate"`
+	Rule               ResearchSuggestedRule        `json:"rule"`
+	OperatorNotes      string                       `json:"operator_notes,omitempty"`
+	ReviewerNotes      string                       `json:"reviewer_notes,omitempty"`
+	ExpiresAtMS        int64                        `json:"expires_at_ms,omitempty"`
+	RollbackPlan       string                       `json:"rollback_plan,omitempty"`
+	RetirementReason   string                       `json:"retirement_reason,omitempty"`
+	Simulations        []DetectionCandidateSimulation `json:"simulations,omitempty"`
+	History            []DetectionCandidateEvent    `json:"history,omitempty"`
+	CreatedMS          int64                        `json:"created_at_ms"`
+	UpdatedMS          int64                        `json:"updated_at_ms,omitempty"`
+}
+
+// DetectionCandidateGate captures the answers the operator must provide
+// before promotion to a signed pack. Empty/missing fields appear in the
+// "missing" list returned by the gate check.
+type DetectionCandidateGate struct {
+	RequiredEvidence       []string `json:"required_evidence,omitempty"`
+	ExpectedFalsePositives string   `json:"expected_false_positives,omitempty"`
+	HasSimulation          bool     `json:"has_simulation"`
+	HasReviewerNotes       bool     `json:"has_reviewer_notes"`
+	HasExpiration          bool     `json:"has_expiration"`
+	HasRollback            bool     `json:"has_rollback"`
+	MissingFields          []string `json:"missing_fields,omitempty"`
+}
+
+// DetectionCandidateSimulation summarizes a simulated match against
+// historical telemetry. Bounded and observe-only.
+type DetectionCandidateSimulation struct {
+	ID                 string   `json:"id"`
+	AtMS               int64    `json:"at_ms"`
+	MatchCount         int      `json:"match_count"`
+	MatchedDeviceCount int      `json:"matched_device_count"`
+	TopIndicators      []string `json:"top_indicators,omitempty"`
+	Window             string   `json:"window,omitempty"`
+	Confidence         string   `json:"confidence,omitempty"`
+	Notes              string   `json:"notes,omitempty"`
+}
+
+// DetectionCandidateEvent records a lifecycle event for the candidate.
+type DetectionCandidateEvent struct {
+	ID        string `json:"id"`
+	AtMS      int64  `json:"at_ms"`
+	Action    string `json:"action"`
+	From      string `json:"from_status,omitempty"`
+	To        string `json:"to_status,omitempty"`
+	Note      string `json:"note,omitempty"`
+	Actor     string `json:"actor,omitempty"`
 }
 
 type ResearchIndicator struct {
@@ -370,5 +436,12 @@ func (p *PlatformData) appendResearch(item ResearchItem) {
 	p.Research = append(p.Research, item)
 	if len(p.Research) > 200 {
 		p.Research = p.Research[len(p.Research)-200:]
+	}
+}
+
+func (p *PlatformData) appendCandidate(c DetectionCandidate) {
+	p.Candidates = append(p.Candidates, c)
+	if len(p.Candidates) > 200 {
+		p.Candidates = p.Candidates[len(p.Candidates)-200:]
 	}
 }

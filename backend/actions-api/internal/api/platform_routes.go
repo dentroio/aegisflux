@@ -24,6 +24,9 @@ func (s *Server) registerPlatformRoutes() {
 	px("/platform/research-feed", s.handleResearchFeedCollection)
 	px("/platform/research-feed/", s.handleResearchFeedItem)
 
+	px("/platform/detection-candidates", s.handleDetectionCandidatesCollection)
+	px("/platform/detection-candidates/", s.handleDetectionCandidateItem)
+
 	px("/platform/integration/devices/", s.handleIntegrationDeviceEvidence)
 	px("/platform/redact/preview", s.handleRedactPreview)
 }

@@ -47,12 +47,79 @@ export type ResearchItem = {
   evidence_required?: string[]
   suggested_detection?: SuggestedDetection
   proposed_pack_id?: string
+  linked_candidate_id?: string
   status: string
   risk_score: number
   operator_notes?: string
   published_at_ms?: number
   ingested_at_ms?: number
   updated_at_ms?: number
+}
+
+export type DetectionCandidate = {
+  id: string
+  source_research_id?: string
+  title: string
+  category?: string
+  status: string
+  pack_id?: string
+  pack_version?: string
+  rollout_status?: string
+  operator_notes?: string
+  reviewer_notes?: string
+  expires_at_ms?: number
+  rollback_plan?: string
+  retirement_reason?: string
+  rule?: SuggestedDetection
+  quality_gate?: {
+    required_evidence?: string[]
+    expected_false_positives?: string
+    has_simulation?: boolean
+    has_reviewer_notes?: boolean
+    has_expiration?: boolean
+    has_rollback?: boolean
+    missing_fields?: string[]
+  }
+  simulations?: Array<{
+    id?: string
+    at_ms?: number
+    match_count?: number
+    matched_device_count?: number
+    top_indicators?: string[]
+    window?: string
+    confidence?: string
+    notes?: string
+  }>
+  history?: Array<{ at_ms?: number; action?: string; from_status?: string; to_status?: string; note?: string }>
+  created_at_ms?: number
+  updated_at_ms?: number
+}
+
+const CANDIDATE_STAGES = [
+  'candidate_new',
+  'simulated',
+  'reviewed',
+  'signed',
+  'deployed',
+  'retired',
+] as const
+
+const CANDIDATE_STAGE_LABEL: Record<string, string> = {
+  candidate_new: 'New',
+  simulated: 'Simulated',
+  reviewed: 'Reviewed',
+  signed: 'Signed',
+  deployed: 'Deployed',
+  retired: 'Retired',
+}
+
+const CANDIDATE_STAGE_TONE: Record<string, string> = {
+  candidate_new: 'border-blue-200 bg-blue-50 text-blue-900',
+  simulated: 'border-amber-200 bg-amber-50 text-amber-900',
+  reviewed: 'border-violet-200 bg-violet-50 text-violet-900',
+  signed: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+  deployed: 'border-emerald-300 bg-emerald-100 text-emerald-900',
+  retired: 'border-slate-300 bg-slate-100 text-slate-700',
 }
 
 type ResearchFeedResponse = {
@@ -103,6 +170,9 @@ export function ResearchFeedPanel({ embedded = false }: { embedded?: boolean }) 
   const [editingNotes, setEditingNotes] = useState<{ id: string; notes: string; status: string } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [candidates, setCandidates] = useState<DetectionCandidate[]>([])
+  const [candidateBusyId, setCandidateBusyId] = useState<string | null>(null)
+  const [candidateDetail, setCandidateDetail] = useState<DetectionCandidate | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -127,9 +197,50 @@ export function ResearchFeedPanel({ embedded = false }: { embedded?: boolean }) 
     }
   }, [filters.category, filters.status])
 
+  const loadCandidates = useCallback(async () => {
+    try {
+      const res = await fetch('/api/actions/platform/detection-candidates', { cache: 'no-store' })
+      if (!res.ok) {
+        setCandidates([])
+        return
+      }
+      const body = (await res.json()) as { candidates?: DetectionCandidate[] }
+      setCandidates(body?.candidates || [])
+    } catch {
+      setCandidates([])
+    }
+  }, [])
+
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    void loadCandidates()
+  }, [loadCandidates])
+
+  async function candidateAction(id: string, path: string, body: Record<string, unknown> | null = null) {
+    setCandidateBusyId(id)
+    setError(null)
+    setInfo(null)
+    try {
+      const res = await fetch(`/api/actions/platform/detection-candidates/${encodeURIComponent(id)}${path}`, {
+        method: path === '' ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : '{}',
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(text || `HTTP ${res.status}`)
+      }
+      await loadCandidates()
+      setInfo('Detection candidate updated.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update detection candidate')
+    } finally {
+      setCandidateBusyId(null)
+    }
+  }
 
   const filteredItems = useMemo(() => {
     const items = data?.items || []
@@ -375,6 +486,21 @@ export function ResearchFeedPanel({ embedded = false }: { embedded?: boolean }) 
         )}
       </section>
 
+      <DetectionWorkflowBoard
+        candidates={candidates}
+        busyId={candidateBusyId}
+        onSimulate={(id) => void candidateAction(id, '/simulate')}
+        onAdvance={(id, status, note) => void candidateAction(id, '', { status, note })}
+        onRetire={(id, reason) => void candidateAction(id, '/retire', { reason })}
+        onOpenDetail={setCandidateDetail}
+      />
+
+      {candidateDetail ? (
+        <ResearchDetailModal title={`Candidate: ${candidateDetail.title}`} onClose={() => setCandidateDetail(null)}>
+          <CandidateDetailContent candidate={candidateDetail} />
+        </ResearchDetailModal>
+      ) : null}
+
       {detailItem ? (
         <ResearchDetailModal title={detailItem.title} onClose={() => setDetailItem(null)}>
           <div className="grid gap-3 text-sm text-slate-800">
@@ -617,4 +743,271 @@ function formatRelative(ts?: number) {
   const hours = Math.round(minutes / 60)
   if (hours < 48) return `${hours}h ago`
   return `${Math.round(hours / 24)}d ago`
+}
+
+function DetectionWorkflowBoard({
+  candidates,
+  busyId,
+  onSimulate,
+  onAdvance,
+  onRetire,
+  onOpenDetail,
+}: {
+  candidates: DetectionCandidate[]
+  busyId: string | null
+  onSimulate: (id: string) => void
+  onAdvance: (id: string, status: string, note?: string) => void
+  onRetire: (id: string, reason?: string) => void
+  onOpenDetail: (candidate: DetectionCandidate) => void
+}) {
+  const grouped = useMemo(() => {
+    const map: Record<string, DetectionCandidate[]> = {}
+    for (const stage of CANDIDATE_STAGES) {
+      map[stage] = []
+    }
+    for (const c of candidates) {
+      const key = CANDIDATE_STAGES.includes(c.status as typeof CANDIDATE_STAGES[number])
+        ? c.status
+        : 'candidate_new'
+      if (!map[key]) map[key] = []
+      map[key].push(c)
+    }
+    return map
+  }, [candidates])
+
+  const totalCount = candidates.length
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-baseline justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Detection workflow</h2>
+          <p className="text-xs text-slate-500">
+            Promoted research is tracked here through simulation, review, signing, and rollout. Detections remain observe-only until signed.
+          </p>
+        </div>
+        <span className="text-xs text-slate-500">{totalCount} candidate{totalCount === 1 ? '' : 's'}</span>
+      </div>
+      {totalCount === 0 ? (
+        <div className="mt-4">
+          <EmptyState
+            title="No detection candidates yet"
+            message="Promote a research item to create a governed observe-only detection candidate."
+          />
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-3 lg:grid-cols-3 xl:grid-cols-6">
+          {CANDIDATE_STAGES.map((stage) => {
+            const list = grouped[stage] || []
+            return (
+              <div key={stage} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-center justify-between">
+                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${CANDIDATE_STAGE_TONE[stage] || 'border-slate-200 bg-white text-slate-700'}`}>
+                    {CANDIDATE_STAGE_LABEL[stage] || stage}
+                  </span>
+                  <span className="text-xs text-slate-500">{list.length}</span>
+                </div>
+                <div className="mt-2 grid gap-2">
+                  {list.length === 0 ? (
+                    <p className="text-[11px] text-slate-400">No items.</p>
+                  ) : (
+                    list.map((candidate) => (
+                      <CandidateCard
+                        key={candidate.id}
+                        candidate={candidate}
+                        busy={busyId === candidate.id}
+                        onSimulate={() => onSimulate(candidate.id)}
+                        onAdvance={(status, note) => onAdvance(candidate.id, status, note)}
+                        onRetire={(reason) => onRetire(candidate.id, reason)}
+                        onOpenDetail={() => onOpenDetail(candidate)}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function CandidateCard({
+  candidate,
+  busy,
+  onSimulate,
+  onAdvance,
+  onRetire,
+  onOpenDetail,
+}: {
+  candidate: DetectionCandidate
+  busy: boolean
+  onSimulate: () => void
+  onAdvance: (status: string, note?: string) => void
+  onRetire: (reason?: string) => void
+  onOpenDetail: () => void
+}) {
+  const missing = candidate.quality_gate?.missing_fields || []
+  const lastSim = (candidate.simulations || []).slice(-1)[0]
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-2 shadow-sm">
+      <button
+        type="button"
+        onClick={onOpenDetail}
+        className="block w-full text-left text-sm font-semibold text-slate-900 hover:text-blue-700"
+      >
+        {candidate.title}
+      </button>
+      <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-slate-600">
+        {candidate.pack_id ? (
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono">{candidate.pack_id}</span>
+        ) : null}
+        {candidate.rollout_status && candidate.rollout_status !== 'none' ? (
+          <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-800">{candidate.rollout_status}</span>
+        ) : null}
+      </div>
+      {lastSim ? (
+        <p className="mt-1 text-[11px] text-slate-600">
+          Last sim: {lastSim.match_count ?? 0} matches • {lastSim.matched_device_count ?? 0} devices
+        </p>
+      ) : null}
+      {missing.length > 0 ? (
+        <p className="mt-1 text-[11px] text-amber-700">Gate missing: {missing.slice(0, 3).join(', ')}{missing.length > 3 ? '…' : ''}</p>
+      ) : null}
+      <div className="mt-2 flex flex-wrap gap-1">
+        {candidate.status === 'candidate_new' ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onSimulate}
+            className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Simulate
+          </button>
+        ) : null}
+        {candidate.status === 'simulated' ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onAdvance('reviewed')}
+            className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Mark reviewed
+          </button>
+        ) : null}
+        {candidate.status === 'reviewed' ? (
+          <button
+            type="button"
+            disabled={busy || (candidate.quality_gate?.missing_fields?.length || 0) > 0}
+            title={(candidate.quality_gate?.missing_fields?.length || 0) > 0 ? `Quality gate blocks signing: ${(candidate.quality_gate?.missing_fields || []).join(', ')}` : 'Sign and queue for rollout'}
+            onClick={() => onAdvance('signed')}
+            className="inline-flex items-center gap-1 rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+          >
+            Sign
+          </button>
+        ) : null}
+        {candidate.status === 'signed' ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onAdvance('deployed')}
+            className="inline-flex items-center gap-1 rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+          >
+            Mark deployed
+          </button>
+        ) : null}
+        {candidate.status !== 'retired' ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              const reason = prompt('Retirement reason?', '') || ''
+              onRetire(reason)
+            }}
+            className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Retire
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function CandidateDetailContent({ candidate }: { candidate: DetectionCandidate }) {
+  const lastSim = (candidate.simulations || []).slice(-1)[0]
+  return (
+    <div className="grid gap-3 text-sm text-slate-800">
+      <div className="grid gap-2 md:grid-cols-2">
+        <Field label="Status">{CANDIDATE_STAGE_LABEL[candidate.status] || candidate.status}</Field>
+        <Field label="Pack id">{candidate.pack_id || '—'}</Field>
+        <Field label="Pack version">{candidate.pack_version || '—'}</Field>
+        <Field label="Rollout">{candidate.rollout_status || '—'}</Field>
+        <Field label="Source research">{candidate.source_research_id || '—'}</Field>
+        <Field label="Expires at">{candidate.expires_at_ms ? new Date(candidate.expires_at_ms).toLocaleString() : '—'}</Field>
+      </div>
+      <Section title="Rule">
+        <div className="grid gap-1 text-xs text-slate-700">
+          <p><span className="font-semibold">Logic:</span> <span className="font-mono">{candidate.rule?.logic || '—'}</span></p>
+          <p><span className="font-semibold">Scope:</span> <span className="font-mono">{candidate.rule?.scope || '—'}</span></p>
+          <p><span className="font-semibold">Confidence:</span> {candidate.rule?.confidence || '—'}</p>
+          <p><span className="font-semibold">Expected noise:</span> {candidate.rule?.expected_noise || '—'}</p>
+        </div>
+      </Section>
+      <Section title="Quality gate">
+        <div className="grid gap-1 text-xs text-slate-700">
+          <p>Has simulation: {candidate.quality_gate?.has_simulation ? 'yes' : 'no'}</p>
+          <p>Reviewer notes: {candidate.quality_gate?.has_reviewer_notes ? 'yes' : 'no'}</p>
+          <p>Expiration: {candidate.quality_gate?.has_expiration ? 'yes' : 'no'}</p>
+          <p>Rollback plan: {candidate.quality_gate?.has_rollback ? 'yes' : 'no'}</p>
+          {(candidate.quality_gate?.missing_fields || []).length > 0 ? (
+            <p className="text-amber-700">Missing for signing: {(candidate.quality_gate?.missing_fields || []).join(', ')}</p>
+          ) : null}
+        </div>
+      </Section>
+      {lastSim ? (
+        <Section title="Latest simulation">
+          <div className="grid gap-1 text-xs text-slate-700">
+            <p>Matches: {lastSim.match_count ?? 0} • Devices: {lastSim.matched_device_count ?? 0}</p>
+            {lastSim.window ? <p>Window: {lastSim.window}</p> : null}
+            {(lastSim.top_indicators || []).length > 0 ? (
+              <p>Top indicators: {(lastSim.top_indicators || []).join(', ')}</p>
+            ) : null}
+            {lastSim.notes ? <p>{lastSim.notes}</p> : null}
+          </div>
+        </Section>
+      ) : null}
+      <Section title="History">
+        {(candidate.history || []).length === 0 ? (
+          <p className="text-xs text-slate-500">No history captured.</p>
+        ) : (
+          <ol className="grid gap-1 text-xs text-slate-700">
+            {(candidate.history || []).slice().reverse().map((entry, idx) => (
+              <li key={`hist-${idx}`} className="rounded border border-slate-200 bg-white p-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">{entry.action || 'event'}</span>
+                  <span className="text-[11px] text-slate-500">{entry.at_ms ? formatRelative(entry.at_ms) : ''}</span>
+                </div>
+                {entry.from_status || entry.to_status ? (
+                  <p className="text-[11px] text-slate-500">
+                    {entry.from_status || '—'} → {entry.to_status || '—'}
+                  </p>
+                ) : null}
+                {entry.note ? <p className="mt-1">{entry.note}</p> : null}
+              </li>
+            ))}
+          </ol>
+        )}
+      </Section>
+      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+        <div className="flex items-center gap-2 font-semibold">
+          <AlertTriangle className="h-4 w-4" /> Observe-only
+        </div>
+        <p className="mt-1">
+          This candidate is for governed simulation and review. Signing and deployment update platform records but never change endpoint enforcement state.
+        </p>
+      </div>
+    </div>
+  )
 }

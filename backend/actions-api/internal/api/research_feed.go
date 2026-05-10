@@ -218,20 +218,46 @@ func (s *Server) promoteResearchItem(w http.ResponseWriter, r *http.Request, id 
 		s.platform.Research[i].ProposedPackID = packID
 		s.platform.Research[i].Status = researchStatusPromoted
 		s.platform.Research[i].UpdatedMS = now
+
+		// Seed a detection candidate so the rest of the workflow (simulate /
+		// review / sign / deploy / retire) is wired up. This becomes the
+		// linked candidate for the research item.
+		candidate := DetectionCandidate{
+			ID:                uuid.NewString(),
+			SourceResearchID:  s.platform.Research[i].ID,
+			Title:             s.platform.Research[i].Title,
+			Category:          s.platform.Research[i].Category,
+			Status:            candidateStatusNew,
+			Rule:              s.platform.Research[i].SuggestedDetection,
+			OperatorNotes:     s.platform.Research[i].OperatorNotes,
+			QualityGate:       DetectionCandidateGate{RequiredEvidence: append([]string(nil), s.platform.Research[i].EvidenceRequired...)},
+			CreatedMS:         now,
+			UpdatedMS:         now,
+		}
+		candidate.History = append(candidate.History, DetectionCandidateEvent{
+			ID: uuid.NewString(), AtMS: now, Action: "created", To: candidateStatusNew, Actor: "system",
+			Note: fmt.Sprintf("Seeded from research item %s on promotion.", id),
+		})
+		candidate = recomputeCandidateGate(candidate)
+		s.platform.appendCandidate(candidate)
+		s.platform.Research[i].LinkedCandidateID = candidate.ID
+
 		s.platform.appendOp(OperationalEvent{
 			ID:          uuid.NewString(),
 			EventType:   "research.promoted",
 			Status:      researchStatusPromoted,
 			Subject:     id,
-			Description: fmt.Sprintf("Research item promoted to pack %s (governed; observe-only)", packID),
+			Description: fmt.Sprintf("Research item promoted to pack %s and seeded candidate %s (governed; observe-only)", packID, candidate.ID),
 			CreatedMS:   now,
 		})
 		jsonWrite(w, http.StatusOK, map[string]any{
 			"id":              id,
 			"item":            s.platform.Research[i],
 			"proposed_pack":   packID,
+			"candidate":       candidate,
+			"candidate_id":    candidate.ID,
 			"observe_only":    true,
-			"governance_note": "Promoted as governed observe-only opportunity. No detection is enabled until reviewed.",
+			"governance_note": "Promoted as governed observe-only opportunity. The seeded candidate must pass quality gates (simulation, reviewer notes, expiration, rollback) before signing.",
 		})
 		return
 	}
