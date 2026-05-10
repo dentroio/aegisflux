@@ -38,11 +38,13 @@ func TestDraftControlObserveOnlySimulation(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create status %d %s", rec.Code, rec.Body.String())
 	}
-	var body map[string]string
+	var body struct {
+		ID string `json:"id"`
+	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	id := strings.TrimSpace(body["id"])
+	id := strings.TrimSpace(body.ID)
 	if id == "" {
 		t.Fatal("missing id")
 	}
