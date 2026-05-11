@@ -1,10 +1,9 @@
 'use client'
 
-import { Bell, BookText, Bot, LogOut, Moon, Search, UserCircle } from 'lucide-react'
+import { LogOut, Search, UserCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { shellNavGroups, targetForNavItem } from './shellNav'
-import { shellStyles as sh } from './consoleShellStyles'
 
 export type HealthTone = 'emerald' | 'amber' | 'slate'
 
@@ -42,126 +41,141 @@ export function ConsoleShell({
     router.push(target)
   }
 
+  const healthDot =
+    health.tone === 'emerald'
+      ? 'bg-emerald-500'
+      : health.tone === 'amber'
+        ? 'bg-amber-400'
+        : 'bg-slate-400'
+
   return (
-    <div className="min-h-screen bg-gray-50 text-slate-900" style={sh.page}>
-      <div style={sh.appShell}>
-        <header className="border-b border-gray-200 bg-white shadow-sm" style={sh.header}>
-          <div className="flex h-16 items-center justify-between px-5" style={sh.headerInner}>
-            <button type="button" onClick={() => goNav('dashboard')} style={{ ...sh.headerLogo, border: 0, background: 'none', cursor: 'pointer' }}>
-              <div style={sh.headerLogoMark}>
-                <img src="/aegisflux-shield.png" alt="AegisFlux" style={sh.logoImage} />
-              </div>
-              <div>
-                <div style={sh.wordmarkText}>
-                  Aegis<span style={sh.wordmarkFlux}>Flux</span>
-                </div>
-              </div>
+    <div className="h-screen flex flex-col bg-gray-50 font-sans">
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <header className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm z-10">
+        <div className="flex items-center justify-between h-16 px-5">
+          {/* Logo / wordmark */}
+          <button
+            type="button"
+            onClick={() => goNav('dashboard')}
+            className="flex items-center gap-3 border-0 bg-transparent cursor-pointer shrink-0"
+          >
+            <div className="w-9 h-9 rounded-lg bg-slate-950 flex items-center justify-center overflow-hidden">
+              <img src="/aegisflux-shield.png" alt="AegisFlux" className="w-full h-full object-cover" />
+            </div>
+            <span className="text-xl font-extrabold tracking-tight text-slate-950 leading-none">
+              Aegis<span className="text-blue-600">Flux</span>
+            </span>
+          </button>
+
+          {/* Right actions */}
+          <div className="flex items-center gap-2">
+            {/* Search */}
+            <button
+              type="button"
+              className="hidden sm:inline-flex items-center gap-2 h-8 px-3 rounded-lg bg-gray-100 text-slate-500 text-sm hover:bg-gray-200 transition-colors"
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span>Search</span>
+              <kbd className="ml-1 rounded border border-gray-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-gray-400 leading-none">
+                ⌘K
+              </kbd>
             </button>
 
-            <div className="flex items-center gap-3" style={sh.headerActions}>
-              <button type="button" style={sh.headerSearch} title="Search">
-                <Search className="h-4 w-4" />
-                <span>Search</span>
-                <span style={sh.keycap}>Cmd K</span>
-              </button>
-              <button type="button" style={sh.iconButton} title="Notifications">
-                <Bell className="h-5 w-5" />
-              </button>
-              <button type="button" style={sh.iconButton} title="Theme">
-                <Moon className="h-5 w-5" />
-              </button>
-              <button type="button" style={sh.iconButton} title="Documentation">
-                <BookText className="h-5 w-5" />
-              </button>
-              <button type="button" style={sh.iconButton} title="AI Assistant">
-                <Bot className="h-5 w-5" />
-              </button>
-              <div style={sh.headerStatus}>
-                <FreshDot active={health.tone === 'emerald'} />
-                <span style={{ fontSize: 14, fontWeight: 650, color: health.tone === 'emerald' ? '#334155' : '#92400e' }}>
-                  {health.label}
+            {/* Health status */}
+            <div className="flex items-center gap-2 pl-3 ml-1 border-l border-gray-200">
+              <span className={`h-2 w-2 rounded-full shrink-0 ${healthDot}`} />
+              <span className="text-sm font-semibold text-slate-700">{health.label}</span>
+              {aiHealthSummary ? (
+                <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500">
+                  AI {aiHealthSummary}
                 </span>
-                {aiHealthSummary ? (
-                  <span style={sh.aiHealthChip} title="Configured AI providers">
-                    AI {aiHealthSummary}
+              ) : null}
+            </div>
+
+            {/* User */}
+            <div className="flex items-center gap-2 pl-3 ml-1 border-l border-gray-200">
+              <UserCircle className="h-5 w-5 text-slate-400" />
+              <span className="text-sm font-semibold text-slate-700">operator</span>
+              <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[11px] font-bold text-blue-700 leading-none">
+                Admin
+              </span>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="ml-0.5 h-7 w-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-600 hover:bg-gray-100 transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Body ──────────────────────────────────────────────── */}
+      <div className="flex flex-1 min-h-0">
+        {/* Sidebar */}
+        <aside className="w-64 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
+          <nav className="p-3 flex-1">
+            {shellNavGroups.map((group) => (
+              <div key={group.label}>
+                <div className="px-3 pt-4 pb-1">
+                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider select-none">
+                    {group.label}
                   </span>
-                ) : null}
-              </div>
-              <div style={sh.userBadge}>
-                <UserCircle className="h-5 w-5 text-slate-500" />
-                <span style={{ fontSize: 14, fontWeight: 650, color: '#334155' }}>operator</span>
-                <span style={sh.rolePill}>Admin</span>
-                <button type="button" onClick={onLogout} style={{ ...sh.iconButton, width: 28, height: 28 }} title="Sign out">
-                  <LogOut className="h-4 w-4 text-slate-400" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div style={sh.bodyShell}>
-          <aside style={sh.sidebar}>
-            <nav data-testid="console-sidebar-nav" style={sh.sideNav}>
-              {shellNavGroups.map((group) => (
-                <div key={group.label}>
-                  <div style={sh.sideGroupLabel}>{group.label}</div>
-                  {group.items.map((item) => {
-                    const Icon = item.icon
-                    const navActive = item.id === activeNavId
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => goNav(item.id)}
-                        style={{
-                          ...sh.sideButton,
-                          ...(navActive ? sh.sideButtonActive : sh.sideButtonMuted),
-                        }}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{item.label}</span>
-                      </button>
-                    )
-                  })}
                 </div>
-              ))}
-            </nav>
-            <div style={sh.sideFooter}>
-              <div style={sh.sideFooterCard}>
-                <div style={{ fontSize: 13, fontWeight: 750, color: '#075985' }}>Observe-only</div>
-                <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.45, color: '#0369a1' }}>
-                  Controls remain staged until approval and rollback are ready.
-                </div>
+                {group.items.map((item) => {
+                  const Icon = item.icon
+                  const active = item.id === activeNavId
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => goNav(item.id)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-0.5 ${
+                        active
+                          ? 'bg-[#1e3a5f] text-white'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  )
+                })}
               </div>
-            </div>
-          </aside>
+            ))}
+          </nav>
+        </aside>
 
-          <div style={sh.contentArea}>
-            <div style={sh.breadcrumb}>
-              <span>AegisFlux</span>
-              {breadcrumbs.map((segment, index) => (
-                <span className="flex min-w-0 items-center gap-1" key={`${segment.label}-${index}`}>
-                  <span>/</span>
-                  {segment.href ? (
-                    <a href={segment.href} className="min-w-0 truncate font-semibold hover:text-blue-900" style={{ color: '#2563eb' }}>
-                      {segment.label}
-                    </a>
-                  ) : (
-                    <span className="min-w-0 truncate font-semibold text-slate-900" style={{ color: '#0f172a' }}>
-                      {segment.label}
-                    </span>
-                  )}
-                </span>
-              ))}
-            </div>
-            <div style={sh.scrollArea}>{children}</div>
-          </div>
+        {/* Main content */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+          {/* Breadcrumb */}
+          <nav className="flex-shrink-0 flex items-center gap-1.5 px-6 py-2 text-sm text-gray-500 border-b border-gray-100 bg-white">
+            <span>AegisFlux</span>
+            {breadcrumbs.map((segment, index) => (
+              <span key={`${segment.label}-${index}`} className="flex items-center gap-1.5">
+                <span className="text-gray-300">/</span>
+                {segment.href ? (
+                  <a
+                    href={segment.href}
+                    className="font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                  >
+                    {segment.label}
+                  </a>
+                ) : (
+                  <span className="font-medium text-gray-900">{segment.label}</span>
+                )}
+              </span>
+            ))}
+          </nav>
+
+          {/* Scrollable content area */}
+          <main className="flex-1 overflow-y-auto min-h-0">
+            {children}
+          </main>
         </div>
       </div>
     </div>
   )
-}
-
-function FreshDot({ active }: { active: boolean }) {
-  return <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: active ? '#10b981' : '#f59e0b' }} />
 }
