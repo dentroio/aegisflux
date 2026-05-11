@@ -397,7 +397,7 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
                 className="btn btn-secondary h-9 px-3 text-primary-700"
               >
                 <Database className="mr-2 h-4 w-4" />
-                Inventory
+                Telemetry
               </a>
               <button type="button" onClick={loadDevice} disabled={refreshing} className="btn btn-secondary h-9 px-3">
                 <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -430,27 +430,34 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
           </div>
         )}
 
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex gap-2 overflow-x-auto pb-1">
+        {/* Tab strip + search */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between border-b border-gray-200 mb-0">
+          <div className="flex overflow-x-auto">
             {tabs.map((tab) => (
               <button
                 key={tab}
+                type="button"
                 onClick={() => setActiveTab(tab)}
-                className={`h-9 whitespace-nowrap rounded-md border px-3 text-sm font-medium ${
-                  activeTab === tab ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                  activeTab === tab
+                    ? 'border-[#1e3a5f] text-[#1e3a5f]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
                 {tab}
               </button>
             ))}
           </div>
-          <label className="relative min-w-0 lg:w-80">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} className="input pl-9" placeholder="Filter this page" />
-          </label>
+          <div className="pb-2">
+            <label className="relative block w-64">
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} className="input pl-9 w-full" placeholder="Filter this page" />
+            </label>
+          </div>
         </div>
 
-        <section className="card p-5">
+        {/* Tab content */}
+        <section className={activeTab === 'AI Capability' ? 'bg-white rounded-b-lg px-5 py-5 shadow-sm border border-t-0 border-gray-200' : 'card p-5 mt-4'}>
           {loading ? (
             <EmptyState title="Loading agent detail" detail="Collecting the latest status and activity for this agent." />
           ) : activeTab === 'AI Capability' ? (

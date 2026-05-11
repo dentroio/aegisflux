@@ -1,17 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
-import { 
-  ArrowLeft, 
-  Shield, 
-  Network, 
-  Target, 
-  Settings,
+import { ConsoleShell } from '@/components/shell/ConsoleShell'
+import { readLabAuthenticated } from '@/shared/labAuth'
+import {
+  Shield,
   Play,
   Save,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
 } from 'lucide-react'
 
 interface Agent {
@@ -42,11 +41,18 @@ interface PolicyForm {
 }
 
 export default function PolicyBuilder() {
+  const router = useRouter()
   const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [gate, setGate] = useState(false)
+
+  useEffect(() => {
+    if (!readLabAuthenticated()) { router.replace('/'); return }
+    setGate(true)
+  }, [router])
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<PolicyForm>({
     defaultValues: {
@@ -199,31 +205,16 @@ export default function PolicyBuilder() {
   const policyType = watch('policy_type')
   const protocol = watch('protocol')
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
-            <div className="flex items-center space-x-4">
-              <a href="/" className="flex items-center text-gray-600 hover:text-gray-900">
-                <ArrowLeft className="h-5 w-5 mr-2" />
-                Back to Dashboard
-              </a>
-              <div className="h-6 w-px bg-gray-300" />
-              <div className="flex items-center space-x-3">
-                <Shield className="h-8 w-8 text-primary-600" />
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Policy Builder</h1>
-                  <p className="text-sm text-gray-500">Create and deploy network security policies</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+  if (!gate) return <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">Loading…</div>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  return (
+    <ConsoleShell
+      activeNavId="policy-builder"
+      breadcrumbs={[{ label: 'Policy Builder' }]}
+      health={{ label: 'Enforcement', tone: 'amber', text: 'Policies can block traffic' }}
+      onLogout={() => { window.localStorage.removeItem('aegisflux.labAuth'); router.replace('/') }}
+    >
+      <main className="mx-auto max-w-4xl px-5 py-6">
         {/* Success/Error Messages */}
         {success && (
           <div className="mb-6 bg-success-50 border border-success-200 rounded-md p-4">
@@ -490,6 +481,6 @@ export default function PolicyBuilder() {
           </div>
         </form>
       </main>
-    </div>
+    </ConsoleShell>
   )
 }

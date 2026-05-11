@@ -381,7 +381,7 @@ function AegisDashboardBody() {
     mainPanel === 'agents' ? 'agents' : mainPanel === 'inventory' ? 'inventory' : 'dashboard'
   const shellBreadcrumbs = [
     {
-      label: mainPanel === 'dashboard' ? 'Dashboard' : mainPanel === 'agents' ? 'Agents' : 'Inventory',
+      label: mainPanel === 'dashboard' ? 'Dashboard' : mainPanel === 'agents' ? 'Agents' : 'Telemetry',
     },
   ]
 

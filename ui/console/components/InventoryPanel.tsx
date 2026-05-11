@@ -321,12 +321,12 @@ export function InventoryPanel({
         </div>
 
         {loading ? (
-          <EmptyState title="Loading inventory" message="Collecting extension, DNS, process, and control telemetry." />
+          <EmptyState title="Loading telemetry" message="Collecting extension, DNS, process, and control telemetry." />
         ) : (
           <>
             <WorkbenchHeader
-              title="Inventory Workbench"
-              subtitle="Category-driven inventory with deliberate bounded details."
+              title="Telemetry"
+              subtitle="Raw AI-related observations — browser extensions, processes, DNS, and SASE components across the fleet."
               actions={
                 <button type="button" onClick={() => void load()} disabled={refreshing} className="btn btn-secondary h-9 px-3">
                   <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />

@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ConsoleShell } from '@/components/shell/ConsoleShell'
 import type { HealthTone } from '@/components/shell/ConsoleShell'
@@ -37,8 +36,8 @@ export default function AuditBundlesPage() {
 
   return (
     <ConsoleShell
-      activeNavId="controls"
-      breadcrumbs={[{ label: 'Controls', href: '/control/controls' }, { label: 'Audit bundles' }]}
+      activeNavId="audit-bundles"
+      breadcrumbs={[{ label: 'Audit Bundles' }]}
       health={health}
       onLogout={onLogout}
     >
@@ -56,9 +55,6 @@ export default function AuditBundlesPage() {
             audit-mode safety doc
           </a>
           .
-        </div>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/control/controls" className="text-sm font-semibold text-blue-700">Back to controls</Link>
         </div>
         <AuditBundlesPanel />
       </main>

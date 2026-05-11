@@ -3,6 +3,7 @@ import {
   Activity,
   BookText,
   Bot,
+  ClipboardList,
   Cpu,
   Database,
   LayoutDashboard,
@@ -14,7 +15,6 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
-  TerminalSquare,
 } from 'lucide-react'
 
 export type ShellNavGroup = {
@@ -30,10 +30,10 @@ export const shellNavGroups: readonly ShellNavGroup[] = [
   {
     label: 'Discover',
     items: [
-      { id: 'agents', label: 'Agents', icon: Server },
-      { id: 'abom', label: 'Agent Bill of Materials', icon: Sparkles },
-      { id: 'inventory', label: 'Inventory', icon: Database },
-      { id: 'activity', label: 'AI Activity', icon: Bot },
+      { id: 'agents',    label: 'Agents',                  icon: Server },
+      { id: 'inventory', label: 'Telemetry',               icon: Database },
+      { id: 'abom',      label: 'Agent Bill of Materials', icon: Sparkles },
+      { id: 'activity',  label: 'AI Activity',             icon: Bot },
     ],
   },
   {
@@ -48,8 +48,9 @@ export const shellNavGroups: readonly ShellNavGroup[] = [
   {
     label: 'Control',
     items: [
-      { id: 'controls', label: 'Controls', icon: ShieldCheck },
-      { id: 'simulation', label: 'Policy Simulation', icon: TerminalSquare },
+      { id: 'controls',        label: 'Controls',        icon: ShieldCheck },
+      { id: 'audit-bundles',   label: 'Audit Bundles',   icon: ClipboardList },
+      { id: 'policy-builder',  label: 'Policy Builder',  icon: Settings },
     ],
   },
   {
@@ -92,8 +93,10 @@ export function targetForNavItem(itemId: string): string {
       return '/analyze/research'
     case 'controls':
       return '/control/controls'
-    case 'simulation':
-      return '/control/simulation'
+    case 'audit-bundles':
+      return '/control/audit-bundles'
+    case 'policy-builder':
+      return '/policy-builder'
     case 'event-feed':
       return '/operate/events'
     case 'monitoring':
