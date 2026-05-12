@@ -80,6 +80,27 @@ Remove the timer and service with:
 sudo ./scripts/uninstall-lab-systemd.sh
 ```
 
+## Hardened Linux systemd Service
+
+For a persistent agent process, build the release binary and install the
+hardened service:
+
+```bash
+cd /opt/aegis/aegisflux/agents/linux-agent
+cargo build --release
+sudo AEGIS_BACKEND_URL=http://127.0.0.1:9091 ./scripts/install-systemd.sh
+```
+
+This mode runs continuously, emits collection batches every
+`AEGIS_COLLECTION_INTERVAL_SECONDS` seconds, sends `READY=1` and watchdog
+notifications to systemd, and is configured with `Restart=always`.
+
+Remove it with:
+
+```bash
+sudo ./scripts/uninstall-systemd.sh
+```
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -89,10 +110,12 @@ sudo ./scripts/uninstall-lab-systemd.sh
 | `AEGIS_SENSOR_VERSION` | crate version | Sensor version in event envelopes |
 | `AEGIS_EVENT_SPOOL` | `/var/lib/aegis/linux-agent/events.jsonl` | JSONL event spool path |
 | `AEGIS_BACKEND_URL` | empty | Optional Phase 1 ingest base URL for outbound lab telemetry |
+| `AEGIS_ACTIONS_HEARTBEAT_URL` | empty | Optional Actions API heartbeat endpoint for lab freshness (`install-systemd.sh` defaults to `http://127.0.0.1:8083/agents/heartbeat`) |
 | `AEGIS_COLLECT_COMMAND_LINE` | `false` | Opt-in command-line collection for lab scenarios; values are sanitized and truncated |
 | `AEGIS_CONTROLLER_URL` | empty | Lab detection-pipeline base URL (`http://host:port`) for WO-DET-003 pack APIs |
 | `AEGIS_DETECTION_PACKS_ENABLED` | `false` | When `true`, fetch/verify/cache/evaluate signed `detection_pack.v1` documents (observe-only) |
 | `AEGIS_DETECTION_PACK_PUBLIC_KEY` | empty | Standard Base64 of the raw 32-byte Ed25519 **verifying** key (required when packs are enabled) |
 | `AEGIS_DETECTION_PACK_CACHE` | empty | Override directory for verified pack cache (default: `detection-pack/` next to the event spool parent) |
+| `AEGIS_COLLECTION_INTERVAL_SECONDS` | `60` | Interval for continuous service mode; minimum `5` seconds |
 
 See [docs/DYNAMIC_PACKS.md](docs/DYNAMIC_PACKS.md) for the controller contract, cache layout, and status fields.

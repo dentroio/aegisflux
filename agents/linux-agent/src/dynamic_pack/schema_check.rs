@@ -36,7 +36,7 @@ pub fn validate_pack_for_linux(
 
     let min_ver = read_str(pack, "min_agent_version")
         .ok_or_else(|| "min_agent_version missing".to_string())?;
-    if !semver_gte(agent_semver, &min_ver) {
+    if !semver_gte(agent_semver, min_ver) {
         return Err(format!(
             "agent version {agent_semver} is below min_agent_version {min_ver}"
         ));
@@ -205,7 +205,7 @@ fn days_in_month(y: i64, month: u32) -> u32 {
 }
 
 fn days_since_unix_epoch(y: i32, mo: u32, d: u32) -> Option<i64> {
-    if mo < 1 || mo > 12 || d < 1 || d > days_in_month(i64::from(y), mo) {
+    if !(1..=12).contains(&mo) || d < 1 || d > days_in_month(i64::from(y), mo) {
         return None;
     }
     let yy = i64::from(y);

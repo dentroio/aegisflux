@@ -241,9 +241,9 @@ fn verify_downloaded(
     pk: &[u8; 32],
     latest: &LatestResponse,
     config: &AgentConfig,
-) -> Result<(Value, PackCacheMeta), RolloutContext> {
+) -> Result<(Value, PackCacheMeta), Box<RolloutContext>> {
     if let Err(e) = verify_content_sha256_header(headers, body) {
-        return Err(RolloutContext::rejected(
+        return Err(Box::new(RolloutContext::rejected(
             "hash_mismatch",
             &e,
             "mismatch",
@@ -251,13 +251,13 @@ fn verify_downloaded(
             "invalid",
             "incompatible",
             latest,
-        ));
+        )));
     }
 
     let pack_value: Value = match serde_json::from_slice(body) {
         Ok(v) => v,
         Err(e) => {
-            return Err(RolloutContext::rejected(
+            return Err(Box::new(RolloutContext::rejected(
                 "json_parse",
                 &format!("{e}"),
                 "unknown",
@@ -265,14 +265,14 @@ fn verify_downloaded(
                 "invalid",
                 "incompatible",
                 latest,
-            ));
+            )));
         }
     };
 
     let sig_b64 = match signature_value_b64(&pack_value) {
         Ok(s) => s,
         Err(e) => {
-            return Err(RolloutContext::rejected(
+            return Err(Box::new(RolloutContext::rejected(
                 "unsigned_or_bad_signature_block",
                 &e,
                 "invalid",
@@ -280,12 +280,12 @@ fn verify_downloaded(
                 "invalid",
                 "incompatible",
                 latest,
-            ));
+            )));
         }
     };
 
     if let Err(e) = verify_ed25519_signature(&pack_value, pk, &sig_b64) {
-        return Err(RolloutContext::rejected(
+        return Err(Box::new(RolloutContext::rejected(
             "signature_invalid",
             &e,
             "invalid",
@@ -293,16 +293,16 @@ fn verify_downloaded(
             "invalid",
             "incompatible",
             latest,
-        ));
+        )));
     }
 
     if let Err(e) = validate_pack_for_linux(&pack_value, &config.sensor_version, SystemTime::now())
     {
         let expired = e.contains("expired");
         if expired {
-            return Err(RolloutContext::expired(&e, latest));
+            return Err(Box::new(RolloutContext::expired(&e, latest)));
         }
-        return Err(RolloutContext::rejected(
+        return Err(Box::new(RolloutContext::rejected(
             "schema_or_policy",
             &e,
             "valid",
@@ -310,12 +310,12 @@ fn verify_downloaded(
             "invalid",
             "incompatible",
             latest,
-        ));
+        )));
     }
 
     let body_hash = sha256_hex(body);
     if !body_hash.eq_ignore_ascii_case(latest.sha256.trim()) {
-        return Err(RolloutContext::rejected(
+        return Err(Box::new(RolloutContext::rejected(
             "sha256_metadata_mismatch",
             "artifact body hash does not match latest.sha256",
             "valid",
@@ -323,7 +323,7 @@ fn verify_downloaded(
             "valid",
             "incompatible",
             latest,
-        ));
+        )));
     }
 
     let meta = PackCacheMeta {

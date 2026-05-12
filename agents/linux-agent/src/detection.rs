@@ -73,25 +73,24 @@ impl DetectionContext {
                 }
                 EventPayload::FlowStarted {
                     flow_id,
-                    pid,
+                    pid: Some(pid),
                     remote_ip,
                     remote_port,
                     remote_hostname,
                     ..
                 } => {
-                    if let Some(pid) = pid {
-                        context
-                            .flows_by_pid
-                            .entry(*pid)
-                            .or_default()
-                            .push(FlowObservation {
-                                flow_id: flow_id.clone(),
-                                remote_ip: remote_ip.clone(),
-                                remote_port: *remote_port,
-                                remote_hostname: remote_hostname.clone(),
-                            });
-                    }
+                    context
+                        .flows_by_pid
+                        .entry(*pid)
+                        .or_default()
+                        .push(FlowObservation {
+                            flow_id: flow_id.clone(),
+                            remote_ip: remote_ip.clone(),
+                            remote_port: *remote_port,
+                            remote_hostname: remote_hostname.clone(),
+                        });
                 }
+                EventPayload::FlowStarted { pid: None, .. } => {}
                 EventPayload::DnsObserved { query, answers, .. } => {
                     context.dns_queries.push(DnsObservation {
                         query: query.clone(),
@@ -547,7 +546,7 @@ impl FlowObservation {
 
 #[cfg(test)]
 mod tests {
-    use std::time::SystemTime;
+    use std::time::{Duration, SystemTime};
 
     use super::detect_ai_agent_activity;
     use crate::config::AgentConfig;
@@ -559,12 +558,14 @@ mod tests {
             device_id: "device-1".to_string(),
             sensor_version: "0.1.0".to_string(),
             backend_url: None,
+            actions_heartbeat_url: None,
             event_spool: "/tmp/events.jsonl".into(),
             collect_command_line: true,
             controller_url: None,
             detection_packs_enabled: false,
             detection_pack_cache: None,
             detection_pack_public_key: None,
+            collection_interval: Duration::from_secs(60),
         }
     }
 
@@ -659,7 +660,10 @@ mod tests {
                 assert_eq!(classification, "script_or_agent_runtime");
                 assert_eq!(detected_patterns, &["agent_marker_command_line"]);
             }
-            _ => panic!("expected agent detection payload"),
+            other => assert!(
+                matches!(other, EventPayload::AgentDetected { .. }),
+                "expected agent detection payload"
+            ),
         }
     }
 }

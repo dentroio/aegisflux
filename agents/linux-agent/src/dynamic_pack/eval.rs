@@ -646,12 +646,14 @@ mod tests {
             device_id: "d".to_string(),
             sensor_version: "1.0.0".to_string(),
             backend_url: None,
+            actions_heartbeat_url: None,
             event_spool: "/tmp/e".into(),
             collect_command_line: false,
             controller_url: None,
             detection_packs_enabled: false,
             detection_pack_cache: None,
             detection_pack_public_key: None,
+            collection_interval: std::time::Duration::from_secs(60),
         };
         let events = vec![AegisEvent::new(
             &cfg,

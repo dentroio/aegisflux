@@ -31,6 +31,24 @@
 - Does not modify firewall, routing, nftables, iptables, eBPF programs, or SELinux/AppArmor policy.
 - Does not change endpoint posture or SGT state.
 
+## Self-Protection Baseline
+
+- Persistent Linux deployments should use `scripts/install-systemd.sh`, not the
+  lab timer.
+- The service runs under the dedicated `aegis` account with a locked-down
+  filesystem view and no ambient Linux capabilities.
+- systemd restarts the agent after crashes or process termination and monitors
+  liveness with watchdog notifications from the agent process.
+- Service hardening reduces the damage an exploited agent process can do:
+  `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`,
+  `ProtectKernelTunables`, `ProtectKernelModules`, `ProtectControlGroups`,
+  `RestrictSUIDSGID`, `MemoryDenyWriteExecute`, and native syscall architecture
+  filtering are enabled.
+- This is resilience and tamper evidence, not an absolute guarantee. A local
+  root attacker can still stop systemd units unless the host also deploys
+  platform controls such as secure boot, signed updates, audit rules, LSM policy,
+  EDR controls, and centralized alerting on service stop or binary modification.
+
 ## Future Hardening
 
 - Code signing for release builds

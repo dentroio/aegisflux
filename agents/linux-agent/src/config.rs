@@ -2,6 +2,7 @@
 
 use std::env;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use base64::Engine;
 
@@ -16,6 +17,8 @@ pub struct AgentConfig {
     pub sensor_version: String,
     /// Optional backend URL reserved for future outbound telemetry.
     pub backend_url: Option<String>,
+    /// Optional Actions API heartbeat URL for lab agent freshness.
+    pub actions_heartbeat_url: Option<String>,
     /// Local JSONL event spool path.
     pub event_spool: PathBuf,
     /// Whether command-line collection is enabled.
@@ -28,6 +31,8 @@ pub struct AgentConfig {
     pub detection_pack_cache: Option<PathBuf>,
     /// Ed25519 verifying key (32 raw bytes) for `detection_pack.v1` signatures, standard base64.
     pub detection_pack_public_key: Option<[u8; 32]>,
+    /// Interval between continuous collection cycles.
+    pub collection_interval: Duration,
 }
 
 impl AgentConfig {
@@ -37,6 +42,9 @@ impl AgentConfig {
         let device_id = env::var("AEGIS_DEVICE_ID").unwrap_or_else(|_| hostname_fallback());
         let sensor_version = env_or_default("AEGIS_SENSOR_VERSION", env!("CARGO_PKG_VERSION"));
         let backend_url = env::var("AEGIS_BACKEND_URL")
+            .ok()
+            .filter(|value| !value.trim().is_empty());
+        let actions_heartbeat_url = env::var("AEGIS_ACTIONS_HEARTBEAT_URL")
             .ok()
             .filter(|value| !value.trim().is_empty());
         let event_spool = env::var("AEGIS_EVENT_SPOOL")
@@ -63,6 +71,7 @@ impl AgentConfig {
                     .to_string(),
             );
         }
+        let collection_interval = env_duration_secs("AEGIS_COLLECTION_INTERVAL_SECONDS", 60, 5)?;
 
         require_safe_identifier("AEGIS_AGENT_ID", &agent_id)?;
         require_safe_identifier("AEGIS_DEVICE_ID", &device_id)?;
@@ -72,12 +81,14 @@ impl AgentConfig {
             device_id,
             sensor_version,
             backend_url,
+            actions_heartbeat_url,
             event_spool,
             collect_command_line,
             controller_url,
             detection_packs_enabled,
             detection_pack_cache,
             detection_pack_public_key,
+            collection_interval,
         })
     }
 }
@@ -111,6 +122,20 @@ fn env_bool(name: &str, default: bool) -> Result<bool, String> {
         },
         Err(_) => Ok(default),
     }
+}
+
+fn env_duration_secs(name: &str, default: u64, min: u64) -> Result<Duration, String> {
+    let raw = match env::var(name) {
+        Ok(value) => value,
+        Err(_) => return Ok(Duration::from_secs(default)),
+    };
+    let seconds = raw
+        .parse::<u64>()
+        .map_err(|_| format!("{name} must be an integer number of seconds"))?;
+    if seconds < min {
+        return Err(format!("{name} must be at least {min} seconds"));
+    }
+    Ok(Duration::from_secs(seconds))
 }
 
 fn require_safe_identifier(name: &str, value: &str) -> Result<(), String> {

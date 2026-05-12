@@ -486,11 +486,13 @@ tcp LISTEN 0 4096 0.0.0.0:22 0.0.0.0:* users:(("sshd",pid=730,fd=3))
     }
 
     #[test]
-    fn parses_bracketed_ipv6_socket_address() {
-        let parsed = parse_socket_addr("[fe80::1]:443").unwrap();
+    fn parses_bracketed_ipv6_socket_address() -> Result<(), String> {
+        let parsed =
+            parse_socket_addr("[fe80::1]:443").ok_or_else(|| "socket did not parse".to_string())?;
 
         assert_eq!(parsed.0, "fe80::1");
         assert_eq!(parsed.1, Some(443));
+        Ok(())
     }
 
     #[test]

@@ -50,6 +50,12 @@ pub struct HttpVisibilityTransport {
     endpoint: HttpEndpoint,
 }
 
+/// HTTP JSON transport for exact lab API endpoints.
+#[derive(Debug, Clone)]
+pub struct HttpJsonTransport {
+    endpoint: HttpEndpoint,
+}
+
 impl HttpVisibilityTransport {
     /// Create an HTTP visibility transport.
     pub fn new(base_url: &str) -> Result<Self, String> {
@@ -70,7 +76,21 @@ impl HttpVisibilityTransport {
             body.push('\n');
         }
 
-        self.endpoint.post_jsonl(&body)
+        self.endpoint.post_body(&body, "application/x-ndjson")
+    }
+}
+
+impl HttpJsonTransport {
+    /// Create an HTTP JSON transport for an exact endpoint URL.
+    pub fn new(url: &str) -> Result<Self, String> {
+        Ok(Self {
+            endpoint: HttpEndpoint::parse_exact(url, "AEGIS_ACTIONS_HEARTBEAT_URL")?,
+        })
+    }
+
+    /// Post one JSON document.
+    pub fn post_json(&self, body: &str) -> Result<(), String> {
+        self.endpoint.post_body(body, "application/json")
     }
 }
 
@@ -83,31 +103,25 @@ struct HttpEndpoint {
 
 impl HttpEndpoint {
     fn parse(base_url: &str) -> Result<Self, String> {
-        let without_scheme = base_url
-            .strip_prefix("http://")
-            .ok_or_else(|| "AEGIS_BACKEND_URL lab transport supports http:// only".to_string())?;
-
-        let (authority, raw_path) = match without_scheme.split_once('/') {
-            Some((authority, path)) => (authority, format!("/{path}")),
-            None => (without_scheme, String::new()),
-        };
-
-        if authority.is_empty() {
-            return Err("AEGIS_BACKEND_URL is missing a host".to_string());
-        }
-
-        let (host, port) = parse_authority(authority)?;
+        let (host, port, raw_path) = parse_http_url(base_url, "AEGIS_BACKEND_URL")?;
         let path = visibility_events_path(&raw_path);
-
         Ok(Self { host, port, path })
     }
 
-    fn post_jsonl(&self, body: &str) -> Result<(), String> {
+    fn parse_exact(url: &str, name: &str) -> Result<Self, String> {
+        let (host, port, path) = parse_http_url(url, name)?;
+        if path.is_empty() {
+            return Err(format!("{name} is missing a path"));
+        }
+        Ok(Self { host, port, path })
+    }
+
+    fn post_body(&self, body: &str, content_type: &str) -> Result<(), String> {
         const MAX_ATTEMPTS: usize = 3;
         let address = format!("{}:{}", self.host, self.port);
         let mut last_error = String::new();
         for attempt in 1..=MAX_ATTEMPTS {
-            match self.post_jsonl_once(body, &address) {
+            match self.post_body_once(body, content_type, &address) {
                 Ok(()) => return Ok(()),
                 Err(PostError::Retryable(error)) => {
                     last_error = error;
@@ -120,33 +134,39 @@ impl HttpEndpoint {
         }
 
         Err(format!(
-            "failed to deliver events to Aegis ingest after {MAX_ATTEMPTS} attempts: {last_error}"
+            "failed to deliver HTTP payload after {MAX_ATTEMPTS} attempts: {last_error}"
         ))
     }
 
-    fn post_jsonl_once(&self, body: &str, address: &str) -> Result<(), PostError> {
+    fn post_body_once(
+        &self,
+        body: &str,
+        content_type: &str,
+        address: &str,
+    ) -> Result<(), PostError> {
         let mut stream = TcpStream::connect(address).map_err(|err| {
             PostError::Retryable(format!(
-                "failed to connect to Aegis ingest at {address}: {err}"
+                "failed to connect to HTTP endpoint at {address}: {err}"
             ))
         })?;
 
         let request = format!(
-            "POST {} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/x-ndjson\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            "POST {} HTTP/1.1\r\nHost: {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
             self.path,
             self.host,
+            content_type,
             body.len(),
             body
         );
 
-        stream.write_all(request.as_bytes()).map_err(|err| {
-            PostError::Retryable(format!("failed to send events to Aegis ingest: {err}"))
-        })?;
+        stream
+            .write_all(request.as_bytes())
+            .map_err(|err| PostError::Retryable(format!("failed to send HTTP payload: {err}")))?;
 
         let mut response = String::new();
-        stream.read_to_string(&mut response).map_err(|err| {
-            PostError::Retryable(format!("failed to read Aegis ingest response: {err}"))
-        })?;
+        stream
+            .read_to_string(&mut response)
+            .map_err(|err| PostError::Retryable(format!("failed to read HTTP response: {err}")))?;
 
         let status_line = response.lines().next().unwrap_or_default();
         if status_line.starts_with("HTTP/1.1 2") || status_line.starts_with("HTTP/1.0 2") {
@@ -154,13 +174,31 @@ impl HttpEndpoint {
         }
         if status_line.starts_with("HTTP/1.1 4") || status_line.starts_with("HTTP/1.0 4") {
             return Err(PostError::NonRetryable(format!(
-                "Aegis ingest rejected visibility events: {status_line}"
+                "HTTP endpoint rejected payload: {status_line}"
             )));
         }
         Err(PostError::Retryable(format!(
-            "Aegis ingest rejected visibility events: {status_line}"
+            "HTTP endpoint rejected payload: {status_line}"
         )))
     }
+}
+
+fn parse_http_url(raw_url: &str, name: &str) -> Result<(String, u16, String), String> {
+    let without_scheme = raw_url
+        .strip_prefix("http://")
+        .ok_or_else(|| format!("{name} lab transport supports http:// only"))?;
+
+    let (authority, raw_path) = match without_scheme.split_once('/') {
+        Some((authority, path)) => (authority, format!("/{path}")),
+        None => (without_scheme, String::new()),
+    };
+
+    if authority.is_empty() {
+        return Err(format!("{name} is missing a host"));
+    }
+
+    let (host, port) = parse_authority(authority, name)?;
+    Ok((host, port, raw_path))
 }
 
 enum PostError {
@@ -168,19 +206,19 @@ enum PostError {
     NonRetryable(String),
 }
 
-fn parse_authority(authority: &str) -> Result<(String, u16), String> {
+fn parse_authority(authority: &str, name: &str) -> Result<(String, u16), String> {
     let (host, port) = match authority.rsplit_once(':') {
         Some((host, port)) => {
             let parsed_port = port
                 .parse::<u16>()
-                .map_err(|_| "AEGIS_BACKEND_URL has an invalid port".to_string())?;
+                .map_err(|_| format!("{name} has an invalid port"))?;
             (host, parsed_port)
         }
         None => (authority, 80),
     };
 
     if host.is_empty() {
-        return Err("AEGIS_BACKEND_URL is missing a host".to_string());
+        return Err(format!("{name} is missing a host"));
     }
 
     Ok((host.to_string(), port))
@@ -202,12 +240,13 @@ mod tests {
     use super::{visibility_events_path, HttpEndpoint};
 
     #[test]
-    fn parses_localhost_endpoint_with_default_path() {
-        let endpoint = HttpEndpoint::parse("http://127.0.0.1:9090").unwrap();
+    fn parses_localhost_endpoint_with_default_path() -> Result<(), String> {
+        let endpoint = HttpEndpoint::parse("http://127.0.0.1:9090")?;
 
         assert_eq!(endpoint.host, "127.0.0.1");
         assert_eq!(endpoint.port, 9090);
         assert_eq!(endpoint.path, "/v1/visibility/events");
+        Ok(())
     }
 
     #[test]
@@ -223,9 +262,13 @@ mod tests {
     }
 
     #[test]
-    fn rejects_https_for_dependency_free_lab_transport() {
-        let err = HttpEndpoint::parse("https://aegis.example.com").unwrap_err();
+    fn rejects_https_for_dependency_free_lab_transport() -> Result<(), String> {
+        let err = match HttpEndpoint::parse("https://aegis.example.com") {
+            Ok(_) => return Err("https endpoint unexpectedly parsed".to_string()),
+            Err(err) => err,
+        };
 
         assert!(err.contains("http:// only"));
+        Ok(())
     }
 }

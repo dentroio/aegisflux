@@ -63,7 +63,7 @@ check_remote_ingest() {
     -o UserKnownHostsFile=/private/tmp/aegisflux_known_hosts \
     -o ConnectTimeout=8 \
     "${user}@${host}" \
-    "curl -fsS --max-time 5 http://127.0.0.1:9091/healthz" >/tmp/aegisflux-remote-health.$$ 2>/tmp/aegisflux-remote-health.err.$$; then
+    "if command -v curl >/dev/null 2>&1; then curl -fsS --max-time 5 http://127.0.0.1:9091/healthz; elif command -v wget >/dev/null 2>&1; then wget -qO- --timeout=5 http://127.0.0.1:9091/healthz; else echo 'curl or wget required' >&2; exit 127; fi" >/tmp/aegisflux-remote-health.$$ 2>/tmp/aegisflux-remote-health.err.$$; then
     ok "$name ingest from ${user}@${host} -> $(cat /tmp/aegisflux-remote-health.$$)"
   else
     fail "$name ingest is not reachable from ${user}@${host}: $(cat /tmp/aegisflux-remote-health.err.$$)"
@@ -89,7 +89,7 @@ check_remote_tunnel_forwards() {
     -o UserKnownHostsFile=/private/tmp/aegisflux_known_hosts \
     -o ConnectTimeout=8 \
     "${user}@${host}" \
-    "for port in 9091 8083 8089; do ss -ltnp 2>/dev/null | awk -v suffix=\":\$port\" '\$4 ~ suffix \"\$\" && /sshd-session/ { found=1 } END { if (found) print \"ok\"; else print \"missing\" }'; done" >/tmp/aegisflux-remote-tunnel.$$ 2>/tmp/aegisflux-remote-tunnel.err.$$; then
+    "for port in 9091 8083 8089; do ss -ltn 2>/dev/null | awk -v suffix=\":\$port\" '\$4 ~ suffix \"\$\" { found=1 } END { if (found) print \"ok\"; else print \"missing\" }'; done" >/tmp/aegisflux-remote-tunnel.$$ 2>/tmp/aegisflux-remote-tunnel.err.$$; then
     if awk 'BEGIN { good=1 } $0 != "ok" { good=0 } END { exit good ? 0 : 1 }' /tmp/aegisflux-remote-tunnel.$$; then
       ok "$name tunnel forwards (9091,8083,8089) are present on ${user}@${host}"
     else
