@@ -1,7 +1,8 @@
 'use client'
 
-import { LogOut, Search, UserCircle } from 'lucide-react'
+import { LogOut, Search, UserCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { shellNavGroups, targetForNavItem } from './shellNav'
 
@@ -28,6 +29,7 @@ export function ConsoleShell({
   aiHealthSummary,
 }: ConsoleShellProps) {
   const router = useRouter()
+  const [isSidebarMinimized, setIsSidebarMinimized] = useState(false)
 
   function goNav(itemId: string) {
     const target = targetForNavItem(itemId)
@@ -115,14 +117,18 @@ export function ConsoleShell({
       {/* ── Body ──────────────────────────────────────────────── */}
       <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
-        <aside className="w-64 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
-          <nav className="p-3 flex-1">
+        <aside className={`${isSidebarMinimized ? 'w-16' : 'w-64'} flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-y-auto transition-all duration-300 relative`}>
+          <nav className="p-3 flex-1 overflow-y-auto overflow-x-hidden">
             {shellNavGroups.map((group) => (
               <div key={group.label}>
-                <div className="px-3 pt-4 pb-1">
-                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider select-none">
-                    {group.label}
-                  </span>
+                <div className={`pt-4 pb-1 ${isSidebarMinimized ? 'px-0 text-center' : 'px-3'}`}>
+                  {!isSidebarMinimized ? (
+                    <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider select-none">
+                      {group.label}
+                    </span>
+                  ) : (
+                    <div className="h-4 mx-2 border-b border-gray-100" />
+                  )}
                 </div>
                 {group.items.map((item) => {
                   const Icon = item.icon
@@ -132,20 +138,34 @@ export function ConsoleShell({
                       key={item.id}
                       type="button"
                       onClick={() => goNav(item.id)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-0.5 ${
+                      title={isSidebarMinimized ? item.label : undefined}
+                      className={`w-full flex items-center ${isSidebarMinimized ? 'justify-center px-0' : 'gap-2.5 px-3'} py-2 rounded-lg text-sm font-medium transition-colors mb-0.5 ${
                         active
-                          ? 'bg-[#1e3a5f] text-white'
+                          ? 'bg-clarion-blue text-white'
                           : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                       }`}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
+                      {!isSidebarMinimized && <span className="truncate">{item.label}</span>}
                     </button>
                   )
                 })}
               </div>
             ))}
           </nav>
+          
+          {/* Minimize Button */}
+          <div className="p-3 border-t border-gray-100 mt-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsSidebarMinimized(!isSidebarMinimized)}
+              className={`w-full flex items-center ${isSidebarMinimized ? 'justify-center px-0' : 'gap-2.5 px-3'} py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors`}
+              title={isSidebarMinimized ? "Expand Menu" : "Collapse Menu"}
+            >
+              {isSidebarMinimized ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronLeft className="h-4 w-4 shrink-0" />}
+              {!isSidebarMinimized && <span className="truncate">Collapse Menu</span>}
+            </button>
+          </div>
         </aside>
 
         {/* Main content */}
