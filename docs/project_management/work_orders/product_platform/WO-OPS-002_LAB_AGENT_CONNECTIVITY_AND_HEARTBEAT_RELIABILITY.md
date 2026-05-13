@@ -137,3 +137,14 @@ is required for the common health path.
 - [x] Detection-pack status freshness tracked independently from basic agent online status.
 - [x] Console and API views agree on agent state; `"stale"` is now returned by both the `GET /agents` API and the readiness fleet endpoint.
 - [x] No manual SSH spelunking required for the common health path — diagnosis section covers each failure mode.
+
+## Verification results (May 12, 2026)
+
+- **Backend:** `cd backend/actions-api && go test ./internal/api/... -run TestComputeAgentReadiness` — all `TestComputeAgentReadiness_*` cases passed.
+- **Lab sweep:** Run `./scripts/lab/check-agents.sh` with `AEGIS_WINDOWS_HOST` / `AEGIS_LINUX_HOST` set when the compose stack, launchd tunnels, and lab agents are up; expect `[ok]` for online agents and `[warn]` only when the API reports `stale` (3–15 minutes since last heartbeat).
+
+## API and console alignment
+
+- `GET /agents` and `GET /agents/{uid}` expose `status` as `online`, `stale`, or `offline` based on server-side age of `last_seen` (heartbeat receipt time).
+- `GET /console/summary/agent-readiness` uses the same `agentConnectionStatus` via `collectAgentInfos`, so fleet readiness `Status` matches list endpoints.
+- The console Agents workbench still shows the primary badge from readiness buckets; when heartbeat is delayed but not dead, operators see `stale` in API JSON and a warn-level connectivity dimension in readiness detail.
