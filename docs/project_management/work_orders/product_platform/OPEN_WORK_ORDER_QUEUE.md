@@ -11,13 +11,13 @@ All earlier visibility, platform, UX, product-differentiation, and growth work o
 | Queue | Work Order | Status | Why It Is Here |
 |-------|------------|--------|----------------|
 | 1 | WO-OPS-002: Lab Agent Connectivity and Heartbeat Reliability | Complete | Agent freshness and tunnel reliability must be understandable before e2e failures mean anything. |
-| 2 | WO-OPS-003: Service Health, Discovery, and Resilience | Planned | Services need consistent health/readiness and dependency failure behavior before deeper validation. |
-| 3 | WO-OPS-004: Ingest and ETL Hardening | Planned | Event validation, dedupe, replay, and storage recovery need to be stable before relying on summaries. |
-| 4 | WO-OPS-005: Observability, Metrics, and Logging Baseline | Planned | Health and ingest failure modes need useful logs, metrics, and operational events. |
-| 5 | WO-OPS-001: End-to-End Pipeline Validation | Planned | Once the lab and services are diagnosable, prove endpoint signal through console evidence. |
-| 6 | WO-OPS-006: Security and Service Authentication Baseline | Planned | After the active endpoints and flows are clear, document/tighten trust boundaries. |
-| 7 | WO-OPS-007: Performance, Load, and Resource Baseline | Planned | Use the stabilized replay/smoke paths to measure realistic latency, throughput, and agent budget. |
-| 8 | WO-OPS-008: Deployment, Release, and Operator Readiness | Planned | Package the validated state into a release-candidate checklist last. |
+| 2 | WO-OPS-003: Service Health, Discovery, and Resilience | Complete | Services need consistent health/readiness and dependency failure behavior before deeper validation. |
+| 3 | WO-OPS-004: Ingest and ETL Hardening | Complete | Event validation, dedupe, replay, and storage recovery need to be stable before relying on summaries. |
+| 4 | WO-OPS-005: Observability, Metrics, and Logging Baseline | Complete | Health and ingest failure modes need useful logs, metrics, and operational events. |
+| 5 | WO-OPS-001: End-to-End Pipeline Validation | Complete | Once the lab and services are diagnosable, prove endpoint signal through console evidence. |
+| 6 | WO-OPS-006: Security and Service Authentication Baseline | Complete | After the active endpoints and flows are clear, document/tighten trust boundaries. |
+| 7 | WO-OPS-007: Performance, Load, and Resource Baseline | Complete | Use the stabilized replay/smoke paths to measure realistic latency, throughput, and agent budget. |
+| 8 | WO-OPS-008: Deployment, Release, and Operator Readiness | Complete | Package the validated state into a release-candidate checklist last. |
 
 ## Processing Rules
 

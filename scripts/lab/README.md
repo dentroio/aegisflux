@@ -1,5 +1,41 @@
 # Aegis Lab Scripts
 
+## End-to-end pipeline smoke (WO-OPS-001)
+
+Prove the lab chain (agents → ingest → summaries → detection status → platform APIs → audit lifecycle) in one script:
+
+```bash
+chmod +x scripts/lab/smoke-e2e-pipeline.sh
+./scripts/lab/smoke-e2e-pipeline.sh
+```
+
+Optional: `RUN_DETECTION_ROLLOUT=1` appends `smoke-detection-rollout.sh`. See `docs/ops/E2E_PIPELINE_SMOKE.md` for scenarios, manual console checklist, and failure modes.
+
+## Operational health sweep (WO-OPS-003)
+
+After `docker compose up -d`:
+
+```bash
+chmod +x scripts/lab/health-sweep.sh
+./scripts/lab/health-sweep.sh
+```
+
+## Ingest replay (WO-OPS-004)
+
+```bash
+chmod +x scripts/lab/replay-visibility-fixtures.sh
+./scripts/lab/replay-visibility-fixtures.sh
+```
+
+## Summary latency sample (WO-OPS-007)
+
+```bash
+chmod +x scripts/lab/load-ingest-summaries.sh
+./scripts/lab/load-ingest-summaries.sh
+```
+
+See also `docs/ops/README.md` for the full operator doc set.
+
 ## Detection Rollout Smoke (WO-DET-006)
 
 Use this smoke to verify the full WO-DET-002 + WO-DET-003 dynamic detection path in one run:

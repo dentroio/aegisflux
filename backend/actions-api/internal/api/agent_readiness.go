@@ -421,26 +421,7 @@ func (s *Server) collectAgentInfos() []AgentInfo {
 		ingestURL = "http://localhost:9091"
 	}
 
-	byHost := map[string]*VisibilityDeviceRecord{}
-	client := &http.Client{Timeout: 12 * time.Second}
-	resp, err := client.Get(ingestURL + "/v1/visibility/devices?limit=120")
-	if err == nil {
-		defer resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
-			var payload struct {
-				Devices []VisibilityDeviceRecord `json:"devices"`
-			}
-			if json.NewDecoder(resp.Body).Decode(&payload) == nil {
-				for i := range payload.Devices {
-					d := &payload.Devices[i]
-					byHost[d.DeviceID] = d
-					if d.AgentID != "" {
-						byHost[d.AgentID] = d
-					}
-				}
-			}
-		}
-	}
+	byHost, _ := FetchIngestVisibilityDevices(ingestURL, summaryHTTPClient())
 
 	s.store.mu.Lock()
 	defer s.store.mu.Unlock()

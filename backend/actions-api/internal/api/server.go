@@ -42,6 +42,8 @@ func NewServer() *Server {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
+	s.mux.HandleFunc("/readyz", s.handleServiceReadyz)
+	s.mux.HandleFunc("/ops/metrics", s.handleOpsMetrics)
 
 	s.registerPlatformRoutes()
 

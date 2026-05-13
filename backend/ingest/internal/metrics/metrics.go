@@ -10,6 +10,7 @@ type Metrics struct {
 	EventsTotal         prometheus.Counter
 	EventsInvalidTotal  prometheus.Counter
 	NatsPublishErrors   prometheus.Counter
+	EventsDedupedTotal  prometheus.Counter
 }
 
 // NewMetrics creates a new Metrics instance with all counters
@@ -27,6 +28,10 @@ func NewMetrics() *Metrics {
 			Name: "nats_publish_errors_total",
 			Help: "Total number of NATS publish errors",
 		}),
+		EventsDedupedTotal: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "events_deduped_total",
+			Help: "Total number of duplicate event_id payloads ignored after persistence check",
+		}),
 	}
 }
 
@@ -43,5 +48,10 @@ func (m *Metrics) IncrementEventsInvalid() {
 // IncrementNatsPublishErrors increments the nats_publish_errors_total counter
 func (m *Metrics) IncrementNatsPublishErrors() {
 	m.NatsPublishErrors.Inc()
+}
+
+// IncrementEventsDeduped increments events_deduped_total (WO-OPS-004).
+func (m *Metrics) IncrementEventsDeduped() {
+	m.EventsDedupedTotal.Inc()
 }
 

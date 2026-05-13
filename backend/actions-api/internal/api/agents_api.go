@@ -25,8 +25,9 @@ type websocketGatewayMessage struct {
 
 // AgentListResponse represents the response for listing agents
 type AgentListResponse struct {
-	Agents []AgentInfo `json:"agents"`
-	Total  int         `json:"total"`
+	Agents        []AgentInfo                 `json:"agents"`
+	Total         int                         `json:"total"`
+	Dependencies  []SummaryDependencyStatus   `json:"dependencies,omitempty"`
 }
 
 // AgentInfo represents agent information for list responses (without sensitive data)
@@ -811,6 +812,7 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if agent, exists := s.store.agents[heartbeatData.AgentUID]; exists {
 		s.applyHeartbeat(agent, heartbeatData.OrgID, heartbeatData.HostID, heartbeatData.Hostname, heartbeatData.MachineIDHash, heartbeatData.AgentVersion, heartbeatData.Note, lastSeen, heartbeatData.Capabilities, heartbeatData.Platform, heartbeatData.Network, heartbeatData.Labels)
 		log.Printf("Updated heartbeat for agent %s: last_seen=%s", heartbeatData.AgentUID, heartbeatData.LastSeen)
+		incHeartbeatAccepted()
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -835,6 +837,7 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if foundAgent != nil {
 		s.applyHeartbeat(foundAgent, heartbeatData.OrgID, heartbeatData.HostID, heartbeatData.Hostname, heartbeatData.MachineIDHash, heartbeatData.AgentVersion, heartbeatData.Note, lastSeen, heartbeatData.Capabilities, heartbeatData.Platform, heartbeatData.Network, heartbeatData.Labels)
 		log.Printf("Updated heartbeat for agent %s (hostname %s): last_seen=%s", foundUID, heartbeatData.AgentUID, heartbeatData.LastSeen)
+		incHeartbeatAccepted()
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -852,6 +855,7 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		s.store.byHost[agent.HostID] = agent
 	}
 	log.Printf("Registered agent from heartbeat %s (%s)", agent.AgentUID, agent.HostID)
+	incHeartbeatAccepted()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{

@@ -31,7 +31,16 @@ class HealthHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/healthz":
-            self._write_json(200, {"service": "etl-enrich", "status": "healthy"})
+            snap = self.server.state.snapshot()
+            self._write_json(
+                200,
+                {
+                    "service": snap["service"],
+                    "status": "healthy" if snap["status"] == "ready" else "degraded",
+                    "dependencies": snap["dependencies"],
+                    "started_at": snap.get("started_at"),
+                },
+            )
             return
 
         if self.path == "/readyz":

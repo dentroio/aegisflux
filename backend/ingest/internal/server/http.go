@@ -181,6 +181,7 @@ func (s *IngestServer) processVisibilityEvent(ctx context.Context, event visibil
 				"event_id", event.EventID,
 				"event_type", event.EventType,
 				"host_id", event.DeviceID)
+			s.metrics.IncrementEventsDeduped()
 			return nil
 		}
 	}

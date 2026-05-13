@@ -19,32 +19,11 @@ func (s *Server) getAgentsWorkbenchSummary(w http.ResponseWriter, r *http.Reques
 		ingestURL = "http://localhost:9091"
 	}
 
-	byHost := map[string]*VisibilityDeviceRecord{}
-	client := &http.Client{Timeout: 12 * time.Second}
-	resp, err := client.Get(ingestURL + "/v1/visibility/devices?limit=120")
-	if err != nil {
-		log.Printf("workbench summary: ingest devices: %v", err)
-	} else {
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("workbench summary: ingest returned HTTP %d", resp.StatusCode)
-		} else {
-			var payload struct {
-				Devices []VisibilityDeviceRecord `json:"devices"`
-			}
-			if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-				log.Printf("workbench summary: decode ingest: %v", err)
-			} else {
-				for i := range payload.Devices {
-					d := &payload.Devices[i]
-					byHost[d.DeviceID] = d
-					if d.AgentID != "" {
-						byHost[d.AgentID] = d
-					}
-				}
-			}
-		}
+	byHost, ingestProbe := FetchIngestVisibilityDevices(ingestURL, summaryHTTPClient())
+	if ingestProbe.Status != "ok" {
+		log.Printf("workbench summary: ingest dependency %s: %s", ingestProbe.Status, ingestProbe.Detail)
 	}
+	deps := []SummaryDependencyStatus{ingestProbe}
 
 	currentBaseline := os.Getenv("AEGISFLUX_AGENT_BASELINE_VERSION")
 	now := time.Now()
@@ -87,7 +66,8 @@ func (s *Server) getAgentsWorkbenchSummary(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("content-type", "application/json")
 	_ = json.NewEncoder(w).Encode(AgentListResponse{
-		Agents: filteredAgents,
-		Total:  len(filteredAgents),
+		Agents:       filteredAgents,
+		Total:        len(filteredAgents),
+		Dependencies: deps,
 	})
 }

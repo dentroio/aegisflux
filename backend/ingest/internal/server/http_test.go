@@ -614,3 +614,24 @@ func TestHandleVisibilityEventsRejectsValidationFailure(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
 	}
 }
+
+func TestHandleVisibilityEventsRejectsMalformedJSONL(t *testing.T) {
+	server := &IngestServer{
+		logger:    slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
+		validator: mockValidator{},
+		publisher: &mockPublisher{},
+		dedupe:    newDuplicateTracker(100),
+		metrics:   sharedTestMetrics,
+		checker:   health.NewServiceChecker(slog.Default()),
+	}
+
+	body := `{"not":"a visibility event"` + "\n"
+	req := httptest.NewRequest(http.MethodPost, "/v1/visibility/events", bytes.NewBufferString(body))
+	rec := httptest.NewRecorder()
+
+	server.handleVisibilityEvents(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+}
