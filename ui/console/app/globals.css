@@ -11,27 +11,27 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 transition-colors duration-200;
+    @apply bg-gray-50 text-slate-900 transition-colors duration-200;
   }
 
   .dark body {
-    @apply bg-gray-900 text-gray-100;
+    @apply bg-gray-900 text-slate-100;
   }
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f1f1f1;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
+  background: #c1c1c1;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {

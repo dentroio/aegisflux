@@ -9,10 +9,11 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        aegis: {
-          navy: '#1e3a5f',
-          blue: '#2563eb',
-          teal: '#0d9488',
+        clarion: {
+          blue: '#1e3a5f',
+          teal: '#2dd4bf',
+          purple: '#a855f7',
+          orange: '#f97316',
           green: '#10b981',
         },
         primary: {

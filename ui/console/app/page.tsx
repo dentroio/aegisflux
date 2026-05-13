@@ -358,7 +358,7 @@ function AegisDashboardBody() {
 
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-[#0a1526] flex items-center justify-center">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-slate-400 text-sm font-semibold">Loading AegisFlux</div>
       </div>
     )
@@ -540,9 +540,9 @@ function DashboardReadinessBand({
       </div>
 
       {/* Signal focus dark card */}
-      <div className="rounded-lg bg-[#0a1526] border border-white/10 p-5 text-white shadow-md">
+      <div className="rounded-lg bg-slate-900 dark:bg-slate-800 border border-white/10 p-5 text-white shadow-md">
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
-          <Sparkles className="h-4 w-4 text-cyan-300" />
+          <Sparkles className="h-4 w-4 text-clarion-teal" />
           Signal focus
         </div>
         <div className="mt-4 grid grid-cols-3 gap-3">
@@ -555,7 +555,7 @@ function DashboardReadinessBand({
         </p>
         <a
           href="/discover/abom"
-          className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/20 transition-colors"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-clarion-teal/40 bg-clarion-teal/10 px-3 py-1.5 text-xs font-semibold text-clarion-teal hover:bg-clarion-teal/20 transition-colors"
         >
           Agent Bill of Materials →
         </a>
@@ -659,13 +659,13 @@ function DashboardEndpointScan({
           <a href="/agents" className="block rounded-lg px-3 py-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
             Review stale endpoints and collector health
           </a>
-          <a href="/discover/abom" className="block rounded-lg px-3 py-2 font-medium text-[#1e3a5f] bg-blue-50 hover:bg-blue-100 transition-colors">
+          <a href="/discover/abom" className="block rounded-lg px-3 py-2 font-medium text-clarion-blue bg-clarion-blue/10 hover:bg-clarion-blue/20 transition-colors">
             Agent Bill of Materials
           </a>
-          <a href="/analyze/evidence" className="block rounded-lg px-3 py-2 font-medium text-[#1e3a5f] bg-blue-50 hover:bg-blue-100 transition-colors">
+          <a href="/analyze/evidence" className="block rounded-lg px-3 py-2 font-medium text-clarion-blue bg-clarion-blue/10 hover:bg-clarion-blue/20 transition-colors">
             Trace a finding through evidence graph
           </a>
-          <a href="/analyze/research" className="block rounded-lg px-3 py-2 font-medium text-[#1e3a5f] bg-blue-50 hover:bg-blue-100 transition-colors">
+          <a href="/analyze/research" className="block rounded-lg px-3 py-2 font-medium text-clarion-blue bg-clarion-blue/10 hover:bg-clarion-blue/20 transition-colors">
             AI Research Feed
           </a>
           <a href="/inventory" className="block rounded-lg px-3 py-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
@@ -699,12 +699,12 @@ function LoginScreen({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }) {
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#0a1526] font-sans text-slate-900">
+    <div className="relative min-h-screen w-full overflow-hidden bg-slate-900 font-sans text-slate-900 dark:text-slate-100">
       {/* Decorative gradient orbs */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute top-[10%] left-[15%] h-96 w-96 rounded-full bg-blue-500/20 blur-[100px]" />
-        <div className="absolute top-[30%] right-[15%] h-[28rem] w-[28rem] rounded-full bg-teal-500/15 blur-[100px]" />
-        <div className="absolute bottom-[10%] left-[30%] h-80 w-80 rounded-full bg-[#1e3a5f]/40 blur-[100px]" />
+        <div className="absolute top-[10%] left-[15%] h-96 w-96 rounded-full bg-clarion-blue/20 blur-[100px]" />
+        <div className="absolute top-[30%] right-[15%] h-[28rem] w-[28rem] rounded-full bg-clarion-teal/20 blur-[100px]" />
+        <div className="absolute bottom-[10%] left-[30%] h-80 w-80 rounded-full bg-clarion-purple/20 blur-[100px]" />
       </div>
 
       {/* Center the card */}
@@ -733,7 +733,7 @@ function LoginScreen({
                 value={username}
                 onChange={(event) => onUsernameChange(event.target.value)}
                 autoComplete="username"
-                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-colors"
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-clarion-blue/20 focus:border-clarion-blue transition-colors"
               />
             </label>
             <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
@@ -743,7 +743,7 @@ function LoginScreen({
                 onChange={(event) => onPasswordChange(event.target.value)}
                 autoComplete="current-password"
                 type="password"
-                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-colors"
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-clarion-blue/20 focus:border-clarion-blue transition-colors"
               />
             </label>
             {error ? (
@@ -753,7 +753,7 @@ function LoginScreen({
             ) : null}
             <button
               type="submit"
-              className="mt-1 rounded-xl bg-[#1e3a5f] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#162d4a] focus:outline-none focus:ring-4 focus:ring-[#1e3a5f]/20 transition-all"
+              className="mt-1 rounded-xl bg-clarion-blue px-4 py-2.5 text-sm font-semibold text-white hover:bg-clarion-blue/90 focus:outline-none focus:ring-4 focus:ring-clarion-blue/20 transition-all"
             >
               Sign in
             </button>
