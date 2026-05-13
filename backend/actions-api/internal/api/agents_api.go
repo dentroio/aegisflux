@@ -247,11 +247,35 @@ func (s *Server) getAgents(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// agentOnlineThreshold is the maximum age for a heartbeat to be considered
+// "online". Three times the default 60-second collection interval gives a
+// generous window for one-shot / timer-mode agents without masking real
+// connectivity problems.
+const agentOnlineThreshold = 3 * time.Minute
+
+// agentOfflineThreshold is the age beyond which an agent is considered
+// "offline". Between agentOnlineThreshold and agentOfflineThreshold the
+// status is "stale" — the agent was recently alive but has missed several
+// expected heartbeat cycles.
+const agentOfflineThreshold = 15 * time.Minute
+
+// agentConnectionStatus returns "online", "stale", or "offline" based on
+// how recently the agent last posted a heartbeat.
+//
+//   - online  — last seen within 3 minutes; heartbeat is current.
+//   - stale   — last seen between 3 and 15 minutes; agent missed expected
+//     cycles but may be reachable.
+//   - offline — last seen more than 15 minutes ago; treat as disconnected.
 func agentConnectionStatus(lastSeen time.Time) string {
-	if time.Since(lastSeen) < 5*time.Minute {
+	age := time.Since(lastSeen)
+	switch {
+	case age < agentOnlineThreshold:
 		return "online"
+	case age < agentOfflineThreshold:
+		return "stale"
+	default:
+		return "offline"
 	}
-	return "offline"
 }
 
 // agentDispatch handles sub-routes for individual agents

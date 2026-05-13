@@ -6,6 +6,7 @@ SOURCE_BIN="${SOURCE_BIN:-${REPO_AGENT_DIR}/target/release/aegis-linux-agent}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/aegis/linux-agent}"
 SERVICE_NAME="${SERVICE_NAME:-aegis-linux-agent-lab}"
 BACKEND_URL="${AEGIS_BACKEND_URL:-http://192.168.1.180:9091}"
+ACTIONS_HEARTBEAT_URL="${AEGIS_ACTIONS_HEARTBEAT_URL:-http://192.168.1.180:8083/agents/heartbeat}"
 AGENT_ID="${AEGIS_AGENT_ID:-linux-dev-agent-01}"
 DEVICE_ID="${AEGIS_DEVICE_ID:-linux-dev-agent-01}"
 
@@ -30,6 +31,7 @@ Environment=AEGIS_LINUX_AGENT_PATH=${INSTALL_DIR}/aegis-linux-agent
 Environment=AEGIS_AGENT_ID=${AGENT_ID}
 Environment=AEGIS_DEVICE_ID=${DEVICE_ID}
 Environment=AEGIS_BACKEND_URL=${BACKEND_URL}
+Environment=ACTIONS_HEARTBEAT_URL=${ACTIONS_HEARTBEAT_URL}
 Environment=AEGIS_COLLECT_COMMAND_LINE=true
 Environment=AEGIS_EVENT_SPOOL=/var/lib/aegis/linux-agent/events.jsonl
 ExecStart=${INSTALL_DIR}/run-lab-once.sh

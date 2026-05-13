@@ -227,6 +227,8 @@ func dimensionConnectivity(agent AgentInfo) AgentReadinessDimension {
 	switch strings.ToLower(strings.TrimSpace(agent.Status)) {
 	case "online":
 		return AgentReadinessDimension{ID: "connectivity", Label: "Tunnel/connectivity", State: readinessStateGood, Value: "online", Detail: "Agent is actively connected.", Weight: 15}
+	case "stale":
+		return AgentReadinessDimension{ID: "connectivity", Label: "Tunnel/connectivity", State: readinessStateWarn, Value: "stale", Detail: "Agent heartbeat is delayed. Check tunnel, agent process, and network path before trusting new evidence.", Weight: 15}
 	case "offline":
 		return AgentReadinessDimension{ID: "connectivity", Label: "Tunnel/connectivity", State: readinessStateBad, Value: "offline", Detail: "Agent is offline. Treat as untrusted for new evidence.", Weight: 15}
 	}

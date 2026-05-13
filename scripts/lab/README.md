@@ -136,6 +136,146 @@ When reverse tunnels are enabled, each remote host uses local loopback URLs:
 - Actions API: `http://127.0.0.1:8083`
 - Detection pipeline: `http://127.0.0.1:8089`
 
+## Heartbeat Freshness Thresholds
+
+The Actions API classifies each agent's heartbeat into one of three states based
+on the age of the last `POST /agents/heartbeat` call:
+
+| Status  | Last-seen age         | Meaning |
+|---------|-----------------------|---------|
+| online  | < 3 minutes           | Heartbeat is current; agent is alive. |
+| stale   | 3 – 15 minutes        | Agent missed several expected cycles. Check tunnel and process. |
+| offline | > 15 minutes          | Agent is disconnected. Do not trust new evidence from it. |
+
+The default lab collection interval is 60 seconds (`AEGIS_COLLECTION_INTERVAL_SECONDS`).
+Three missed cycles (3 minutes) triggers the `stale` transition. Fifteen minutes
+without contact (≈ 15 missed cycles) triggers `offline`.
+
+The `check-agents.sh` script reports each expected agent as:
+
+- `[ok]` — API status is `online` (heartbeat < 3 min old).
+- `[warn]` — API status is `stale` (heartbeat 3–15 min old).
+- `[fail]` — API status is `offline` or agent is missing.
+
+Detection-pack status is tracked independently and may show a valid last-applied
+pack even when the agent heartbeat is stale. Evaluate them separately.
+
+## Failure Mode Diagnosis
+
+Use the following checks to distinguish the most common lab failure patterns.
+Run `./scripts/lab/check-agents.sh` first — each section below maps to a
+possible failure output from that script.
+
+### Agent process stopped
+
+**Symptom:** API returns `stale` or `offline`; remote tunnel listeners are
+present on the lab host.
+
+**Check:**
+```bash
+# Linux lab
+ssh -i ~/.ssh/id_ed25519 clarion@<LINUX_HOST> 'systemctl status aegis-linux-agent-lab.timer'
+# or for the persistent service:
+ssh -i ~/.ssh/id_ed25519 clarion@<LINUX_HOST> 'systemctl status aegis-linux-agent.service'
+
+# Windows lab (from PowerShell on the Windows host)
+schtasks /Query /TN "AegisLabWindowsAgent" /FO LIST
+```
+
+**Fix:**
+```bash
+# Linux timer restart
+ssh -i ~/.ssh/id_ed25519 clarion@<LINUX_HOST> \
+  'sudo systemctl restart aegis-linux-agent-lab.timer && sudo systemctl start aegis-linux-agent-lab.service'
+
+# Windows one-shot
+# (run on Windows host)
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\AegisLab\aegisflux\agents\windows-agent\scripts\run-lab-once.ps1
+```
+
+### Tunnel down
+
+**Symptom:** Remote tunnel-forward check fails (`[fail] linux-lab tunnel-forward listeners
+are incomplete`). API may show `stale` or `offline`.
+
+**Check:**
+```bash
+# Inspect launchd tunnel state on the developer Mac
+launchctl print gui/$(id -u)/net.aegis.linux-reverse-tunnel
+launchctl print gui/$(id -u)/net.aegis.windows-reverse-tunnel
+
+# Check tunnel logs
+tail -40 ~/Library/Logs/Aegis/linux-reverse-tunnel.err.log
+tail -40 ~/Library/Logs/Aegis/windows-reverse-tunnel.err.log
+```
+
+**Fix:**
+```bash
+./scripts/lab/install-macos-linux-tunnel-launchd.sh
+./scripts/lab/install-macos-windows-tunnel-launchd.sh
+```
+
+### Backend down
+
+**Symptom:** `check_http` lines report `[fail]` for `actions-api`, `ingest`, or
+`detection-pipeline`. Tunnel listeners may be present but agents cannot deliver events.
+
+**Check:**
+```bash
+docker compose ps
+curl -fsS http://localhost:8083/healthz
+curl -fsS http://localhost:9091/healthz
+curl -fsS http://localhost:8089/healthz
+```
+
+**Fix:**
+```bash
+docker compose down
+docker compose up -d
+# Wait for services to pass health checks, then re-run check-agents.sh
+```
+
+### Clock or freshness issue
+
+**Symptom:** Tunnel and backend are healthy, but the API shows `stale` or
+`offline` even though the agent ran recently. The `last_seen` timestamp in
+`GET /agents` may differ significantly from the developer Mac clock.
+
+**Check:**
+```bash
+# Compare clocks
+date -u
+curl -fsS http://localhost:8083/agents | python3 -c \
+  'import json,sys; [print(a["agent_uid"], a.get("last_seen"), a.get("status")) for a in json.load(sys.stdin).get("agents", [])]'
+
+# Check NTP sync on the lab host
+ssh clarion@<LINUX_HOST> 'timedatectl status'
+```
+
+**Fix:** Sync NTP on the affected host (`sudo timedatectl set-ntp true` on
+systemd Linux). Re-run the lab agent once after clock correction.
+
+### Detection-pack status stale, but last applied pack is valid
+
+**Symptom:** Agent shows `online` heartbeat but readiness score shows
+`stale` or `needs_attention` in the detection-pack dimension. The agent
+collected and reported events, but has not fetched a new pack recently.
+
+**Check:**
+```bash
+# Query detection-pack rollout status for both lab agents
+curl -fsS http://localhost:8089/v1/agents/linux-dev-agent-01/detection-pack-status
+curl -fsS http://localhost:8089/v1/agents/windows-dev-agent-01/detection-pack-status
+```
+
+**Fix:** If `AEGIS_DETECTION_PACKS_ENABLED=true` is set but the agent cannot
+reach the detection pipeline, confirm the tunnel port 8089 listener is present
+on the lab host and that `AEGIS_CONTROLLER_URL` is set correctly.
+
+If detection packs are intentionally disabled (`AEGIS_DETECTION_PACKS_ENABLED=false`),
+the `detection_pack` readiness dimension will read `no rollout record` — this is
+expected and does not indicate a connectivity fault.
+
 ## Reliability Notes
 
 - Both tunnel scripts now clean stale remote forward listeners before creating new

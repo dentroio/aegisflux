@@ -10,7 +10,6 @@ fi
 ACTIONS_URL="${ACTIONS_URL:-http://localhost:8083}"
 INGEST_URL="${INGEST_URL:-http://localhost:9091}"
 DETECTION_URL="${DETECTION_URL:-http://localhost:8089}"
-LOCAL_AGENT_URL="${LOCAL_AGENT_URL:-http://localhost:18080}"
 EXPECTED_AGENTS="${EXPECTED_AGENTS:-windows-dev-agent-01 linux-dev-agent-01}"
 AGENT_STALE_SECONDS="${AGENT_STALE_SECONDS:-180}"
 WINDOWS_HOST="${AEGIS_WINDOWS_HOST:-}"
@@ -140,7 +139,8 @@ rm -f /tmp/aegisflux-compose-ps.$$ /tmp/aegisflux-compose-ps.err.$$
 check_http "actions-api" "$ACTIONS_URL/healthz"
 check_http "ingest" "$INGEST_URL/healthz"
 check_http "detection-pipeline" "$DETECTION_URL/healthz"
-check_http "local-agent" "$LOCAL_AGENT_URL/healthz"
+# Note: the Linux agent does not expose an inbound HTTP listener by design.
+# Agent liveness is checked via the Actions API /agents heartbeat freshness below.
 
 if "$DOCKER" compose exec -T websocket-gateway wget -qO- http://127.0.0.1:8080/health >/tmp/aegisflux-ws-health.$$ 2>/dev/null; then
   ok "websocket-gateway container health -> $(cat /tmp/aegisflux-ws-health.$$)"
@@ -160,20 +160,49 @@ check_remote_ingest "linux-lab" "$LINUX_USER" "$LINUX_HOST" "$LINUX_SSH_KEY"
 if agents_json="$(curl -fsS "$ACTIONS_URL/agents" 2>/dev/null)"; then
   printf '\nAgents:\n%s\n' "$agents_json"
   for agent in $EXPECTED_AGENTS; do
-    if printf '%s' "$agents_json" | python3 -c 'import json,sys,time,datetime; data=json.load(sys.stdin); uid=sys.argv[1]; stale=int(sys.argv[2]); now=time.time(); agents=data.get("agents") or []; agent=next((a for a in agents if a.get("agent_uid")==uid), None); 
-if not agent or agent.get("status")!="online": sys.exit(1)
-last_seen_raw=agent.get("last_seen")
-if not last_seen_raw: sys.exit(2)
-try:
-    ts=last_seen_raw.replace("Z","+00:00")
-    seen=datetime.datetime.fromisoformat(ts).timestamp()
-except Exception:
-    sys.exit(3)
-sys.exit(0 if now-seen <= stale else 4)' "$agent" "$AGENT_STALE_SECONDS"; then
-      ok "$agent is online and fresh"
-    else
-      fail "$agent is missing, stale, or not online"
-    fi
+    result="$(printf '%s' "$agents_json" | python3 -c '
+import json,sys,time,datetime
+data=json.load(sys.stdin)
+uid=sys.argv[1]
+stale_sec=int(sys.argv[2])
+now=time.time()
+agents=data.get("agents") or []
+a=next((x for x in agents if x.get("agent_uid")==uid), None)
+if not a:
+    print("missing"); sys.exit(1)
+status=a.get("status","")
+last_seen_raw=a.get("last_seen","")
+age_sec=None
+if last_seen_raw:
+    try:
+        ts=last_seen_raw.replace("Z","+00:00")
+        seen=datetime.datetime.fromisoformat(ts).timestamp()
+        age_sec=now-seen
+    except Exception:
+        pass
+if status=="online":
+    print("online"); sys.exit(0)
+elif status=="stale":
+    # stale: agent is registered but missed recent cycles
+    if age_sec is not None:
+        print("stale:%.0fs" % age_sec)
+    else:
+        print("stale")
+    sys.exit(2)
+else:
+    # offline or unknown
+    if age_sec is not None:
+        print("offline:%.0fs" % age_sec)
+    else:
+        print("offline:no-last-seen")
+    sys.exit(1)
+' "$agent" "$AGENT_STALE_SECONDS" 2>/dev/null)"
+    rc=$?
+    case "$rc" in
+      0) ok "$agent is online and fresh ($result)" ;;
+      2) warn "$agent is stale — $result — check tunnel and agent process" ;;
+      *) fail "$agent is not reachable or offline — $result" ;;
+    esac
   done
 else
   fail "could not fetch agents from $ACTIONS_URL/agents"
