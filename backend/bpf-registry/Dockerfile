@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for AegisFlux BPF Registry Service
 # Stage 1: Build stage with golang:1.21-alpine
-FROM golang:1.21-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 # Install git and ca-certificates for dependencies
 RUN apk add --no-cache git ca-certificates tzdata
