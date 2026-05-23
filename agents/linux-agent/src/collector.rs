@@ -68,7 +68,11 @@ impl Collector for ProcessCollector {
             ),
         ));
 
+        let mut emitted = 0usize;
         for process in system.processes().values() {
+            if emitted >= config.process_snapshot_limit {
+                break;
+            }
             let pid = process.pid().as_u32();
             let ppid = process.parent().map(|parent| parent.as_u32());
             let instance_id = process_guid(config, process.start_time(), pid);
@@ -103,6 +107,7 @@ impl Collector for ProcessCollector {
                     collection_method: "sysinfo.snapshot".to_string(),
                 },
             ));
+            emitted += 1;
         }
 
         Ok(events)

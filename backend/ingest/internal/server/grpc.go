@@ -67,7 +67,7 @@ func NewIngestServer(natsURL string, logger *slog.Logger) (*IngestServer, error)
 		logger:    logger,
 		validator: schemaValidator,
 		publisher: natsPublisher,
-		dedupe:    newDuplicateTracker(10000),
+		dedupe:    newDuplicateTracker(ingestDedupeLimitFromEnv()),
 		store:     visibilityStore,
 		metrics:   metricsInstance,
 		checker:   checker,

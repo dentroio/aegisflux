@@ -33,6 +33,10 @@ pub struct AgentConfig {
     pub detection_pack_public_key: Option<[u8; 32]>,
     /// Interval between continuous collection cycles.
     pub collection_interval: Duration,
+    /// Maximum process snapshot records emitted per cycle.
+    pub process_snapshot_limit: usize,
+    /// Maximum visibility events per HTTP POST body.
+    pub visibility_post_chunk_size: usize,
 }
 
 impl AgentConfig {
@@ -72,6 +76,8 @@ impl AgentConfig {
             );
         }
         let collection_interval = env_duration_secs("AEGIS_COLLECTION_INTERVAL_SECONDS", 60, 5)?;
+        let process_snapshot_limit = env_usize("AEGIS_PROCESS_SNAPSHOT_LIMIT", 256)?;
+        let visibility_post_chunk_size = env_usize("AEGIS_VISIBILITY_POST_CHUNK_SIZE", 500)?;
 
         require_safe_identifier("AEGIS_AGENT_ID", &agent_id)?;
         require_safe_identifier("AEGIS_DEVICE_ID", &device_id)?;
@@ -89,7 +95,25 @@ impl AgentConfig {
             detection_pack_cache,
             detection_pack_public_key,
             collection_interval,
+            process_snapshot_limit,
+            visibility_post_chunk_size,
         })
+    }
+}
+
+fn env_usize(name: &str, default: usize) -> Result<usize, String> {
+    match env::var(name) {
+        Ok(value) => value
+            .parse::<usize>()
+            .map_err(|_| format!("{name} must be a positive integer"))
+            .and_then(|parsed| {
+                if parsed == 0 {
+                    Err(format!("{name} must be greater than zero"))
+                } else {
+                    Ok(parsed)
+                }
+            }),
+        Err(_) => Ok(default),
     }
 }
 

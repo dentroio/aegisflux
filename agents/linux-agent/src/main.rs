@@ -111,7 +111,7 @@ fn collect_and_emit(config: &AgentConfig, args: &Args) -> Result<(), String> {
 
     if let Some(backend_url) = &config.backend_url {
         let transport = HttpVisibilityTransport::new(backend_url)?;
-        transport.post_events(&events)?;
+        transport.post_events_chunked(&events, config.visibility_post_chunk_size)?;
     }
     if let Some(actions_url) = &config.actions_heartbeat_url {
         let transport = HttpJsonTransport::new(actions_url)?;

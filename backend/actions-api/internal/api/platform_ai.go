@@ -1,12 +1,13 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"backend/actionsapi/internal/agentsharness"
 
 	"github.com/google/uuid"
 )
@@ -210,8 +211,9 @@ func (s *Server) handleEndpointEvidenceAnalyst(w http.ResponseWriter, r *http.Re
 		return
 	}
 	var body struct {
-		DeviceID string         `json:"device_id"`
-		Context  map[string]any `json:"context"`
+		DeviceID  string         `json:"device_id"`
+		FindingID string         `json:"finding_id"`
+		Context   map[string]any `json:"context"`
 	}
 	if !jsonRead(w, r, &body) {
 		return
@@ -221,42 +223,43 @@ func (s *Server) handleEndpointEvidenceAnalyst(w http.ResponseWriter, r *http.Re
 		http.Error(w, `{"error":"device_id required"}`, http.StatusBadRequest)
 		return
 	}
-	s.platform.mu.Lock()
-	priv := s.platform.Privacy
-	defaultProv := s.platform.DefaultProvider
-	s.platform.mu.Unlock()
-
-	ctxBytes, _ := json.Marshal(body.Context)
-	red := RedactLine(string(ctxBytes), priv)
-
-	var assessment, evidence, confidence, next string
-	if !priv.AllowExternalAI {
-		assessment = "External AI calls are disabled; deterministic summary from redacted context."
-		confidence = "High (rules-based)"
-		next = "Enable governed external AI if you need model narrative."
-	} else {
-		assessment = "External AI allowed; production would invoke default provider."
-		confidence = "Medium (model-dependent)"
-		next = "Review audit before sharing externally."
+	_, runDetail, err := s.runAgentHarness(agentsharness.RunSpec{
+		AgentID:   agentsharness.AgentEndpointAnalyst,
+		DeviceID:  deviceID,
+		FindingID: strings.TrimSpace(body.FindingID),
+		Context:   body.Context,
+	})
+	if err != nil {
+		http.Error(w, `{"error":"harness failed"}`, http.StatusInternalServerError)
+		return
 	}
-	evidence = red
-	if len(evidence) > 1200 {
-		evidence = evidence[:1200] + "..."
+	if runDetail.Status != agentsharness.JobCompleted {
+		s.platform.mu.Lock()
+		s.platform.appendAudit("endpoint_evidence_analyst_failed", deviceID, runDetail.RunID, true)
+		s.platform.mu.Unlock()
+		jsonWrite(w, http.StatusUnprocessableEntity, map[string]any{
+			"error":                            "evidence_bound_or_harness_failed",
+			"run_id":                           runDetail.RunID,
+			"status":                           runDetail.Status,
+			"evidence_bound_validation_errors": runDetail.EvidenceBoundValidationErrors,
+			"evidence_bound_conclusion":        runDetail.EvidenceBoundConclusion,
+		})
+		return
 	}
 
 	run := AIRunRecord{
-		RunID:          uuid.NewString(),
+		RunID:          runDetail.RunID,
 		AgentID:        "endpoint_evidence_analyst",
 		DeviceID:       deviceID,
-		CreatedMS:      time.Now().UnixMilli(),
-		ProviderKind:   defaultProv,
-		Status:         "completed",
+		CreatedMS:      runDetail.StartedMS,
+		ProviderKind:   runDetail.ProviderKind,
+		Status:         runDetail.Status,
 		Redacted:       true,
-		PrivacyApplied: true,
-		Assessment:     assessment,
-		Evidence:       evidence,
-		Confidence:     confidence,
-		NextAction:     next,
+		PrivacyApplied: runDetail.PrivacyApplied,
+		Assessment:     runDetail.Assessment,
+		Evidence:       runDetail.EvidenceSummary,
+		Confidence:     runDetail.Confidence,
+		NextAction:     runDetail.RecommendedNextAction,
 	}
 	s.platform.mu.Lock()
 	s.platform.appendRun(run)
@@ -272,12 +275,13 @@ func (s *Server) handleEndpointEvidenceAnalyst(w http.ResponseWriter, r *http.Re
 	s.platform.mu.Unlock()
 
 	jsonWrite(w, http.StatusOK, map[string]any{
-		"run_id":                  run.RunID,
-		"agent_id":                "endpoint_evidence_analyst",
-		"assessment":              assessment,
-		"evidence":                evidence,
-		"confidence":              confidence,
-		"recommended_next_action": next,
+		"run_id":                    run.RunID,
+		"agent_id":                  "endpoint_evidence_analyst",
+		"assessment":                runDetail.Assessment,
+		"evidence":                  runDetail.EvidenceSummary,
+		"confidence":                runDetail.Confidence,
+		"recommended_next_action":   runDetail.RecommendedNextAction,
+		"evidence_bound_conclusion": runDetail.EvidenceBoundConclusion,
 	})
 }
 

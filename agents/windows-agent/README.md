@@ -141,6 +141,16 @@ cargo build --release
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-lab-scheduled-task.ps1 -RunNow
 ```
 
+For a numbered lab host, pass the stable identity explicitly:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-lab-scheduled-task.ps1 `
+  -TaskName "Aegis Windows Agent Lab windows-dev-agent-02" `
+  -AgentId "windows-dev-agent-02" `
+  -DeviceId "windows-dev-agent-02" `
+  -RunNow
+```
+
 The task runs:
 
 ```text

@@ -49,6 +49,61 @@ func TestSQLiteVisibilityStoreAppendQuery(t *testing.T) {
 	}
 }
 
+func TestSQLiteVisibilityStoreListDevicesFromRegistry(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "vis-devices.db")
+	store, err := newSQLiteVisibilityStore(path)
+	if err != nil {
+		t.Fatalf("newSQLiteVisibilityStore: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	ctx := context.Background()
+	events := []visibilityEvent{
+		{
+			SchemaVersion: "visibility.v1",
+			EventID:       "e-dev-1",
+			EventType:     "aegis.process.started",
+			TimestampMS:   100,
+			ReceivedAtMS:  100,
+			Source:        "test",
+			DeviceID:      "dev-a",
+			AgentID:       "ag-a",
+			SensorVersion: "0.1.0",
+			Sequence:      1,
+			Payload:       json.RawMessage(`{}`),
+		},
+		{
+			SchemaVersion: "visibility.v1",
+			EventID:       "e-dev-2",
+			EventType:     "aegis.network.flow",
+			TimestampMS:   200,
+			ReceivedAtMS:  200,
+			Source:        "test",
+			DeviceID:      "dev-b",
+			AgentID:       "ag-b",
+			SensorVersion: "0.1.0",
+			Sequence:      2,
+			Payload:       json.RawMessage(`{}`),
+		},
+	}
+	if err := store.AppendBatch(ctx, events); err != nil {
+		t.Fatalf("append batch: %v", err)
+	}
+
+	devices, err := store.ListDevices(ctx, visibilityDeviceFilter{Limit: 10})
+	if err != nil {
+		t.Fatalf("list devices: %v", err)
+	}
+	if len(devices) != 2 {
+		t.Fatalf("expected 2 devices, got %d", len(devices))
+	}
+	if devices[0].DeviceID != "dev-b" {
+		t.Fatalf("expected most recent device dev-b first, got %s", devices[0].DeviceID)
+	}
+}
+
 func TestNewVisibilityStoreFromEnvSQLite(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "env.db")

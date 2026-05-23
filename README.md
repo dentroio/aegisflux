@@ -1,7 +1,7 @@
 # AegisFlux
 
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
-[![Go Version](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.23+-blue.svg)](https://golang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 
 > **Backend Control Plane for Adaptive Security**  
@@ -85,7 +85,7 @@ graph TB
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/sgerhart/aegisflux.git
+   git clone git@github.com:dentroio/aegisflux.git
    cd aegisflux
    ```
 
@@ -378,8 +378,8 @@ The dual license accommodates eBPF kernel license requirements while providing f
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/sgerhart/aegisflux/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/sgerhart/aegisflux/discussions)
+- **Issues**: [GitHub Issues](https://github.com/dentroio/aegisflux/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/dentroio/aegisflux/discussions)
 
 ---
 
@@ -395,6 +395,6 @@ The dual license accommodates eBPF kernel license requirements while providing f
 
 **AegisFlux** — *Adaptive Security for the Modern Cloud*
 
-[⭐ Star this repo](https://github.com/sgerhart/aegisflux) • [🐛 Report Bug](https://github.com/sgerhart/aegisflux/issues) • [💡 Request Feature](https://github.com/sgerhart/aegisflux/issues)
+[⭐ Star this repo](https://github.com/dentroio/aegisflux) • [🐛 Report Bug](https://github.com/dentroio/aegisflux/issues) • [💡 Request Feature](https://github.com/dentroio/aegisflux/issues)
 
 </div>

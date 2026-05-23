@@ -81,7 +81,11 @@ impl Collector for ProcessCollector {
             snapshot_message(system.processes().len()),
         ));
 
+        let mut emitted = 0usize;
         for process in system.processes().values() {
+            if emitted >= config.process_snapshot_limit {
+                break;
+            }
             let pid = process.pid().as_u32();
             let ppid = process.parent().map(|parent| parent.as_u32());
             let instance_id = process_guid(config, process.start_time(), pid);
@@ -117,6 +121,7 @@ impl Collector for ProcessCollector {
                     collection_method: "sysinfo.snapshot".to_string(),
                 },
             ));
+            emitted += 1;
         }
 
         Ok(events)
@@ -2072,6 +2077,8 @@ Windows IP Configuration
             detection_packs_enabled: false,
             detection_pack_cache: None,
             detection_pack_public_key: None,
+            process_snapshot_limit: 256,
+            visibility_post_chunk_size: 500,
         }
     }
 }

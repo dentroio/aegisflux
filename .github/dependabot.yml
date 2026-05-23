@@ -1,0 +1,97 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /agents/local-agent
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /backend/actions-api
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /backend/bpf-registry
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /backend/common
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /backend/config-api
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /backend/correlator
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /backend/decision
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /backend/detection-pipeline
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /backend/detectionpack-schema
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /backend/ingest
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /backend/orchestrator
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /backend/segmenter
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /backend/websocket-gateway
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directory: /ui/console
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: pip
+    directory: /backend/etl-enrich
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /backend/actions-api
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /backend/ingest
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /backend/bpf-registry
+    schedule:
+      interval: weekly

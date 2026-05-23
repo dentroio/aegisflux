@@ -654,6 +654,8 @@ mod tests {
             detection_pack_cache: None,
             detection_pack_public_key: None,
             collection_interval: std::time::Duration::from_secs(60),
+            process_snapshot_limit: 256,
+            visibility_post_chunk_size: 500,
         };
         let events = vec![AegisEvent::new(
             &cfg,

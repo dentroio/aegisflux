@@ -181,11 +181,14 @@ func (s *Server) getAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse query parameters for filtering
+	// Parse query parameters for filtering and pagination
 	labelFilter := r.URL.Query().Get("label")
 	hostnameFilter := r.URL.Query().Get("hostname")
 	hostIDFilter := r.URL.Query().Get("host_id")
 	ipFilter := r.URL.Query().Get("ip")
+	limit := parseAgentListLimit(r.URL.Query().Get("limit"))
+	offset := parseAgentListOffset(r.URL.Query().Get("offset"))
+	includeDetectionPack := queryBoolDefaultFalse(r, "include_detection_pack")
 
 	s.store.mu.Lock()
 	defer s.store.mu.Unlock()
@@ -221,27 +224,33 @@ func (s *Server) getAgents(w http.ResponseWriter, r *http.Request) {
 		}
 
 		agentInfo := AgentInfo{
-			AgentUID:            agent.AgentUID,
-			OrgID:               agent.OrgID,
-			HostID:              agent.HostID,
-			Hostname:            agent.Hostname,
-			MachineIDHash:       agent.MachineIDHash,
-			AgentVersion:        agent.AgentVersion,
-			Platform:            agent.Platform,
-			Network:             agent.Network,
-			Labels:              labels,
-			Note:                agent.Note,
-			Created:             agent.Created,
-			LastSeen:            agent.LastSeen,
-			Status:              agentConnectionStatus(agent.LastSeen),
-			DetectionPackStatus: s.fetchDetectionPackStatus(agent.AgentUID),
+			AgentUID:     agent.AgentUID,
+			OrgID:        agent.OrgID,
+			HostID:       agent.HostID,
+			Hostname:     agent.Hostname,
+			MachineIDHash: agent.MachineIDHash,
+			AgentVersion: agent.AgentVersion,
+			Platform:     agent.Platform,
+			Network:      agent.Network,
+			Labels:       labels,
+			Note:         agent.Note,
+			Created:      agent.Created,
+			LastSeen:     agent.LastSeen,
+			Status:       agentConnectionStatus(agent.LastSeen),
+		}
+		if includeDetectionPack {
+			agentInfo.DetectionPackStatus = s.fetchDetectionPackStatus(agent.AgentUID)
 		}
 		filteredAgents = append(filteredAgents, agentInfo)
 	}
 
+	total := len(filteredAgents)
+	sortAgentsByLastSeen(filteredAgents)
+	page := paginateAgents(filteredAgents, offset, limit)
+
 	response := AgentListResponse{
-		Agents: filteredAgents,
-		Total:  len(filteredAgents),
+		Agents: page,
+		Total:  total,
 	}
 
 	w.Header().Set("content-type", "application/json")
@@ -811,7 +820,6 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	// Try to find agent by UID first
 	if agent, exists := s.store.agents[heartbeatData.AgentUID]; exists {
 		s.applyHeartbeat(agent, heartbeatData.OrgID, heartbeatData.HostID, heartbeatData.Hostname, heartbeatData.MachineIDHash, heartbeatData.AgentVersion, heartbeatData.Note, lastSeen, heartbeatData.Capabilities, heartbeatData.Platform, heartbeatData.Network, heartbeatData.Labels)
-		log.Printf("Updated heartbeat for agent %s: last_seen=%s", heartbeatData.AgentUID, heartbeatData.LastSeen)
 		incHeartbeatAccepted()
 
 		w.Header().Set("Content-Type", "application/json")
@@ -836,7 +844,6 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 
 	if foundAgent != nil {
 		s.applyHeartbeat(foundAgent, heartbeatData.OrgID, heartbeatData.HostID, heartbeatData.Hostname, heartbeatData.MachineIDHash, heartbeatData.AgentVersion, heartbeatData.Note, lastSeen, heartbeatData.Capabilities, heartbeatData.Platform, heartbeatData.Network, heartbeatData.Labels)
-		log.Printf("Updated heartbeat for agent %s (hostname %s): last_seen=%s", foundUID, heartbeatData.AgentUID, heartbeatData.LastSeen)
 		incHeartbeatAccepted()
 
 		w.Header().Set("Content-Type", "application/json")
@@ -854,7 +861,6 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if agent.HostID != "" {
 		s.store.byHost[agent.HostID] = agent
 	}
-	log.Printf("Registered agent from heartbeat %s (%s)", agent.AgentUID, agent.HostID)
 	incHeartbeatAccepted()
 
 	w.Header().Set("Content-Type", "application/json")

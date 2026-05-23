@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"backend/actionsapi/internal/agentsharness"
+
 	"github.com/google/uuid"
 )
 
@@ -24,6 +26,10 @@ type PlatformData struct {
 	Research     []ResearchItem
 	Candidates   []DetectionCandidate
 	AuditBundles []AuditBundle
+
+	// WO-AGENTS-001: governed agent harness job/run audit (lab memory store).
+	AgentHarnessJobs []agentsharness.JobRecord
+	AgentHarnessRuns []agentsharness.RunRecord
 }
 
 // AuditBundle is the foundation for safe enforcement (WO-GROWTH-007).

@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  GOTOOLCHAIN: auto
+
+jobs:
+  go-modules:
+    name: Go · ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - agents/local-agent
+          - backend/actions-api
+          - backend/bpf-registry
+          - backend/common
+          - backend/config-api
+          - backend/correlator
+          - backend/decision
+          - backend/detection-pipeline
+          - backend/detectionpack-schema
+          - backend/ingest
+          - backend/orchestrator
+          - backend/segmenter
+          - backend/websocket-gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache-dependency-path: ${{ matrix.module }}/go.sum
+
+      - name: Run tests
+        working-directory: ${{ matrix.module }}
+        run: go test ./...
+
+  ui:
+    name: UI lint and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui/console
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/console/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  python:
+    name: Python ETL tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/etl-enrich/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/etl-enrich/requirements.txt pytest
+
+      - name: Run tests
+        run: pytest backend/etl-enrich/tests -q
+
+  docker:
+    name: Docker · ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: actions-api
+            context: backend/actions-api
+          - service: ingest
+            context: backend/ingest
+          - service: bpf-registry
+            context: backend/bpf-registry
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: false
+          tags: aegisflux/${{ matrix.service }}:ci
+          load: true
+
+  summary:
+    name: CI summary
+    runs-on: ubuntu-latest
+    needs: [go-modules, ui, python, docker]
+    if: always()
+    steps:
+      - name: Report status
+        run: |
+          echo "## CI Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Job | Result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Go modules | ${{ needs.go-modules.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| UI | ${{ needs.ui.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Python | ${{ needs.python.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Docker | ${{ needs.docker.result }} |" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "${{ needs.ui.result }}" != "success" || "${{ needs.python.result }}" != "success" ]]; then
+            exit 1
+          fi

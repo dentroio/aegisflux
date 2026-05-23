@@ -66,17 +66,27 @@ impl HttpVisibilityTransport {
 
     /// Post a batch of events as newline-delimited JSON.
     pub fn post_events(&self, events: &[AegisEvent]) -> Result<(), String> {
+        self.post_events_chunked(events, events.len())
+    }
+
+    /// Post events in bounded chunks to keep request bodies predictable at fleet scale.
+    pub fn post_events_chunked(&self, events: &[AegisEvent], chunk_size: usize) -> Result<(), String> {
         if events.is_empty() {
             return Ok(());
         }
-
-        let mut body = String::new();
-        for event in events {
-            body.push_str(&event.to_json());
-            body.push('\n');
+        if chunk_size == 0 {
+            return Err("visibility post chunk size must be greater than zero".to_string());
         }
 
-        self.endpoint.post_body(&body, "application/x-ndjson")
+        for chunk in events.chunks(chunk_size) {
+            let mut body = String::new();
+            for event in chunk {
+                body.push_str(&event.to_json());
+                body.push('\n');
+            }
+            self.endpoint.post_body(&body, "application/x-ndjson")?;
+        }
+        Ok(())
     }
 }
 

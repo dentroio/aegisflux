@@ -27,6 +27,7 @@ Welcome to the AegisFlux documentation. This directory contains comprehensive gu
 - **[Agent Performance Architecture](AEGIS_AGENT_PERFORMANCE_ARCHITECTURE.md)** - Low-resource Windows/Linux agent design constraints and budgets
 - **[UI Clarion Alignment](AEGIS_UI_CLARION_ALIGNMENT.md)** - Aegis management UI direction aligned to Clarion frontend patterns
 - **[AI Agent Platform Architecture](AEGIS_AI_AGENT_PLATFORM_ARCHITECTURE.md)** - Clarion-inspired AI provider, AI-agent, privacy, audit, and dynamic detection architecture
+- **[AI-Native Leap Architecture](AEGIS_AI_NATIVE_LEAP_ARCHITECTURE.md)** - Deep agent harness, evidence-bound reasoning, adaptive detection factory, and governed control design architecture
 
 ### Development
 - **[Backend Safety Shim](BACKEND_SAFETY_SHIM.md)** - Safety mechanisms and safeguards

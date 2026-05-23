@@ -10,7 +10,7 @@ fi
 ACTIONS_URL="${ACTIONS_URL:-http://localhost:8083}"
 INGEST_URL="${INGEST_URL:-http://localhost:9091}"
 DETECTION_URL="${DETECTION_URL:-http://localhost:8089}"
-EXPECTED_AGENTS="${EXPECTED_AGENTS:-windows-dev-agent-01 linux-dev-agent-01}"
+EXPECTED_AGENTS="${EXPECTED_AGENTS:-windows-dev-agent-01 windows-dev-agent-02 windows-dev-agent-03 windows-dev-agent-04 linux-dev-agent-01}"
 AGENT_STALE_SECONDS="${AGENT_STALE_SECONDS:-180}"
 WINDOWS_HOST="${AEGIS_WINDOWS_HOST:-}"
 WINDOWS_USER="${AEGIS_WINDOWS_USER:-aegis}"

@@ -19,6 +19,7 @@ const maxVisibilityQueryLimit = 1000
 type visibilityStore interface {
 	Has(ctx context.Context, eventID string) (bool, error)
 	Append(ctx context.Context, event visibilityEvent) error
+	AppendBatch(ctx context.Context, events []visibilityEvent) error
 	Query(ctx context.Context, filter visibilityQueryFilter) ([]visibilityEvent, error)
 	ListDevices(ctx context.Context, filter visibilityDeviceFilter) ([]visibilityDeviceRecord, error)
 	Close() error
@@ -53,11 +54,14 @@ type visibilityDeviceRecord struct {
 }
 
 type fileVisibilityStore struct {
-	mu     sync.Mutex
-	path   string
-	file   *os.File
-	events []visibilityEvent
-	seen   map[string]struct{}
+	mu              sync.Mutex
+	path            string
+	devicesPath     string
+	file            *os.File
+	seen            map[string]struct{}
+	devices         map[string]*visibilityDeviceRecord
+	writesSinceSync int
+	maxBytes        int64
 }
 
 // newVisibilityStoreFromEnv selects SQLite (durable lab/CI) or JSONL file backing.
@@ -78,8 +82,11 @@ func newFileVisibilityStore(path string) (*fileVisibilityStore, error) {
 	}
 
 	store := &fileVisibilityStore{
-		path: path,
-		seen: make(map[string]struct{}),
+		path:        path,
+		devicesPath: path + ".devices.json",
+		seen:        make(map[string]struct{}),
+		devices:     make(map[string]*visibilityDeviceRecord),
+		maxBytes:    jsonlMaxBytesFromEnv(),
 	}
 	if err := store.load(); err != nil {
 		return nil, err
@@ -94,6 +101,13 @@ func newFileVisibilityStore(path string) (*fileVisibilityStore, error) {
 }
 
 func (s *fileVisibilityStore) load() error {
+	if err := s.loadSeenIDs(); err != nil {
+		return err
+	}
+	return s.loadDevicesIndex()
+}
+
+func (s *fileVisibilityStore) loadSeenIDs() error {
 	file, err := os.Open(s.path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -114,7 +128,6 @@ func (s *fileVisibilityStore) load() error {
 		if err := json.Unmarshal(line, &event); err != nil {
 			return fmt.Errorf("failed to parse visibility store record: %w", err)
 		}
-		s.events = append(s.events, event)
 		if event.EventID != "" {
 			s.seen[event.EventID] = struct{}{}
 		}
@@ -122,6 +135,82 @@ func (s *fileVisibilityStore) load() error {
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("failed to scan visibility store: %w", err)
 	}
+	return nil
+}
+
+func (s *fileVisibilityStore) loadDevicesIndex() error {
+	raw, err := os.ReadFile(s.devicesPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read visibility devices index: %w", err)
+	}
+	var records []visibilityDeviceRecord
+	if err := json.Unmarshal(raw, &records); err != nil {
+		return fmt.Errorf("failed to parse visibility devices index: %w", err)
+	}
+	for i := range records {
+		record := records[i]
+		if record.DeviceID == "" {
+			continue
+		}
+		if record.EventTypeCount == nil {
+			record.EventTypeCount = make(map[string]int)
+		}
+		copy := record
+		s.devices[record.DeviceID] = &copy
+	}
+	return nil
+}
+
+func (s *fileVisibilityStore) persistDevicesIndexLocked() error {
+	records := make([]visibilityDeviceRecord, 0, len(s.devices))
+	for _, record := range s.devices {
+		records = append(records, *record)
+	}
+	sort.Slice(records, func(i, j int) bool {
+		if records[i].LastSeenMS == records[j].LastSeenMS {
+			return records[i].DeviceID < records[j].DeviceID
+		}
+		return records[i].LastSeenMS > records[j].LastSeenMS
+	})
+	raw, err := json.Marshal(records)
+	if err != nil {
+		return fmt.Errorf("failed to encode visibility devices index: %w", err)
+	}
+	tmp := s.devicesPath + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0o644); err != nil {
+		return fmt.Errorf("failed to write visibility devices index: %w", err)
+	}
+	return os.Rename(tmp, s.devicesPath)
+}
+
+func (s *fileVisibilityStore) maybeRotateLocked() error {
+	if s.maxBytes <= 0 {
+		return nil
+	}
+	info, err := s.file.Stat()
+	if err != nil {
+		return err
+	}
+	if info.Size() < s.maxBytes {
+		return nil
+	}
+	if err := s.file.Close(); err != nil {
+		return err
+	}
+	rotated := s.path + "." + time.Now().UTC().Format("20060102-150405") + ".jsonl"
+	if err := os.Rename(s.path, rotated); err != nil {
+		return fmt.Errorf("failed to rotate visibility store: %w", err)
+	}
+	s.seen = make(map[string]struct{})
+	file, err := os.OpenFile(s.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return fmt.Errorf("failed to reopen visibility store: %w", err)
+	}
+	s.file = file
+	s.writesSinceSync = 0
 	return nil
 }
 
@@ -164,16 +253,32 @@ func (s *fileVisibilityStore) Append(ctx context.Context, event visibilityEvent)
 	if err != nil {
 		return fmt.Errorf("failed to encode visibility event: %w", err)
 	}
+	if err := s.maybeRotateLocked(); err != nil {
+		return err
+	}
 	if _, err := s.file.Write(append(encoded, '\n')); err != nil {
 		return fmt.Errorf("failed to write visibility event: %w", err)
 	}
-	if err := s.file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync visibility event: %w", err)
+	s.writesSinceSync++
+	if s.writesSinceSync >= fileStoreSyncEvery {
+		if err := s.file.Sync(); err != nil {
+			return fmt.Errorf("failed to sync visibility event: %w", err)
+		}
+		s.writesSinceSync = 0
 	}
 
-	s.events = append(s.events, event)
 	if event.EventID != "" {
 		s.seen[event.EventID] = struct{}{}
+	}
+	upsertDeviceRecord(s.devices, event)
+	return s.persistDevicesIndexLocked()
+}
+
+func (s *fileVisibilityStore) AppendBatch(ctx context.Context, events []visibilityEvent) error {
+	for _, event := range events {
+		if err := s.Append(ctx, event); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -196,9 +301,30 @@ func (s *fileVisibilityStore) Query(ctx context.Context, filter visibilityQueryF
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	file, err := os.Open(s.path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read visibility store: %w", err)
+	}
+	defer file.Close()
+
+	lines, err := readTailLines(file, limit*8)
+	if err != nil {
+		return nil, err
+	}
+
 	results := make([]visibilityEvent, 0, limit)
-	for i := len(s.events) - 1; i >= 0 && len(results) < limit; i-- {
-		event := s.events[i]
+	for i := len(lines) - 1; i >= 0 && len(results) < limit; i-- {
+		line := lines[i]
+		if len(line) == 0 {
+			continue
+		}
+		var event visibilityEvent
+		if err := json.Unmarshal(line, &event); err != nil {
+			continue
+		}
 		if filter.EventID != "" && event.EventID != filter.EventID {
 			continue
 		}
@@ -219,6 +345,31 @@ func (s *fileVisibilityStore) Query(ctx context.Context, filter visibilityQueryF
 	return results, nil
 }
 
+func readTailLines(file *os.File, maxLines int) ([][]byte, error) {
+	if maxLines <= 0 {
+		maxLines = defaultVisibilityQueryLimit
+	}
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 0, 64*1024), maxVisibilityLineBytes)
+	lines := make([][]byte, 0, maxLines)
+	for scanner.Scan() {
+		line := append([]byte(nil), scanner.Bytes()...)
+		if len(line) == 0 {
+			continue
+		}
+		if len(lines) >= maxLines {
+			copy(lines, lines[1:])
+			lines[len(lines)-1] = line
+			continue
+		}
+		lines = append(lines, line)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to scan visibility store: %w", err)
+	}
+	return lines, nil
+}
+
 func (s *fileVisibilityStore) ListDevices(ctx context.Context, filter visibilityDeviceFilter) ([]visibilityDeviceRecord, error) {
 	select {
 	case <-ctx.Done():
@@ -237,55 +388,11 @@ func (s *fileVisibilityStore) ListDevices(ctx context.Context, filter visibility
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	byDevice := make(map[string]*visibilityDeviceRecord)
-	for _, event := range s.events {
-		if event.DeviceID == "" {
+	devices := make([]visibilityDeviceRecord, 0, len(s.devices))
+	for _, record := range s.devices {
+		if filter.TenantID != "" && record.TenantID != filter.TenantID {
 			continue
 		}
-		if filter.TenantID != "" && event.TenantID != filter.TenantID {
-			continue
-		}
-
-		seenMS := event.ReceivedAtMS
-		if seenMS == 0 {
-			seenMS = event.TimestampMS
-		}
-
-		record, exists := byDevice[event.DeviceID]
-		if !exists {
-			record = &visibilityDeviceRecord{
-				DeviceID:       event.DeviceID,
-				AgentID:        event.AgentID,
-				Source:         event.Source,
-				TenantID:       event.TenantID,
-				SensorVersion:  event.SensorVersion,
-				FirstSeenMS:    seenMS,
-				LastSeenMS:     seenMS,
-				LastEventType:  event.EventType,
-				LastSequence:   event.Sequence,
-				EventTypeCount: make(map[string]int),
-			}
-			byDevice[event.DeviceID] = record
-		}
-
-		if seenMS < record.FirstSeenMS || record.FirstSeenMS == 0 {
-			record.FirstSeenMS = seenMS
-		}
-		if seenMS >= record.LastSeenMS {
-			record.LastSeenMS = seenMS
-			record.LastEventType = event.EventType
-			record.LastSequence = event.Sequence
-			record.AgentID = event.AgentID
-			record.Source = event.Source
-			record.SensorVersion = event.SensorVersion
-			record.TenantID = event.TenantID
-		}
-		record.EventCount++
-		record.EventTypeCount[event.EventType]++
-	}
-
-	devices := make([]visibilityDeviceRecord, 0, len(byDevice))
-	for _, record := range byDevice {
 		devices = append(devices, *record)
 	}
 
@@ -307,6 +414,9 @@ func (s *fileVisibilityStore) Close() error {
 	defer s.mu.Unlock()
 	if s.file == nil {
 		return nil
+	}
+	if err := s.file.Sync(); err != nil {
+		return err
 	}
 	err := s.file.Close()
 	s.file = nil

@@ -53,6 +53,18 @@ Quick pre-check:
 ./scripts/lab/check-agents.sh
 ```
 
+To seed the three additional Windows lab identities before their scheduled
+tasks are live:
+
+```bash
+./scripts/lab/register-windows-agents.sh
+```
+
+By default this registers `windows-dev-agent-02`, `windows-dev-agent-03`, and
+`windows-dev-agent-04` through `POST /agents/heartbeat`. Override
+`WINDOWS_AGENT_IDS` or provide matching `WINDOWS_AGENT_IPS` if you already know
+the host addresses.
+
 ### Run
 
 ```bash
@@ -117,6 +129,23 @@ ssh -i ~/.ssh/aegis_windows_lab -N -R 9091:127.0.0.1:9091 aegis@192.168.12.101
 Install the same tunnel as a macOS user `launchd` job:
 
 ```bash
+./scripts/lab/install-macos-windows-tunnel-launchd.sh
+```
+
+For multiple Windows lab hosts, install one launchd job per host with a unique
+label:
+
+```bash
+AEGIS_WINDOWS_HOST=192.168.12.102 \
+AEGIS_TUNNEL_LAUNCHD_LABEL=net.aegis.windows-reverse-tunnel-02 \
+./scripts/lab/install-macos-windows-tunnel-launchd.sh
+
+AEGIS_WINDOWS_HOST=192.168.12.103 \
+AEGIS_TUNNEL_LAUNCHD_LABEL=net.aegis.windows-reverse-tunnel-03 \
+./scripts/lab/install-macos-windows-tunnel-launchd.sh
+
+AEGIS_WINDOWS_HOST=192.168.12.104 \
+AEGIS_TUNNEL_LAUNCHD_LABEL=net.aegis.windows-reverse-tunnel-04 \
 ./scripts/lab/install-macos-windows-tunnel-launchd.sh
 ```
 

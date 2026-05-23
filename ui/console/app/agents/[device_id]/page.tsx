@@ -23,6 +23,11 @@ import { readLabAuthenticated } from '@/shared/labAuth'
 import { AbomPanel } from '@/components/AbomPanel'
 import { EvidenceGraphPanel } from '@/components/EvidenceGraphPanel'
 import {
+  EvidenceBoundConclusionPanel,
+  type EvidenceBoundConclusion,
+} from '@/components/EvidenceBoundConclusionPanel'
+import { parseAnalystResponse, type AnalystApiResponse } from '@/shared/agentAnalyst'
+import {
   ReadinessBadge,
   type AgentReadiness,
   READINESS_BUCKET_LABEL,
@@ -302,11 +307,15 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
   const filteredEvents = filterRows(data.events, query)
 
   const [analystBusy, setAnalystBusy] = useState(false)
-  const [analystNote, setAnalystNote] = useState<string | null>(null)
+  const [analystConclusion, setAnalystConclusion] = useState<EvidenceBoundConclusion | null>(null)
+  const [analystError, setAnalystError] = useState<string | null>(null)
+  const [analystLegacyApi, setAnalystLegacyApi] = useState(false)
 
   async function runEvidenceAnalyst() {
     setAnalystBusy(true)
-    setAnalystNote(null)
+    setAnalystConclusion(null)
+    setAnalystError(null)
+    setAnalystLegacyApi(false)
     try {
       const payload = {
         device_id: deviceId,
@@ -325,12 +334,18 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const body = res.ok ? await res.json() : null
-      setAnalystNote(
-        body
-          ? `${body.assessment} | ${body.confidence} → ${body.recommended_next_action}`
-          : `Analyst request failed (HTTP ${res.status})`,
-      )
+      let body: AnalystApiResponse | null = null
+      try {
+        body = (await res.json()) as AnalystApiResponse
+      } catch {
+        body = null
+      }
+      const parsed = parseAnalystResponse(res, body)
+      if (parsed.conclusion) {
+        setAnalystConclusion(parsed.conclusion)
+        setAnalystLegacyApi(Boolean(parsed.legacyApi))
+      }
+      if (parsed.error) setAnalystError(parsed.error)
     } finally {
       setAnalystBusy(false)
     }
@@ -406,9 +421,19 @@ export default function DeviceDetailPage({ params }: { params: { device_id: stri
             </div>
           </div>
         </div>
-        {analystNote ? (
+        {analystConclusion || analystError ? (
           <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{analystNote}</div>
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">Evidence-bound analyst conclusion</h2>
+              {analystLegacyApi ? (
+                <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  Actions API is running an older build without the agent harness. Restart actions-api from current
+                  source (<code className="font-mono">backend/actions-api</code>) for cited evidence and harness runs.
+                </p>
+              ) : null}
+              {analystError ? <p className="mb-3 text-xs text-red-700">{analystError}</p> : null}
+              {analystConclusion ? <EvidenceBoundConclusionPanel conclusion={analystConclusion} compact /> : null}
+            </div>
           </div>
         ) : null}
 

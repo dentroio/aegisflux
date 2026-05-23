@@ -77,7 +77,9 @@ services:
       - "9091:9090"
     environment:
       - NATS_URL=nats://nats:4222
-      - AEGIS_VISIBILITY_STORE_PATH=/data/visibility-events.jsonl
+      - AEGIS_VISIBILITY_SQLITE_PATH=/data/visibility.db
+      - AEGIS_VISIBILITY_RETENTION_HOURS=168
+      - AEGIS_INGEST_DEDUPE_LIMIT=100000
     volumes:
       - ingest_visibility_data:/data
 

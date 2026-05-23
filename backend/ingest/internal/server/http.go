@@ -97,20 +97,19 @@ func (s *IngestServer) handleVisibilityEvents(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	for _, event := range events {
-		if err := s.processVisibilityEvent(r.Context(), event); err != nil {
-			if errors.Is(err, errEventValidation) {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+	accepted, err := s.ingestVisibilityEvents(r.Context(), events)
+	if err != nil {
+		if errors.Is(err, errEventValidation) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
 	}
 
 	writeJSON(w, http.StatusAccepted, visibilityIngestResponse{
 		OK:       true,
-		Accepted: len(events),
+		Accepted: accepted,
 		Message:  "visibility events accepted",
 	})
 }
@@ -164,38 +163,58 @@ func parseQueryLimit(raw string) (int, error) {
 	return limit, nil
 }
 
-func (s *IngestServer) processVisibilityEvent(ctx context.Context, event visibilityEvent) error {
-	protoEvent, err := event.toProtoEvent()
+func (s *IngestServer) ingestVisibilityEvents(ctx context.Context, events []visibilityEvent) (int, error) {
+	if len(events) == 0 {
+		return 0, nil
+	}
+
+	eventIDs := make([]string, 0, len(events))
+	for _, event := range events {
+		if event.EventID != "" {
+			eventIDs = append(eventIDs, event.EventID)
+		}
+	}
+	existing, err := HasMany(ctx, s.store, eventIDs)
 	if err != nil {
-		s.metrics.IncrementEventsInvalid()
-		return err
+		return 0, err
 	}
 
-	if s.store != nil {
-		exists, err := s.store.Has(ctx, event.EventID)
-		if err != nil {
-			return err
-		}
-		if exists {
-			s.logger.Info("Duplicate persisted event ignored",
-				"event_id", event.EventID,
-				"event_type", event.EventType,
-				"host_id", event.DeviceID)
+	accepted := 0
+	pending := make([]visibilityEvent, 0, len(events))
+	for _, event := range events {
+		if event.EventID != "" && existing[event.EventID] {
 			s.metrics.IncrementEventsDeduped()
-			return nil
+			continue
 		}
+
+		protoEvent, err := event.toProtoEvent()
+		if err != nil {
+			s.metrics.IncrementEventsInvalid()
+			return accepted, err
+		}
+		if err := s.processEvent(ctx, protoEvent); err != nil {
+			return accepted, err
+		}
+		pending = append(pending, event)
+		accepted++
 	}
 
-	if err := s.processEvent(ctx, protoEvent); err != nil {
+	if len(pending) > 0 && s.store != nil {
+		if err := s.store.AppendBatch(ctx, pending); err != nil {
+			return accepted, err
+		}
+	}
+	return accepted, nil
+}
+
+func (s *IngestServer) processVisibilityEvent(ctx context.Context, event visibilityEvent) error {
+	accepted, err := s.ingestVisibilityEvents(ctx, []visibilityEvent{event})
+	if err != nil {
 		return err
 	}
-
-	if s.store != nil {
-		if err := s.store.Append(ctx, event); err != nil {
-			return err
-		}
+	if accepted == 0 {
+		s.metrics.IncrementEventsDeduped()
 	}
-
 	return nil
 }
 

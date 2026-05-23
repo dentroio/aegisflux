@@ -554,19 +554,7 @@ func (s *Server) handleIntegrationDeviceEvidence(w http.ResponseWriter, r *http.
 		http.NotFound(w, r)
 		return
 	}
-	sample := fmt.Sprintf(`{"windows":{"device_id":"win-lab-host","signals":["dns","collector"]},"linux":{"device_id":"lin-lab-host","signals":["flows","collector"]}}`)
-	jsonWrite(w, http.StatusOK, map[string]any{
-		"schema":                            "aegisflux.integration.evidence_summary.v1",
-		"device_id":                         deviceID,
-		"agent_id":                          deviceID,
-		"os_or_source":                      "visibility",
-		"freshness_ms_hint":                 time.Now().UnixMilli(),
-		"ai_activity_summary":               map[string]any{"signals": []string{"dns", "process", "findings"}, "count_hint": simulateMatches(deviceID)},
-		"inventory_summary":                 map[string]any{"hints": []string{"browser_extensions", "sase"}},
-		"finding_links":                     []map[string]string{{"finding_id": "example-" + deviceID, "relative": fmt.Sprintf("/analyze/findings?device=%s", deviceID)}},
-		"integration_event_names":           []string{"aegis.device.observed", "aegis.ai_activity.summarized", "aegis.inventory.item_observed", "aegis.finding.created"},
-		"sample_payload_windows_linux_json": sample,
-	})
+	jsonWrite(w, http.StatusOK, labDeviceEvidenceSummaryMap(deviceID))
 }
 
 func (s *Server) handleRedactPreview(w http.ResponseWriter, r *http.Request) {

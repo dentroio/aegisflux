@@ -54,8 +54,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/agents/register/init", s.postRegisterInit)
 	s.mux.HandleFunc("/agents/register/complete", s.postRegisterComplete)
 
-	// Agent heartbeat endpoint
+	// Agent heartbeat endpoints
 	s.mux.HandleFunc("/agents/heartbeat", s.handleHeartbeat)
+	s.mux.HandleFunc("/agents/heartbeats", s.handleBatchHeartbeats)
 
 	// Agents API endpoints - specific routes first, then catch-all
 	s.mux.HandleFunc("/agents/broadcast", s.broadcastToAgents) // Broadcast endpoint (must come before /agents/)

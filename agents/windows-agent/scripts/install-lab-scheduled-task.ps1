@@ -1,6 +1,14 @@
 param(
     [string]$TaskName = "Aegis Windows Agent Lab",
     [string]$RunnerPath = "C:\AegisLab\aegisflux\agents\windows-agent\scripts\run-lab-once.ps1",
+    [string]$AgentId = "windows-dev-agent-01",
+    [string]$DeviceId = "",
+    [string]$BackendUrl = "http://192.168.1.180:9091",
+    [string]$ActionsHeartbeatUrl = "http://192.168.1.180:8083/agents/heartbeat",
+    [string]$ControllerUrl = "",
+    [switch]$DetectionPacksEnabled,
+    [string]$DetectionPackCache = "",
+    [string]$DetectionPackPublicKey = "",
     [int]$EveryMinutes = 1,
     [switch]$RunNow
 )
@@ -12,7 +20,33 @@ if (!(Test-Path -LiteralPath $RunnerPath)) {
 }
 
 $powershell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
-$arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$RunnerPath`""
+if ([string]::IsNullOrWhiteSpace($DeviceId)) {
+    $DeviceId = $AgentId
+}
+
+$runnerArgs = @(
+    "-NoProfile",
+    "-ExecutionPolicy", "Bypass",
+    "-File", "`"$RunnerPath`"",
+    "-AgentId", "`"$AgentId`"",
+    "-DeviceId", "`"$DeviceId`"",
+    "-BackendUrl", "`"$BackendUrl`"",
+    "-ActionsHeartbeatUrl", "`"$ActionsHeartbeatUrl`""
+)
+if (![string]::IsNullOrWhiteSpace($ControllerUrl)) {
+    $runnerArgs += @("-ControllerUrl", "`"$ControllerUrl`"")
+}
+if ($DetectionPacksEnabled) {
+    $runnerArgs += "-DetectionPacksEnabled"
+}
+if (![string]::IsNullOrWhiteSpace($DetectionPackCache)) {
+    $runnerArgs += @("-DetectionPackCache", "`"$DetectionPackCache`"")
+}
+if (![string]::IsNullOrWhiteSpace($DetectionPackPublicKey)) {
+    $runnerArgs += @("-DetectionPackPublicKey", "`"$DetectionPackPublicKey`"")
+}
+
+$arguments = $runnerArgs -join " "
 $action = New-ScheduledTaskAction -Execute $powershell -Argument $arguments
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
     -RepetitionInterval (New-TimeSpan -Minutes $EveryMinutes) `

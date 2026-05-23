@@ -1,9 +1,9 @@
 # AegisFlux Product Platform Work Orders
 
 **Program:** AegisFlux product platform and Clarion-aligned management experience  
-**Phase:** Phase 3 - Growth, Trust, and Safe Control Design  
-**Status:** Complete (work orders implemented; roadmap living document)  
-**Last updated:** May 10, 2026
+**Phase:** Phase 3 complete; operational readiness and AI-native leap planned  
+**Status:** Living roadmap (completed waves plus planned readiness/AI-native waves)  
+**Last updated:** May 12, 2026
 
 ## Objective
 
@@ -68,6 +68,8 @@ The AegisFlux UI should follow the Clarion shell pattern:
 
 ## Work Order Sequence
 
+The completed product-platform sequence is retained below for history. The current open operational-readiness queue is tracked in [Open Work Order Queue](OPEN_WORK_ORDER_QUEUE.md). The next AI-native capability wave is tracked in [AI-Native Leap Work Order Queue](AI_NATIVE_LEAP_WORK_ORDER_QUEUE.md).
+
 | ID | Title | Primary Output | Depends On |
 |----|-------|----------------|------------|
 | WO-PLAT-001 | Clarion-Aligned Console Shell | Shared shell, header, nav groups, route placeholders | None |
@@ -110,6 +112,24 @@ The AegisFlux UI should follow the Clarion shell pattern:
 | WO-GROWTH-005 | Adaptive Detection Workflow Maturity | Research -> candidate -> simulation -> signed pack -> rollout -> retirement workflow | WO-PROD-004, WO-DET-003 |
 | WO-GROWTH-006 | First-Value Demo Polish and Sample Scenarios | Credible buyer/operator demo path with sample scenarios and setup docs | WO-PROD-005 |
 | WO-GROWTH-007 | Audit-Mode Enforcement Adapter Foundation | Audit-only policy bundle delivery/status path without blocking behavior | WO-GROWTH-003, WO-GROWTH-004 |
+| WO-OPS-001 | End-to-End Pipeline Validation | Repeatable lab smoke from endpoint signal to console evidence and audit-mode status | WO-OPS-002 recommended, WO-DET-006, WO-GROWTH-007 |
+| WO-OPS-002 | Lab Agent Connectivity and Heartbeat Reliability | Reliable online/stale/offline diagnosis for Linux and Windows lab agents | WO-LAB-001, WO-GROWTH-004 |
+| WO-OPS-003 | Service Health, Discovery, and Resilience | Consistent health/readiness contracts and dependency failure behavior | WO-API-001, WO-OPS-002 recommended |
+| WO-OPS-004 | Ingest and ETL Hardening | Validation, dedupe, replay, storage recovery, and ETL/enrich error handling | WO-VIS-004, WO-VIS-005, WO-API-001 |
+| WO-OPS-005 | Observability, Metrics, and Logging Baseline | Practical logs, metrics, and operational-event checks for lab diagnosis | WO-PLAT-006, WO-OPS-003 |
+| WO-OPS-006 | Security and Service Authentication Baseline | Lab trust-boundary inventory, endpoint auth tightening, and secret-handling baseline | WO-AI-002, WO-DET-003, WO-GROWTH-007 |
+| WO-OPS-007 | Performance, Load, and Resource Baseline | Measured route/API/ingest/agent resource baselines and thresholds | WO-AGENT-001, WO-PERF-001, WO-API-001 |
+| WO-OPS-008 | Deployment, Release, and Operator Readiness | Clone-to-validated-lab checklist, known limitations, release evidence, and reset steps | WO-OPS-001 through WO-OPS-007 |
+| WO-AGENTS-001 | AI Agent Harness and Tool Runtime | Governed AI platform agent jobs, tools, run audit, and status | WO-OPS-008, WO-AI-001 through WO-AI-003 |
+| WO-AGENTS-002 | Evidence-Bound Reasoning Contract | Required evidence refs, confidence, missing evidence, assumptions, and safety boundary for agent outputs | WO-AGENTS-001 |
+| WO-GOV-001 | Agent Governance, Memory, and Decision Ledger | Scoped product memory and durable approval/rejection/recommendation ledger | WO-AGENTS-001, WO-AGENTS-002, WO-AI-002 |
+| WO-AGENTS-003 | Endpoint Analyst Deep Agent | Evidence-bound device/finding investigation agent | WO-AGENTS-001, WO-AGENTS-002, WO-GOV-001 recommended |
+| WO-ADAPT-001 | Detection Opportunity Research Agents | Research/fleet signals become scored detection opportunities | WO-AGENTS-001, WO-AGENTS-002, WO-PROD-004 |
+| WO-ADAPT-002 | Detection Candidate Simulation Harness | Candidate packs replayed against fixtures/historical evidence before approval | WO-ADAPT-001, WO-DET-001 through WO-DET-003 |
+| WO-CONTROL-002 | Control Design Copilot | Evidence-bound finding-to-control proposals with blast radius and rollback | WO-AGENTS-002, WO-GROWTH-003, WO-GROWTH-007 |
+| WO-FLEET-001 | AI Capability Drift Radar | Daily fleet radar for new/risky/widespread/stale AI capability changes | WO-GROWTH-001, WO-GROWTH-004, WO-ADAPT-001 recommended |
+| WO-ENFORCE-001 | Enforcement Readiness Scorecard | Explains missing prerequisites before future enforcement consideration | WO-GROWTH-003, WO-GROWTH-004, WO-GROWTH-007 |
+| WO-DEMO-002 | Autonomous Demo Scenario Generator | Lab-safe scenario fixtures and validation for AI-native demo paths | WO-OPS-001, WO-ADAPT-002 recommended |
 
 ## Parallelization Guidance
 
@@ -144,6 +164,21 @@ These can run in parallel with low conflict:
 - WO-GROWTH-005 matures the Adapt workflow and can run alongside growth UX work if detection/API ownership is separate.
 - WO-GROWTH-006 should package the demo after ABOM, evidence, and controls are polished enough to tell the story cleanly.
 - WO-GROWTH-007 comes last in this wave; audit-mode is a bridge to enforcement, not a shortcut around trust.
+- WO-OPS-002 should lead operational readiness because stale/offline lab agents will confuse every later validation task.
+- WO-OPS-003 and WO-OPS-004 can run in parallel if ownership is split between platform health and ingest/ETL.
+- WO-OPS-005 should follow enough health/ingest work to instrument real failure modes.
+- WO-OPS-001 should run once agent reliability and health checks are stable enough to make e2e failures meaningful.
+- WO-OPS-006 can run in parallel with validation after the current endpoint/API inventory is clear.
+- WO-OPS-007 should use the stabilized smoke/replay paths from WO-OPS-001 and WO-OPS-004.
+- WO-OPS-008 comes last and packages the validated state into a release-candidate checklist.
+- WO-AGENTS-001 and WO-AGENTS-002 must lead the AI-native wave; all deep agents depend on the harness and evidence-bound output contract.
+- WO-GOV-001 should land before agents make product-impacting recommendations at scale.
+- WO-AGENTS-003 is the first useful deep-agent experience after the harness exists.
+- WO-ADAPT-001 and WO-ADAPT-002 form the adaptive detection factory and should precede automated pack lifecycle expansion.
+- WO-CONTROL-002 should wait for evidence-bound reasoning and governance so control proposals are auditable.
+- WO-FLEET-001 can run after ABOM/growth work and should link into Endpoint Analyst and Adapt workflows.
+- WO-ENFORCE-001 is a readiness scorecard only; it does not enable enforcement.
+- WO-DEMO-002 should package the implemented AI-native flows late in the wave.
 
 ## Phase Exit Criteria
 
@@ -171,6 +206,23 @@ These can run in parallel with low conflict:
 - Agent readiness scores clarify when evidence can be trusted.
 - Adaptive detection lifecycle is auditable from research to rollout and retirement.
 - Audit-mode policy delivery can be tested without blocking endpoint behavior.
+- Linux and Windows lab agents have reliable online/stale/offline diagnosis.
+- Service health/readiness makes dependency failures explicit.
+- Ingest and ETL paths are tested against malformed, duplicate, partial, and replayed data.
+- Operators can diagnose common lab failures from health, metrics, logs, and operational events.
+- The full lab pipeline can be validated from endpoint signal to console evidence with one documented path.
+- The lab security baseline and deployment-hardening gaps are documented.
+- Performance, load, and agent resource baselines are measured and repeatable.
+- A release-candidate checklist can bring a fresh operator from clone to validated lab state.
+- AI platform agents run through a governed harness with typed tools and auditable runs.
+- Agent conclusions are evidence-bound and show confidence, assumptions, and missing evidence.
+- Endpoint Analyst can investigate device/finding context as a deep, evidence-citing agent.
+- Research agents can turn ecosystem and fleet signals into scored detection opportunities.
+- Candidate detection packs can be simulated before approval.
+- Control Design Copilot can draft observe-only proposals without enabling enforcement.
+- Fleet drift radar highlights daily AI capability changes.
+- Governance memory and decision ledger make AI recommendations and operator decisions durable.
+- Enforcement readiness is scored without enabling blocking behavior.
 
 ## Non-Goals
 

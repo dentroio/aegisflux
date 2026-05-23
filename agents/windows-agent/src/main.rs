@@ -131,7 +131,7 @@ fn run_one_cycle(config: &AgentConfig, args: &Args, use_lifecycle: bool) -> Resu
 
     if let Some(backend_url) = &config.backend_url {
         let transport = HttpVisibilityTransport::new(backend_url)?;
-        transport.post_events(&events)?;
+        transport.post_events_chunked(&events, config.visibility_post_chunk_size)?;
     }
 
     Ok(())

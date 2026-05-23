@@ -130,6 +130,20 @@ The first implementation should stay observe-only. The UI can show the draft, bu
 - Add packaged installers, upgrade channels, fleet management, and tenant isolation.
 - Add compliance reporting that proves why a control exists and when it last matched real behavior.
 
+### Next Leap: AI-Native Security Operating Loop
+
+After operational readiness, AegisFlux should add a governed deep-agent layer rather than isolated AI features. See [AegisFlux AI-Native Leap Architecture](AEGIS_AI_NATIVE_LEAP_ARCHITECTURE.md).
+
+- Add an AI agent harness with typed tools, run audit, privacy controls, and approval gates.
+- Require evidence-bound reasoning for agent conclusions: evidence refs, confidence, assumptions, missing evidence, and safety boundary.
+- Add Endpoint Analyst as the first deep agent for device/finding investigation.
+- Add research and detection-authoring agents that turn ecosystem/fleet signals into scored detection opportunities.
+- Add candidate simulation before detection-pack approval.
+- Add Control Design Copilot for observe-only proposals, blast radius, rollback, and approval packets.
+- Add fleet AI capability drift radar for new, risky, widespread, stale, and low-confidence capability changes.
+- Add governance memory and decision ledger so AI recommendations and operator decisions are durable.
+- Add enforcement readiness scorecards that explain missing prerequisites without enabling blocking behavior.
+
 ## Demo Narrative
 
 The strongest demo path is:

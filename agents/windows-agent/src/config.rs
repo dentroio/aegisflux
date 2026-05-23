@@ -30,6 +30,10 @@ pub struct AgentConfig {
     pub detection_pack_cache: Option<PathBuf>,
     /// Ed25519 verifying key (32 raw bytes) for `detection_pack.v1` signatures, standard base64.
     pub detection_pack_public_key: Option<[u8; 32]>,
+    /// Maximum process snapshot records emitted per cycle.
+    pub process_snapshot_limit: usize,
+    /// Maximum visibility events per HTTP POST body.
+    pub visibility_post_chunk_size: usize,
 }
 
 impl AgentConfig {
@@ -68,6 +72,8 @@ impl AgentConfig {
                     .to_string(),
             );
         }
+        let process_snapshot_limit = env_usize("AEGIS_PROCESS_SNAPSHOT_LIMIT", 256)?;
+        let visibility_post_chunk_size = env_usize("AEGIS_VISIBILITY_POST_CHUNK_SIZE", 500)?;
 
         require_safe_identifier("AEGIS_AGENT_ID", &agent_id)?;
         require_safe_identifier("AEGIS_DEVICE_ID", &device_id)?;
@@ -84,7 +90,25 @@ impl AgentConfig {
             detection_packs_enabled,
             detection_pack_cache,
             detection_pack_public_key,
+            process_snapshot_limit,
+            visibility_post_chunk_size,
         })
+    }
+}
+
+fn env_usize(name: &str, default: usize) -> Result<usize, String> {
+    match env::var(name) {
+        Ok(value) => value
+            .parse::<usize>()
+            .map_err(|_| format!("{name} must be a positive integer"))
+            .and_then(|parsed| {
+                if parsed == 0 {
+                    Err(format!("{name} must be greater than zero"))
+                } else {
+                    Ok(parsed)
+                }
+            }),
+        Err(_) => Ok(default),
     }
 }
 

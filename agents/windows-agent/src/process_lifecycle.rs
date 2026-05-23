@@ -276,6 +276,8 @@ mod tests {
             detection_packs_enabled: false,
             detection_pack_cache: None,
             detection_pack_public_key: None,
+            process_snapshot_limit: 256,
+            visibility_post_chunk_size: 500,
         }
     }
 

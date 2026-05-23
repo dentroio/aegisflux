@@ -14,6 +14,7 @@ func (s *Server) registerPlatformRoutes() {
 
 	px("/platform/ai/privacy", s.handlePlatformAIPrivacy)
 	px("/platform/ai/runs", s.handlePlatformAIRuns)
+	px("/platform/ai/agent-harness/", s.handleAgentHarness)
 	px("/platform/ai/endpoint-evidence-analyst", s.handleEndpointEvidenceAnalyst)
 
 	px("/platform/operational-events", s.handlePlatformOperationalEvents)

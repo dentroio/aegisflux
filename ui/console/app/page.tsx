@@ -393,7 +393,7 @@ function AegisDashboardBody() {
       onLogout={handleLogout}
       aiHealthSummary={aiChip}
     >
-      <div className={`mx-auto max-w-[1500px] ${mainPanel === 'dashboard' ? 'px-5 py-6' : 'min-w-0 px-4 py-4'}`}>
+      <div className={`w-full max-w-[1500px] ${mainPanel === 'dashboard' ? 'px-5 py-6' : 'min-w-0 px-4 py-4'}`}>
         {mainPanel === 'dashboard' ? (
           <DashboardScanSurface
             data={data}
