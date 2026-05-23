@@ -1,10 +1,10 @@
 module aegisflux/agents/local-agent
 
-go 1.21
+go 1.24
 
 require (
 	github.com/cilium/ebpf v0.12.3
-	github.com/klauspost/compress v1.17.2
+	github.com/klauspost/compress v1.18.6
 	github.com/nats-io/nats.go v1.31.0
 )
 
