@@ -24,7 +24,7 @@
     "postcss": "^8.4.0",
     "lucide-react": "^0.292.0",
     "recharts": "^2.8.0",
-    "axios": "^1.6.0",
+    "axios": "^1.16.1",
     "react-hook-form": "^7.47.0",
     "react-query": "^3.39.0",
     "date-fns": "^2.30.0",
