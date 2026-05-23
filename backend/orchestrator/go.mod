@@ -1,10 +1,10 @@
 module aegisflux/backend/orchestrator
 
-go 1.21
+go 1.24
 
 require (
 	github.com/gorilla/mux v1.8.1
-	github.com/klauspost/compress v1.17.0
+	github.com/klauspost/compress v1.18.6
 	github.com/nats-io/nats.go v1.31.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 )
