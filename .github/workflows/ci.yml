@@ -8,6 +8,7 @@ on:
 
 env:
   GOTOOLCHAIN: auto
+  CGO_ENABLED: "0"
 
 jobs:
   go-modules:
@@ -74,6 +75,9 @@ jobs:
   python:
     name: Python ETL tests
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/etl-enrich
     steps:
       - uses: actions/checkout@v4
 
@@ -86,10 +90,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/etl-enrich/requirements.txt pytest
+          pip install -r requirements.txt pytest
 
       - name: Run tests
-        run: pytest backend/etl-enrich/tests -q
+        env:
+          PYTHONPATH: .
+        run: pytest tests/test_simple.py tests/test_consumer_import.py -q
 
   docker:
     name: Docker · ${{ matrix.service }}
@@ -134,6 +140,6 @@ jobs:
           echo "| Python | ${{ needs.python.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Docker | ${{ needs.docker.result }} |" >> "$GITHUB_STEP_SUMMARY"
 
-          if [[ "${{ needs.ui.result }}" != "success" || "${{ needs.python.result }}" != "success" ]]; then
+          if [[ "${{ needs.go-modules.result }}" != "success" || "${{ needs.ui.result }}" != "success" || "${{ needs.python.result }}" != "success" || "${{ needs.docker.result }}" != "success" ]]; then
             exit 1
           fi

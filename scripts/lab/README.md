@@ -149,6 +149,12 @@ AEGIS_TUNNEL_LAUNCHD_LABEL=net.aegis.windows-reverse-tunnel-04 \
 ./scripts/lab/install-macos-windows-tunnel-launchd.sh
 ```
 
+Known Windows lab hosts:
+
+| Agent UID | Hostname | IP address | Tunnel label |
+|-----------|----------|------------|--------------|
+| `windows-dev-agent-02` | `llewis-ws` | `192.168.12.100` | `net.aegis.windows-reverse-tunnel-02` |
+
 The launch agent label is:
 
 ```text

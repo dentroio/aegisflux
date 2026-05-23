@@ -127,7 +127,11 @@ func (s *sqliteVisibilityStore) rebuildDeviceIndex(ctx context.Context) error {
 	}
 
 	rows, err := s.db.QueryContext(ctx, `
-SELECT device_id, agent_id, source, tenant_id, sensor_version, event_type,
+SELECT device_id, agent_id,
+       COALESCE(json_extract(envelope_json, '$.source'), ''),
+       tenant_id,
+       COALESCE(json_extract(envelope_json, '$.sensor_version'), ''),
+       event_type,
        COALESCE(received_at_ms, timestamp_ms, 0), COALESCE(timestamp_ms, 0),
        COALESCE(json_extract(envelope_json, '$.sequence'), 0)
 FROM visibility_events

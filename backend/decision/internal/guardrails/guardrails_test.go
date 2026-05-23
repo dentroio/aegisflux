@@ -5,11 +5,22 @@ import (
 	"log/slog"
 	"os"
 	"testing"
+	"time"
 
 	"aegisflux/backend/decision/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func newTestGuardrails(t *testing.T, hour int) *Guardrails {
+	t.Helper()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+	guardrails := NewGuardrails(logger)
+	guardrails.now = func() time.Time {
+		return time.Date(2026, 1, 15, hour, 0, 0, 0, time.UTC)
+	}
+	return guardrails
+}
 
 func TestGuardrails_DecideStrategy(t *testing.T) {
 	tests := []struct {
@@ -28,13 +39,13 @@ func TestGuardrails_DecideStrategy(t *testing.T) {
 			hostLabels: []string{"web", "frontend"},
 			envVars:    map[string]string{},
 			expected: &StrategyDecision{
-				Strategy:     model.StrategyModeEnforce,
+				Strategy:     model.StrategyModeSuggest,
 				CanarySize:   0,
 				TTLSeconds:   3600,
-				Reasons:      []string{},
-				AppliedRules: []string{},
+				Reasons:      []string{"Canary size is 0 in enforce/canary mode - downgraded to suggest"},
+				AppliedRules: []string{"canary_size_zero"},
 			},
-			description: "Enforce strategy should be allowed without restrictions",
+			description: "Enforce without canary capacity downgrades to suggest",
 		},
 		{
 			name:       "maintenance_window_downgrade",
@@ -46,7 +57,7 @@ func TestGuardrails_DecideStrategy(t *testing.T) {
 			},
 			expected: &StrategyDecision{
 				Strategy:     model.StrategyModeCanary,
-				CanarySize:   0,
+				CanarySize:   3,
 				TTLSeconds:   3600,
 				Reasons:      []string{"Maintenance window is active - strategy downgraded for safety"},
 				AppliedRules: []string{"maintenance_window"},
@@ -81,9 +92,9 @@ func TestGuardrails_DecideStrategy(t *testing.T) {
 			},
 			expected: &StrategyDecision{
 				Strategy:     model.StrategyModeSuggest,
-				CanarySize:   10,
+				CanarySize:   0,
 				TTLSeconds:   3600,
-				Reasons:      []string{"Target has NEVER_BLOCK_LABELS ([production]) - strategy capped from enforce to canary", "Canary size is 0 in enforce mode - downgraded to suggest"},
+				Reasons:      []string{"Target has NEVER_BLOCK_LABELS ([production]) - strategy capped from enforce to canary", "Canary size is 0 in enforce/canary mode - downgraded to suggest"},
 				AppliedRules: []string{"never_block_labels", "canary_size_zero"},
 			},
 			description: "Should downgrade to suggest when canary size is 0",
@@ -164,12 +175,15 @@ func TestGuardrails_DecideStrategy(t *testing.T) {
 
 			logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 			guardrails := NewGuardrails(logger)
-			
-			// Mock current time for maintenance window test
-			if tt.name == "maintenance_window_downgrade" {
-				// Set time to 10 AM (within maintenance window 9-17)
-				// Note: This test will only work if run during 9-17 hours
-				// For a more robust test, we'd need to refactor the guardrails to accept a time provider
+			switch tt.name {
+			case "maintenance_window_downgrade", "multiple_rules_combined":
+				guardrails.now = func() time.Time {
+					return time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC)
+				}
+			default:
+				guardrails.now = func() time.Time {
+					return time.Date(2026, 1, 15, 3, 0, 0, 0, time.UTC)
+				}
 			}
 
 			result, err := guardrails.DecideStrategy(tt.desired, tt.numTargets, tt.hostLabels)
@@ -214,14 +228,11 @@ func TestGuardrails_parseStrategy(t *testing.T) {
 }
 
 func TestGuardrails_isMaintenanceWindowActive(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	guardrails := NewGuardrails(logger)
-
 	tests := []struct {
-		name           string
+		name              string
 		maintenanceWindow string
-		currentHour    int
-		expected       bool
+		currentHour       int
+		expected          bool
 	}{
 		{
 			name:           "within_same_day_window",
@@ -263,16 +274,13 @@ func TestGuardrails_isMaintenanceWindowActive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set environment variable
+			guardrails := newTestGuardrails(t, tt.currentHour)
 			if tt.maintenanceWindow != "" {
 				os.Setenv("DECISION_MAINTENANCE_WINDOW", tt.maintenanceWindow)
 			} else {
 				os.Unsetenv("DECISION_MAINTENANCE_WINDOW")
 			}
-
-			// Mock time
-			// Note: This test will only work if run during the specified hour
-			// For a more robust test, we'd need to refactor the guardrails to accept a time provider
+			t.Cleanup(func() { os.Unsetenv("DECISION_MAINTENANCE_WINDOW") })
 
 			result := guardrails.isMaintenanceWindowActive()
 			assert.Equal(t, tt.expected, result)
@@ -465,7 +473,7 @@ func TestGuardrails_GetStrategyRecommendation(t *testing.T) {
 			numTargets:     2,
 			hostLabels:     []string{"web"},
 			findingSeverity: "critical",
-			expected:       model.StrategyModeEnforce,
+			expected:       model.StrategyModeSuggest,
 		},
 		{
 			name:           "critical_finding_many_targets",
@@ -506,10 +514,8 @@ func TestGuardrails_GetStrategyRecommendation(t *testing.T) {
 }
 
 func TestGuardrails_GetGuardrailsStatus(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	guardrails := NewGuardrails(logger)
+	guardrails := newTestGuardrails(t, 10)
 
-	// Set some environment variables
 	os.Setenv("DECISION_MAINTENANCE_WINDOW", "9,17")
 	os.Setenv("DECISION_NEVER_BLOCK_LABELS", "production,database")
 	os.Setenv("DECISION_MAX_CANARY_HOSTS", "3")
@@ -520,10 +526,6 @@ func TestGuardrails_GetGuardrailsStatus(t *testing.T) {
 		os.Unsetenv("DECISION_MAX_CANARY_HOSTS")
 		os.Unsetenv("DECISION_DEFAULT_TTL_SECONDS")
 	}()
-
-	// Mock time to be within maintenance window
-	// Note: This test will only work if run during 10 AM
-	// For a more robust test, we'd need to refactor the guardrails to accept a time provider
 
 	status := guardrails.GetGuardrailsStatus()
 

@@ -16,6 +16,7 @@ import (
 type Guardrails struct {
 	logger *slog.Logger
 	config *config.ConfigSnapshot
+	now    func() time.Time
 }
 
 // NewGuardrails creates a new guardrails instance
@@ -23,7 +24,15 @@ func NewGuardrails(logger *slog.Logger) *Guardrails {
 	return &Guardrails{
 		logger: logger,
 		config: nil, // Will be set via UpdateConfig
+		now:    time.Now,
 	}
+}
+
+func (g *Guardrails) currentTime() time.Time {
+	if g.now != nil {
+		return g.now()
+	}
+	return time.Now()
 }
 
 // UpdateConfig updates the guardrails configuration
@@ -159,8 +168,7 @@ func (g *Guardrails) isMaintenanceWindowActive() bool {
 		return false
 	}
 
-	// Get current hour
-	currentHour := time.Now().Hour()
+	currentHour := g.currentTime().Hour()
 
 	// Check if current hour is within maintenance window
 	if startHour <= endHour {
